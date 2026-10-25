@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 
 inline std::vector<std::string> wrapTextPixels(
     const std::string& text, float maxWidth,

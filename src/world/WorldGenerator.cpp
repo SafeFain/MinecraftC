@@ -1,5 +1,6 @@
 #include "world/WorldGenerator.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/GenerationValidation.h"
 #include "world/VillageLayout.h"
 #include "world/BiomeBlockLogic.h"
 #include "Config.h"

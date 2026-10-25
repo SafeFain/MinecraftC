@@ -1,4 +1,5 @@
 #include "plugins/PluginManager.h"
+#include "plugins/ContentQueries.h"
 #include <algorithm>
 #include <cmath>
 

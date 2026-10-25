@@ -7,7 +7,7 @@
 #include "core/Window.h"
 #include "game/ClientSettings.h"
 #include "game/Command.h"
-#include "platform/Clipboard.h"
+#include "core/Clipboard.h"
 #include "player/Player.h"
 #include "ui/Menu.h"
 #include "debug/Log.h"

@@ -1,8 +1,8 @@
 #include "core/TextEditBuffer.h"
 
 #include "debug/Log.h"
-#include "game/Utf8.h"
-#include "platform/Clipboard.h"
+#include "core/Utf8.h"
+#include "core/Clipboard.h"
 
 #include <algorithm>
 

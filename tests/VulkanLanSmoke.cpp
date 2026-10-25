@@ -5,7 +5,7 @@
 #include "app/ApplicationInputController.h"
 #include "core/Window.h"
 #include "game/ClientSettings.h"
-#include "platform/Clipboard.h"
+#include "core/Clipboard.h"
 #include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
 #include <chrono>
 #include <fstream>

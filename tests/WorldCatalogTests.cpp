@@ -7,6 +7,8 @@
 #include <iostream>
 #include <fstream>
 #include "entity/EntityLogic.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 
 namespace {
 void require(bool condition, const char* message) {
@@ -27,21 +29,21 @@ std::map<std::string,std::string> snapshotRecoveryFiles(const std::filesystem::p
     return result;
 }
 void runRecoveryTests(const std::filesystem::path& root) {
-    const auto originalState=std::make_unique<Plugins::ContentState>(Plugins::content());
-    Plugins::content().frozen=false;
+    const auto originalState=std::make_unique<Plugins::ContentState>(Plugins::mutableContentState());
+    Plugins::mutableContentState().frozen=false;
     Plugins::BlockContent block;block.key="recovery:block";block.name="Recovery block";
     const auto blockId=Plugins::registerBlock(block);
     Plugins::ItemContent item;item.key="recovery:item";item.properties.maxStack=64;
     const auto itemId=Plugins::registerItem(item);
     Plugins::EntityContent definition;definition.id=4096;definition.key="recovery:mob";definition.stateVersion=1;
-    Plugins::content().extensions.entities.emplace(definition.id,definition);
+    Plugins::mutableContentState().extensions.entities.emplace(definition.id,definition);
     Plugins::GeneratorContent generator;generator.key="recovery:terrain";generator.revision="1";generator.dimension=0;
-    Plugins::content().extensions.generators.emplace(generator.key,generator);
+    Plugins::mutableContentState().extensions.generators.emplace(generator.key,generator);
     Plugins::ModifierContent modifier;modifier.key="recovery:modifier";modifier.revision="1";modifier.dimension=0;
-    Plugins::content().extensions.modifiers.emplace(modifier.key,modifier);
-    Plugins::LootContent loot;loot.key="recovery:loot";loot.revision="1";Plugins::content().extensions.loot.emplace(loot.key,loot);
-    Plugins::StructureContent structure;structure.key="recovery:structure";structure.revision="1";Plugins::content().extensions.structures.emplace(structure.key,structure);
-    Plugins::content().requirements={{"recovery","1.0:old-hash"},{"removed","1.0:removed"}};
+    Plugins::mutableContentState().extensions.modifiers.emplace(modifier.key,modifier);
+    Plugins::LootContent loot;loot.key="recovery:loot";loot.revision="1";Plugins::mutableContentState().extensions.loot.emplace(loot.key,loot);
+    Plugins::StructureContent structure;structure.key="recovery:structure";structure.revision="1";Plugins::mutableContentState().extensions.structures.emplace(structure.key,structure);
+    Plugins::mutableContentState().requirements={{"recovery","1.0:old-hash"},{"removed","1.0:removed"}};
     WorldCatalog catalog(root);
     const auto id=catalog.create("Recovery",123,GameMode::Creative,Difficulty::Normal);
     SaveStore store(root/id);auto metadata=store.loadMetadata();
@@ -69,21 +71,21 @@ void runRecoveryTests(const std::filesystem::path& root) {
     std::filesystem::create_directories(root/id/"dimensions/heaven/private/chunks");{std::ofstream f(root/id/"dimensions/heaven/private/chunks/plugin.bin");f<<"private non-partition";}
     const auto before=snapshotRecoveryFiles(root/id);
     require(store.inspectCompatibility().compatible(),"unchanged gameplay set is compatible");
-    Plugins::content().requirements[0].second="1.0:hash-only-change";
+    Plugins::mutableContentState().requirements[0].second="1.0:hash-only-change";
     const auto fingerprintOnly=store.inspectCompatibility();
     require(fingerprintOnly.recoverable()&&std::any_of(fingerprintOnly.issues.begin(),fingerprintOnly.issues.end(),[](const auto& issue){return issue.kind=="changed_plugin"&&issue.saved=="1.0:old-hash"&&issue.current=="1.0:hash-only-change";}),"same-version fingerprint differences are reported in full");
-    Plugins::content().extensions.entities.at(4096).stateVersion=2;
+    Plugins::mutableContentState().extensions.entities.at(4096).stateVersion=2;
     const auto changedEntity=store.inspectCompatibility();
     require(std::any_of(changedEntity.issues.begin(),changedEntity.issues.end(),[](const auto& issue){return issue.kind=="entity_revision";}),"entity state change is visible");
-    Plugins::content().extensions.generators.at("recovery:terrain").revision="2";
-    Plugins::content().extensions.modifiers.erase("recovery:modifier");
-    Plugins::content().extensions.loot.erase("recovery:loot");Plugins::content().extensions.structures.at("recovery:structure").revision="2";
-    Plugins::content().blocks.erase(static_cast<uint16_t>(blockId));Plugins::content().items.erase(static_cast<uint16_t>(itemId));
-    Plugins::content().extensions.entities.erase(4096);Plugins::content().extensions.dimensions.erase(1);
+    Plugins::mutableContentState().extensions.generators.at("recovery:terrain").revision="2";
+    Plugins::mutableContentState().extensions.modifiers.erase("recovery:modifier");
+    Plugins::mutableContentState().extensions.loot.erase("recovery:loot");Plugins::mutableContentState().extensions.structures.at("recovery:structure").revision="2";
+    Plugins::mutableContentState().blocks.erase(static_cast<uint16_t>(blockId));Plugins::mutableContentState().items.erase(static_cast<uint16_t>(itemId));
+    Plugins::mutableContentState().extensions.entities.erase(4096);Plugins::mutableContentState().extensions.dimensions.erase(1);
     const auto reservedBlock=static_cast<uint16_t>(BlockId::SUNSTONE),reservedItem=static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER);
-    Plugins::content().blocks.erase(reservedBlock);Plugins::content().validBlocks[reservedBlock]=0;
-    Plugins::content().items.erase(reservedItem);Plugins::content().validItems[reservedItem]=0;
-    Plugins::content().requirements={{"recovery","2.0:new-hash"},{"extra","1.0:extra"}};
+    Plugins::mutableContentState().blocks.erase(reservedBlock);Plugins::mutableContentState().validBlocks[reservedBlock]=0;
+    Plugins::mutableContentState().items.erase(reservedItem);Plugins::mutableContentState().validItems[reservedItem]=0;
+    Plugins::mutableContentState().requirements={{"recovery","2.0:new-hash"},{"extra","1.0:extra"}};
     const auto report=store.inspectCompatibility();
     if(!report.recoverable())std::cerr<<"Recovery blocked: "<<report.blocker<<std::endl;
     require(report.recoverable(),"missing plugin content is recoverable");
@@ -201,19 +203,19 @@ void runRecoveryTests(const std::filesystem::path& root) {
     require(!store.inspectCompatibility().blocker.empty(),"corrupt durable partition remains blocked");
     require(catalog.deleteWorld(id),"recovered world can be explicitly deleted");
     require(catalog.list().empty(),"completed backups never resurrect an explicitly deleted world");
-    Plugins::content()=*originalState;
-    const auto heaven=Plugins::content().extensions.dimensions.at(1);
-    Plugins::content().extensions.dimensions.erase(1);
+    Plugins::mutableContentState()=*originalState;
+    const auto heaven=Plugins::mutableContentState().extensions.dimensions.at(1);
+    Plugins::mutableContentState().extensions.dimensions.erase(1);
     Plugins::GeneratorContent lost;lost.key="lost:terrain";lost.revision="1";lost.dimension=0;
-    Plugins::content().extensions.generators.emplace(lost.key,lost);Plugins::content().requirements.push_back({"lost","1.0:old"});
+    Plugins::mutableContentState().extensions.generators.emplace(lost.key,lost);Plugins::mutableContentState().requirements.push_back({"lost","1.0:old"});
     const auto fallbackId=catalog.create("Fallback",9,GameMode::Creative,Difficulty::Normal,false,WorldType::Normal,{{0,{lost.key,lost.revision,"{}",{}}}});
-    Plugins::content().extensions.dimensions.emplace(1,heaven);Plugins::content().extensions.generators.erase(lost.key);Plugins::content().requirements=originalState->requirements;
+    Plugins::mutableContentState().extensions.dimensions.emplace(1,heaven);Plugins::mutableContentState().extensions.generators.erase(lost.key);Plugins::mutableContentState().requirements=originalState->requirements;
     SaveStore fallback(root/fallbackId);const auto fallbackReport=fallback.inspectCompatibility();
     require(fallbackReport.recoverable()&&std::any_of(fallbackReport.issues.begin(),fallbackReport.issues.end(),[](const auto& issue){return issue.kind=="extra_dimension";}),"newly installed dimension is reported");
     WorldRecovery fallbackRecovery(root/fallbackId,fallbackReport.token);
     for(int n=0;!fallbackRecovery.done()&&n<100;++n)fallbackRecovery.step();
     require(fallbackRecovery.succeeded()&&fallback.loadMetadata().generation.at(0).generator.empty()&&fallback.loadMetadata().generation.at(1)==heaven.generation,"missing generator falls back and added dimension gets current defaults");
-    Plugins::content()=*originalState;
+    Plugins::mutableContentState()=*originalState;
 }
 }
 

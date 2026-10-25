@@ -2,6 +2,8 @@
 #include "world/StructureGenerator.h"
 #include "reference/heaven_v9/FrozenHeavenV9.h"
 #include "reference/heaven_v9/FrozenLoot.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 
 namespace GenerationPolicyV2Integration {
 struct HeavenStructureReference {
@@ -16,7 +18,7 @@ inline void heavenReference(const std::filesystem::path& root){
     for(uint64_t seed:{12ULL,123ULL,999ULL}){
         WorldGenerator native(seed,WorldType::Normal,DimensionId::Heaven);
         FrozenHeavenReference::FrozenHeavenV9 frozen(native.getSeed());
-        auto& dimension=Plugins::content().extensions.dimensions.at(1);
+        auto& dimension=Plugins::mutableContentState().extensions.dimensions.at(1);
         dimension.spawnUserdata=&native;
         dimension.sampleSpawn=[](const MC_GenerationContext* c,double* p,void* u)->int32_t {
             const auto& g=*static_cast<WorldGenerator*>(u);if(c->seed!=g.getSeed())return -1;
@@ -82,7 +84,7 @@ inline void heavenReference(const std::filesystem::path& root){
             else {entry(ItemId::CLOUDSTONE,2,6,100);entry(ItemId::SUNSTONE,1,4,70);entry(ItemId::STAR_CRYSTAL,1,2,35);entry(ItemId::CLOUD_BLOOM,1,3,45);}
             entry(ItemId::STAR_CRYSTAL_SHARD,2,5,85);entry(ItemId::CLOUDBERRY,2,4,70);
             entry(index==2?ItemId::SUNSTONE_BRICKS:index==3?ItemId::MOONSTONE_BRICKS:ItemId::CLOUDSTONE_BRICKS,3,8,80);
-            Plugins::content().extensions.loot[table.key]=table;
+            Plugins::mutableContentState().extensions.loot[table.key]=table;
             Plugins::StructureContent s;s.key="worldgen_policy_v2:reference_"+std::to_string(index);keys.push_back(s.key);s.name=s.key;s.revision="9";s.dimension=1;s.cell=16;s.radius=9;s.minY=-88;s.maxY=90;s.userdata=&ref;s.namespaces={"minecraftc","worldgen_policy_v2"};s.order=1000;
             s.placements=[](const MC_StructureContext* c,int32_t x,int32_t z,MC_StructureInstance* out,uint32_t,uint32_t* count,void* u)->int32_t{
                 const auto& r=*static_cast<HeavenStructureReference*>(u);if(c->generation.seed!=r.generator->getSeed())return -1;
@@ -91,7 +93,7 @@ inline void heavenReference(const std::filesystem::path& root){
             s.buildV2=[](const MC_StructureContext*,MC_StructureBlockV2* out,uint32_t cap,uint32_t* count,void* u)->int32_t{
                 const auto& r=*static_cast<HeavenStructureReference*>(u);if(cap<r.blocks.size())return -1;*count=uint32_t(r.blocks.size());std::copy(r.blocks.begin(),r.blocks.end(),out);return 0;
             };
-            Plugins::content().extensions.structures.emplace(s.key,s);
+            Plugins::mutableContentState().extensions.structures.emplace(s.key,s);
             const auto located=native.locatePluginStructure(s.key,ax-3,az-2,16);check(located&&located->anchor[0]==ax&&located->anchor[1]==ay&&located->anchor[2]==az&&located->variant==ref.instance.variant,"native Heaven locate/variant equivalence");
             std::vector<std::unique_ptr<Chunk>> adapted;std::vector<Chunk*> region;for(const auto& a:original){adapted.push_back(std::make_unique<Chunk>(a->cx,a->cz));region.push_back(adapted.back().get());}
             std::reverse(region.begin(),region.end());std::vector<RegionGenerationData::PendingBlock> pending;native.generateRegion(cx-1,cz-1,3,6,region,pending);
@@ -111,9 +113,9 @@ inline void heavenReference(const std::filesystem::path& root){
                 }
             }
             check(checkedChest,"reference chest compared");
-            Plugins::content().extensions.structures.erase(s.key);
+            Plugins::mutableContentState().extensions.structures.erase(s.key);
         }
-        for(const auto& r:refs)Plugins::content().extensions.loot.erase(r->loot);
+        for(const auto& r:refs)Plugins::mutableContentState().extensions.loot.erase(r->loot);
     }
 }
 }

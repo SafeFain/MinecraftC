@@ -1,7 +1,7 @@
 #include "app/GameSession.h"
 #include "network/EntityProtocol.h"
 #include "debug/Log.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "world/WorldGenContext.h"
 #include <algorithm>
 #include <cmath>

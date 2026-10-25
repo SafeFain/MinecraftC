@@ -1,5 +1,7 @@
 #pragma once
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include <stdexcept>
 
 namespace PluginSessionIntegration {
@@ -46,7 +48,7 @@ inline int run(const std::filesystem::path& assets) {
         check(session.worldState().getBlock(placement.x,placement.y,placement.z)==block,"modded world edit reloads");
         drainGeneration(session);session.leaveWorld();
         const auto saved=readBytesForPluginTest(worldPath/"level.bin");
-        auto requirements=Plugins::content().requirements;Plugins::content().requirements.clear();bool refused=false;
+        auto requirements=Plugins::mutableContentState().requirements;Plugins::mutableContentState().requirements.clear();bool refused=false;
         try{session.startWorld(id,false,clock.now());}catch(const std::exception&){refused=true;}
         check(refused&&readBytesForPluginTest(worldPath/"level.bin")==saved,"missing plugin refuses session without rewrite");
         const auto report=SaveStore(worldPath).inspectCompatibility();
@@ -62,7 +64,7 @@ inline int run(const std::filesystem::path& assets) {
         check(recoveredReady&&!std::filesystem::exists(worldPath/SaveStore::RECOVERY_SPAWN_MARKER),"recovered landing validated before play and marker cleared");
         check(session.hasWorldStore()&&session.inventory().slot(0).id==item,"recovered world enters the ordinary strict session pipeline");
         drainGeneration(session);session.leaveWorld();
-        Plugins::content().requirements=std::move(requirements);
+        Plugins::mutableContentState().requirements=std::move(requirements);
     }
     plugins.shutdown();Config::RENDER_DISTANCE=distance;std::filesystem::remove_all(root);
     std::cout<<"Plugin game session integration passed\n";return 0;

@@ -1,4 +1,5 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/ContentMutation.h"
 #include <fstream>
 #include "renderer/BlockAtlasData.h"
 
@@ -70,7 +71,7 @@ void preserveLeafCutoutCoverage(std::vector<uint8_t>& mip,
     for (auto texture : {BlockTexture::Leaves, BlockTexture::BirchLeaves,
             BlockTexture::SpruceLeaves, BlockTexture::JungleLeaves, BlockTexture::AcaciaLeaves})
         leaves.push_back(getAtlasTextureIndex(texture));
-    for (const auto& entry : Plugins::content().extensions.blockBehaviors)
+    for (const auto& entry : Plugins::mutableContentState().extensions.blockBehaviors)
         if (entry.second.tags & MC_TAG_LEAVES)
             for (int face = 0; face < 6; ++face)
                 leaves.push_back(getFaceTextureIndex(static_cast<BlockId>(entry.first), static_cast<FaceDir>(face)));
@@ -180,7 +181,7 @@ uint8_t roughnessForTexture(BlockTexture texture) {
 }
 
 uint8_t materialRoughness(size_t slot) {
-    for (const auto& entry : Plugins::content().extensions.blockBehaviors)
+    for (const auto& entry : Plugins::mutableContentState().extensions.blockBehaviors)
         if (entry.second.tags & MC_TAG_LEAVES)
             for (int face = 0; face < 6; ++face)
                 if (getFaceTextureIndex(static_cast<BlockId>(entry.first), static_cast<FaceDir>(face)) == slot)
@@ -416,7 +417,7 @@ BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot) {
 
 namespace {
 void appendPluginMaterials(BlockAtlasData& atlas) {
-    auto& registry=Plugins::content();
+    auto& registry=Plugins::mutableContentState();
     if(registry.materials.empty()&&registry.blocks.empty()&&registry.items.empty())return;
     const uint32_t oldSide=atlas.tilesPerSide,oldCapacity=oldSide*oldSide;
     std::map<std::string,uint16_t> indices;
@@ -539,7 +540,7 @@ VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
         colors[t] = weight > 0.0f ? sum / weight : glm::vec3(0.0f);
     }
     VoxelGiMaterialTable result{};
-    if(!Plugins::content().blocks.empty()) result.resize(Plugins::content().blocks.rbegin()->first+1u);
+    if(!Plugins::mutableContentState().blocks.empty()) result.resize(Plugins::mutableContentState().blocks.rbegin()->first+1u);
     for (size_t b = 1; b < result.size(); ++b) {
         const auto id = static_cast<BlockId>(b);
         if(!isValidBlockId(id)) continue;
@@ -560,7 +561,7 @@ VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
 void appendPluginItemIcons(TextureData& atlas,std::unordered_map<std::string,int>& indices,int columns,int& rows) {
     if(columns<=0||rows<=0||atlas.width!=uint32_t(columns*16)||atlas.height!=uint32_t(rows*16))throw std::runtime_error("Invalid item atlas dimensions");
     int next=columns*rows;
-    for(const auto& entry:Plugins::content().items) {
+    for(const auto& entry:Plugins::mutableContentState().items) {
         const auto& item=entry.second;if(item.icon.empty())continue;
         const auto legacy=indices.find(item.command);const int slot=legacy==indices.end()?next++:legacy->second;
         if(slot<0||slot>=256*256||columns>256||slot/columns>=256)throw std::runtime_error("Item icon atlas capacity exceeded");

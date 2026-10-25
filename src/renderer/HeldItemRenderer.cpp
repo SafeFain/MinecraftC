@@ -1,4 +1,4 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "renderer/HeldItemRenderer.h"
 #include "renderer/BlockAtlasData.h"
 #include "model/ModelAnimation.h"

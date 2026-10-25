@@ -1,7 +1,7 @@
 #include "game/Localization.h"
 #include "core/AssetStore.h"
 #include "game/ArabicShaper.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 
 #include <algorithm>
 #include <cctype>

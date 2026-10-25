@@ -3,6 +3,7 @@
 #include "core/Window.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "world/ChunkMesh.h"
+#include "world/ChunkMeshBuilder.h"
 #include "world/WorldGenerator.h"
 
 #include <glm/gtc/matrix_transform.hpp>

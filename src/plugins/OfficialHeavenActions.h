@@ -1,6 +1,6 @@
 #pragma once
 #include "plugins/HeavenSkywayPolicy.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include <limits>
 namespace Plugins {
 inline int32_t skywayTargetPolicy(const MC_ActionViewV2* v,MC_ActionTargetV2* out){

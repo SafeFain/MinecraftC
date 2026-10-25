@@ -1,4 +1,4 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "plugins/Runtime.h"
 #include "app/GameSession.h"
 #include "game/DimensionRules.h"

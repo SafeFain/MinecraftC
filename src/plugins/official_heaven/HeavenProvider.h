@@ -1,6 +1,7 @@
 #pragma once
 #include "plugins/official_heaven/HeavenGenerator.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 
 namespace OfficialHeaven {
 HeavenGenerator& generator(uint64_t derivedSeed);
@@ -9,7 +10,7 @@ MC_GeneratorDefinitionV3 generatorDefinitionV3();
 std::vector<MC_StructureDefinitionV2> structureDefinitions();
 int32_t sampleSpawn(const MC_GenerationContext*,double*,void*);
 inline void installStructureAliases() {
-    auto& aliases=Plugins::content().extensions.legacyStructureAliases;
+    auto& aliases=Plugins::mutableContentState().extensions.legacyStructureAliases;
     aliases.emplace(uint32_t(StructureType::XiguangRuin),"official_heaven:ruin");
     aliases.emplace(uint32_t(StructureType::StarCrystalGeode),"official_heaven:geode");
     aliases.emplace(uint32_t(StructureType::CloudspireTower),"official_heaven:spire");
@@ -39,22 +40,22 @@ void describeGeneration(Generator addGenerator,Structure addStructure,Loot addLo
 // Standalone regression fixtures use the same descriptors without a loader.
 inline void installGenerationFixture() {
     installStructureAliases();
-    auto& d=Plugins::content().extensions.dimensions.at(1);
+    auto& d=Plugins::mutableContentState().extensions.dimensions.at(1);
     d.seedDomain=HeavenGenerator::SEED_DOMAIN;d.generation={"official_heaven:heaven","9","{}",{}};
     d.spawn=MC_SPAWN_SAMPLED;d.sampleSpawn=sampleSpawn;
     describeGeneration([](const MC_GeneratorDefinitionV3& definition) {
         const auto& d=definition.base;
         Plugins::GeneratorContent g;g.key=d.base.key;g.name=d.base.name;g.revision=d.base.revision;g.dimension=d.base.dimension;
         g.column=d.base.column;g.voxel=d.base.voxel;g.batch=d.batch;g.terrainLod=d.terrain_lod;g.decorationLod=d.decoration_lod;g.lodRevision=d.lod_revision;
-        g.layers=definition.layers;Plugins::content().extensions.generators.emplace(g.key,g);
+        g.layers=definition.layers;Plugins::mutableContentState().extensions.generators.emplace(g.key,g);
     },[](const MC_StructureDefinitionV2& d) {
         Plugins::StructureContent s;s.key=d.key;s.name=d.name;s.revision=d.revision;s.dimension=d.dimension;
         s.omitCoarseLod=true;s.cell=d.cell_size;s.radius=d.radius;s.minY=d.min_y;s.maxY=d.max_y;s.order=d.order;s.placements=d.placements;s.buildV2=d.build;s.userdata=d.userdata;s.namespaces={"minecraftc","official_heaven"};
-        Plugins::content().extensions.structures.emplace(s.key,s);
+        Plugins::mutableContentState().extensions.structures.emplace(s.key,s);
     },[](const MC_LootTable& d) {
         Plugins::LootContent l;l.key=d.key;l.revision=d.revision;
         for(uint32_t i=0;i<d.count;++i){const auto& e=d.entries[i];l.entries.push_back({e.item,e.minimum,e.maximum,e.chance});}
-        Plugins::content().extensions.loot.emplace(l.key,l);
+        Plugins::mutableContentState().extensions.loot.emplace(l.key,l);
     });
 }
 }

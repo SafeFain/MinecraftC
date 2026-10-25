@@ -12,6 +12,7 @@
 #include "renderer/Shadow.h"
 #include "renderer/VisualQuality.h"
 #include "player/PlayerVisual.h"
+#include "world/ChunkMeshBuilder.h"
 
 #include <algorithm>
 #include <array>

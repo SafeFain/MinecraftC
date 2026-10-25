@@ -1,5 +1,5 @@
 #include "world/LodTerrainSystem.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 
 #include "Config.h"
 #include "core/Platform.h"
@@ -9,6 +9,7 @@
 #include "threading/ThreadPool.h"
 #include "world/BiomeMap.h"
 #include "world/Chunk.h"
+#include "world/ChunkMeshBuilder.h"
 #include "world/SurfaceRules.h"
 #include "world/WorldGenerator.h"
 

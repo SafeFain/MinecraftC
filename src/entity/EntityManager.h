@@ -16,7 +16,7 @@
 #include <glm/glm.hpp>
 
 #include "game/Item.h"
-#include "game/SaveStore.h"
+#include "entity/EntityRecord.h"
 #include "entity/EntityLogic.h"
 #include "entity/EntityModelRegistry.h"
 #include "game/CombatRules.h"
@@ -29,6 +29,7 @@ class Player;
 class IGameRenderer;
 class World;
 class Chunk;
+class SaveStore;
 
 struct EntityAiStats {
     size_t decisions = 0;
@@ -159,8 +160,8 @@ public:
     const std::vector<DeadEntityRender>& deadEntityRenders() const {
         return m_deadEntityRenders;
     }
-    std::vector<WorldMetadata::PersistedEntity> saveEntities() const;
-    void loadEntities(const std::vector<WorldMetadata::PersistedEntity>& entities);
+    std::vector<EntityRecord> saveEntities() const;
+    void loadEntities(const std::vector<EntityRecord>& entities);
     bool hasHostileNear(const glm::dvec3& position, float radius) const;
     std::optional<uint64_t> useRay(const glm::dvec3& origin,
                                    const glm::vec3& direction,

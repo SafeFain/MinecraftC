@@ -1,9 +1,13 @@
 #pragma once
-#include "plugins/ContentRegistry.h"
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
+#include <array>
+#include <map>
 #include <memory>
+#include <vector>
+
+#include "minecraftc/extensions.h"
 
 namespace vkp {
 struct PluginSceneSubmission {

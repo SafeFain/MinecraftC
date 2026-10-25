@@ -2,6 +2,7 @@
 #include "plugins/official_heaven/HeavenGenerator.h"
 #include "reference/heaven_v9/FrozenHeavenV9.h"
 #include "reference/heaven_v9/FrozenHeavenLod.h"
+#include "world/ChunkMeshBuilder.h"
 #include <future>
 
 inline void testHeavenMigration() {

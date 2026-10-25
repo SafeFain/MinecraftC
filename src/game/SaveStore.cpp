@@ -1,4 +1,5 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/GenerationValidation.h"
 #include "plugins/Json.h"
 #include "game/SaveStore.h"
 #include "Config.h"

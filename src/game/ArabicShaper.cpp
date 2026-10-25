@@ -1,6 +1,6 @@
 #include "game/ArabicShaper.h"
 
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 
 #include <cstdint>
 #include <optional>

@@ -1,5 +1,6 @@
 #pragma once
 #include "renderer/NetherEnvironment.h"
+#include "world/ChunkMeshBuilder.h"
 #include "world/LodTerrainSystem.h"
 #include <set>
 

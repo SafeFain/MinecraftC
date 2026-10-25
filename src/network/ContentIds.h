@@ -1,6 +1,6 @@
 #pragma once
 #include "network/Protocol.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include <algorithm>
 
 namespace Lan {

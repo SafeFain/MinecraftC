@@ -1,6 +1,7 @@
 #include "core/Window.h"
 #include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
 #include "world/ChunkMesh.h"
+#include "world/ChunkMeshBuilder.h"
 
 #include <fstream>
 #include <iomanip>

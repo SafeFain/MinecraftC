@@ -1,5 +1,8 @@
 #pragma once
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/GenerationValidation.h"
 #include "network/EntityProtocol.h"
 #include "network/StateProtocol.h"
 #include "world/LodTerrainSystem.h"
@@ -22,7 +25,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     AssetStore rootedAssets(assets);
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
     auto check=[](bool value,const char* reason){if(!value)throw std::runtime_error(reason);};
-    check(Plugins::content().runtimeFault.empty(),"extension initialization fault");
+    check(Plugins::mutableContentState().runtimeFault.empty(),"extension initialization fault");
     for(const auto& info:plugins.plugins())if(info.enabled)check(info.active,"example package rejected");
     EntityModelRegistry models;models.loadAll(assets);
     check(!models.definition(static_cast<EntityType>(Plugins::resolveEntity("model_data:custom"))).usesPlaceholder,"package model/animation loads with rooted Title Storage active");
@@ -60,7 +63,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     check(!store.loadGeneratedChunk(-1,-1,generator.chunkCacheVersion(),Plugins::generationFingerprint(config)+1),"generation cache identity mismatch rejected");
     check(store.loadMetadata().generation[0]==config,"generation metadata roundtrip");
     // Simulate a changed local runtime allocation while preserving stable content identity.
-    auto definition=*Plugins::entityContent(type);Plugins::content().extensions.entities.erase(type);definition.id=5000;Plugins::content().extensions.entities.emplace(5000,definition);
+    auto definition=*Plugins::entityContent(type);Plugins::mutableContentState().extensions.entities.erase(type);definition.id=5000;Plugins::mutableContentState().extensions.entities.emplace(5000,definition);
     const auto loaded=store.loadMetadata();check(loaded.entities.front().type==5000&&loaded.entities.front().pluginState==persisted.pluginState,"entity stable key/state survives runtime remap");
     EntitySnapshot snapshot;snapshot.id=1;snapshot.type=static_cast<EntityType>(5000);snapshot.health=30;snapshot.pluginStateVersion=1;snapshot.pluginState=persisted.pluginState;
     Lan::EntityBatch batch;batch.entities.push_back(snapshot);const auto decoded=Lan::decodeEntityBatch(Lan::encodeEntityBatch(batch));check(decoded.entities[0].type==snapshot.type&&decoded.entities[0].pluginState==persisted.pluginState,"LAN entity state roundtrip");
@@ -77,14 +80,14 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     const auto saved=entities.saveEntities();entities.clear();entities.loadEntities(saved);check(entities.entities().front().type==static_cast<EntityType>(5000),"entity manager save/load");
     MC_EntityIntent intent{};intent.size=sizeof(intent);intent.attack_player=UINT64_MAX;intent.state="{\"test\":1}";check(entities.pluginIntent(entities.entities().front().id,intent),"validated entity intent state");
     check(entities.saveEntities().front().pluginState==intent.state,"entity instance state persisted");
-    Plugins::content().extensions.entities.erase(5000);bool refused=false;try{store.loadMetadata();}catch(...){refused=true;}check(refused,"missing entity type refuses load");
-    auto original=Plugins::content().extensions.generators.at(config.generator);Plugins::content().extensions.generators.erase(config.generator);refused=false;try{WorldGenerator invalid(12,WorldType::Normal,DimensionId::Overworld,config);}catch(...){refused=true;}check(refused,"missing generator refuses construction");Plugins::content().extensions.generators.emplace(original.key,original);
-    auto& faulty=Plugins::content().extensions.generators.at(config.generator);
+    Plugins::mutableContentState().extensions.entities.erase(5000);bool refused=false;try{store.loadMetadata();}catch(...){refused=true;}check(refused,"missing entity type refuses load");
+    auto original=Plugins::mutableContentState().extensions.generators.at(config.generator);Plugins::mutableContentState().extensions.generators.erase(config.generator);refused=false;try{WorldGenerator invalid(12,WorldType::Normal,DimensionId::Overworld,config);}catch(...){refused=true;}check(refused,"missing generator refuses construction");Plugins::mutableContentState().extensions.generators.emplace(original.key,original);
+    auto& faulty=Plugins::mutableContentState().extensions.generators.at(config.generator);
     faulty.column=[](const MC_GenerationContext*,int32_t,int32_t,MC_SurfaceSample*,void*)->int32_t{return -1;};
     WorldGenerator broken(12,WorldType::Normal,DimensionId::Overworld,config);
     const auto failed=std::async(std::launch::async,[&]{try{Chunk chunk(0,0);broken.generate(chunk);}catch(...){return true;}return false;}).get();
-    check(failed&&Plugins::content().runtimeFault.empty(),"worker failure isolated from main content state");
-    plugins.pollFaults();check(!Plugins::content().runtimeFault.empty(),"worker generation failure reaches main-thread fault boundary");
+    check(failed&&Plugins::mutableContentState().runtimeFault.empty(),"worker failure isolated from main content state");
+    plugins.pollFaults();check(!Plugins::mutableContentState().runtimeFault.empty(),"worker generation failure reaches main-thread fault boundary");
     plugins.shutdown();std::filesystem::remove_all(root);std::cout<<"Plugin entity/worldgen extension integration passed\n";return 0;
 }
 }

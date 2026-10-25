@@ -1,5 +1,6 @@
 #include "plugins/official_heaven/HeavenDefinitions.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include <fstream>
 #include <nlohmann/json.hpp>
 
@@ -14,7 +15,7 @@ void loadDefinitions(const std::filesystem::path& package) {
     if(data.contains("aliases"))for(const auto& value:data.at("aliases").items()) {
         const auto target=value.value().get<std::string>();
         if(target.rfind("official_heaven:",0)!=0)throw std::runtime_error("Invalid official translation alias");
-        Plugins::content().extensions.translationAliases.emplace(value.key(),target);
+        Plugins::mutableContentState().extensions.translationAliases.emplace(value.key(),target);
     }
     for(const auto& value:data.at("blocks")) {
         const auto raw=value.at("id").get<uint16_t>();const auto id=BlockId(raw);
@@ -45,8 +46,8 @@ void loadDefinitions(const std::filesystem::path& package) {
         item.icon=package/icon;
         if(!std::filesystem::is_regular_file(item.icon))throw std::runtime_error("Missing official item icon");
         const auto nameKey="official_heaven:item."+item.command;
-        Plugins::content().extensions.nameKeys.emplace(item.key,nameKey);
-        Plugins::content().extensions.translationAliases.emplace("item."+std::to_string(raw),nameKey);
+        Plugins::mutableContentState().extensions.nameKeys.emplace(item.key,nameKey);
+        Plugins::mutableContentState().extensions.translationAliases.emplace("item."+std::to_string(raw),nameKey);
         Plugins::registerItem(std::move(item));
     }
     for(const auto& value:data.at("crafting")) {
@@ -54,14 +55,14 @@ void loadDefinitions(const std::filesystem::path& package) {
         for(size_t i=0;i<9;++i)r.ingredients[i]=ItemId(value.at("ingredients").at(i).get<uint16_t>());
         r.output={ItemId(value.at("output").get<uint16_t>()),value.at("count"),0};
         const std::string key=value.at("key");r.sortOrder=uint32_t(std::stoul(key.substr(key.rfind('_')+1)));
-        if(!Plugins::content().crafting.emplace(key,r).second)throw std::runtime_error("Duplicate official crafting recipe");
+        if(!Plugins::mutableContentState().crafting.emplace(key,r).second)throw std::runtime_error("Duplicate official crafting recipe");
     }
     for(const auto& value:data.at("smelting")) {
         SmeltingRecipe r{ItemId(value.at("input").get<uint16_t>()),{ItemId(value.at("output").get<uint16_t>()),value.at("count"),0},value.at("ticks")};
-        if(!Plugins::content().smelting.emplace(value.at("key"),r).second)throw std::runtime_error("Duplicate official smelting recipe");
+        if(!Plugins::mutableContentState().smelting.emplace(value.at("key"),r).second)throw std::runtime_error("Duplicate official smelting recipe");
     }
-    for(uint16_t id=1;id<uint16_t(BlockId::COUNT);++id)if(Plugins::heavenBlockSlot(BlockId(id))&&!Plugins::content().blocks.count(id))throw std::runtime_error("Incomplete official block definitions");
-    for(uint16_t id=1;id<uint16_t(ItemId::COUNT);++id)if(Plugins::heavenItemSlot(ItemId(id))&&!Plugins::content().items.count(id))throw std::runtime_error("Incomplete official item definitions");
+    for(uint16_t id=1;id<uint16_t(BlockId::COUNT);++id)if(Plugins::heavenBlockSlot(BlockId(id))&&!Plugins::mutableContentState().blocks.count(id))throw std::runtime_error("Incomplete official block definitions");
+    for(uint16_t id=1;id<uint16_t(ItemId::COUNT);++id)if(Plugins::heavenItemSlot(ItemId(id))&&!Plugins::mutableContentState().items.count(id))throw std::runtime_error("Incomplete official item definitions");
 }
 int32_t registerAssets(const MC_Host* host,MC_PluginContext* ctx,const std::filesystem::path& package) {
     const auto* materials=static_cast<const MC_MaterialSequencesV1*>(host->query_extension(ctx,MC_MATERIAL_SEQUENCES_EXTENSION,1));
@@ -78,7 +79,7 @@ int32_t registerAssets(const MC_Host* host,MC_PluginContext* ctx,const std::file
         d.variants=value.at("variants");d.frames=value.at("frames");d.fps_milli=value.at("fps_milli");d.seed=value.at("seed");d.images=a.data();d.normals=b.data();d.properties=c.data();
         if(materials->register_sequence(ctx,&d))return -1;
     }
-    for(const auto& entry:Plugins::content().items)if(Plugins::heavenItemSlot(ItemId(entry.first))) {
+    for(const auto& entry:Plugins::mutableContentState().items)if(Plugins::heavenItemSlot(ItemId(entry.first))) {
         const auto path=entry.second.icon.lexically_relative(package).generic_string();
         const MC_ItemIcon d{sizeof(d),entry.second.key.c_str(),path.c_str()};if(presentation->register_item_icon(ctx,&d))return -1;
     }
@@ -92,7 +93,7 @@ void loadAssetsFixture(const std::filesystem::path& package) {
         for(const auto& path:value.at("normals"))m.normals.push_back(package/path.get<std::string>());
         for(const auto& path:value.at("properties"))m.propertyFrames.push_back(package/path.get<std::string>());
         m.image=m.images.at(0);m.normal=m.normals.at(0);m.properties=m.propertyFrames.at(0);
-        Plugins::content().materials.emplace(m.key,std::move(m));
+        Plugins::mutableContentState().materials.emplace(m.key,std::move(m));
     }
 }
 }

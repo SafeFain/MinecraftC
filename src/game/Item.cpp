@@ -1,4 +1,4 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "game/Item.h"
 
 #include <array>

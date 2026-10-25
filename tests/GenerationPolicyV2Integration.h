@@ -1,5 +1,7 @@
 #pragma once
 #include "plugins/PluginManager.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/ContentMutation.h"
 #include "world/ChunkStore.h"
 #include "core/AssetStore.h"
 #include <fstream>
@@ -33,12 +35,12 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     const auto spawn=g.sampleDimensionSpawn();check(spawn&&*spawn==glm::dvec3(.5,101.01,.5)&&same.sampleDimensionSpawn()==spawn&&other.sampleDimensionSpawn()!=spawn,"pure seeded lower-layer spawn and actual parameters");
     check(g.sampleTerrainColumn(0,0).height==240,"fixture highest surface differs from spawn layer");
     check(std::async(std::launch::async,[&]{return g.sampleDimensionSpawn();}).get()==spawn,"concurrent spawn equality");
-    auto& d=Plugins::content().extensions.dimensions.at(id);const auto sample=d.sampleSpawn;
+    auto& d=Plugins::mutableContentState().extensions.dimensions.at(id);const auto sample=d.sampleSpawn;
     d.sampleSpawn=[](const MC_GenerationContext*,double*,void*)->int32_t{return -1;};rejected([&]{g.sampleDimensionSpawn();});
     d.sampleSpawn=[](const MC_GenerationContext*,double*,void*)->int32_t{throw std::runtime_error("spawn fault");};rejected([&]{g.sampleDimensionSpawn();});
     d.sampleSpawn=[](const MC_GenerationContext*,double* out,void*)->int32_t{out[0]=0;out[1]=320;out[2]=0;return 0;};rejected([&]{g.sampleDimensionSpawn();});
     d.sampleSpawn=[](const MC_GenerationContext*,double*,void*)->int32_t{return 0;};rejected([&]{g.sampleDimensionSpawn();});d.sampleSpawn=sample;
-    const std::string key="worldgen_policy_v2:shrine";auto& s=Plugins::content().extensions.structures.at(key);
+    const std::string key="worldgen_policy_v2:shrine";auto& s=Plugins::mutableContentState().extensions.structures.at(key);
     const auto located=g.locatePluginStructure(key,-48,-48,64);check(located&&located->anchor[0]==-48&&located->anchor[1]==180&&located->variant==12,"custom placement locate and tie order");
     const auto blocks=g.pluginStructureBlocks(-64,-64,48,48);
     check(blocks.size()==4,"final writer owns duplicate positions and metadata");
@@ -62,8 +64,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     s.buildV2=[](const MC_StructureContext*,MC_StructureBlockV2*,uint32_t,uint32_t*,void*)->int32_t{throw std::runtime_error("build fault");};
     auto untouched=std::make_unique<Chunk>(0,0);untouched->setBlock(0,100,0,BlockId::DIAMOND_ORE);rejected([&]{g.generate(*untouched);});check(!untouched->generated&&untouched->getBlock(0,100,0)==BlockId::DIAMOND_ORE,"callback failure publishes nothing");
     s.buildV2=[](const MC_StructureContext*,MC_StructureBlockV2* out,uint32_t,uint32_t* count,void*)->int32_t{*count=1;out[0]={{0,-89,0,1,nullptr},0};return 0;};rejected([&]{g.pluginStructureBlocks(0,0,48,48);});s.buildV2=build;
-    const auto fingerprint=g.pluginStructureFingerprint();const auto description=Plugins::content().networkDescription;
-    s.minY=-87;plugins.describeCapabilities();check(g.pluginStructureFingerprint()!=fingerprint&&Lan::contentSignature(description)!=Lan::contentSignature(Plugins::content().networkDescription),"V2 bounds invalidate cache and LAN identity");s.minY=-88;plugins.describeCapabilities();
+    const auto fingerprint=g.pluginStructureFingerprint();const auto description=Plugins::mutableContentState().networkDescription;
+    s.minY=-87;plugins.describeCapabilities();check(g.pluginStructureFingerprint()!=fingerprint&&Lan::contentSignature(description)!=Lan::contentSignature(Plugins::mutableContentState().networkDescription),"V2 bounds invalidate cache and LAN identity");s.minY=-88;plugins.describeCapabilities();
     const int distance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=0;
     {
         GameSession session(root/"host/saves");EntityAiTestRenderer renderer;
@@ -88,7 +90,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         check(terrain.placeBed({3,101,0},BedDirection::South),"sampled dimension bed fixture");
         GameSessionTestAccess::dimensionBed(session,id,glm::ivec3(3,101,0));session.respawn();
         check(ready()&&session.playerState().getPosition().x==3.5&&session.playerState().getPosition().y<102,"valid bed wins over sampled spawn");
-        auto& sourcePolicy=Plugins::content().extensions.dimensions.at(0);const auto deathTarget=sourcePolicy.deathTarget;
+        auto& sourcePolicy=Plugins::mutableContentState().extensions.dimensions.at(0);const auto deathTarget=sourcePolicy.deathTarget;
         sourcePolicy.deathTarget=d.key;terrain.setBlock(0,101,0,BlockId::FIRE);
         check(session.switchDimension(DimensionId::Overworld,0)&&ready(),"leave target bed for cross-dimension respawn");
         GameSessionTestAccess::dimensionPosition(session,id,*spawn);
@@ -117,7 +119,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Config::RENDER_DISTANCE=distance;
     heavenReference(root);
     plugins.shutdown();install(badModule);Plugins::PluginManager bad({assets,root});bad.initialize();
-    check(!Plugins::content().extensions.structures.count(key)&&!Plugins::content().extensions.generators.count("worldgen_policy_v2:terrain"),"invalid V2 descriptor rolls back whole package");bad.shutdown();
+    check(!Plugins::mutableContentState().extensions.structures.count(key)&&!Plugins::mutableContentState().extensions.generators.count("worldgen_policy_v2:terrain"),"invalid V2 descriptor rolls back whole package");bad.shutdown();
     std::filesystem::remove_all(root);std::cout<<"Seeded spawn and structure V2 passed\n";return 0;
 }
 }

@@ -1,6 +1,8 @@
 #include "entity/EntityManager.h"
 #include "plugins/Runtime.h"
 #include "plugins/Json.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include "world/World.h"
 #include "player/Player.h"
 #include <algorithm>
@@ -51,7 +53,7 @@ void EntityManager::pluginEvent(Entity& entity,uint32_t kind) {
         try {
             if(intent.state){std::string state=intent.state;valid=valid&&state.size()<=MC_ENTITY_STATE_LIMIT;Plugins::Json::parse(state);if(valid)entity.pluginState=std::move(state);}
         }catch(...){valid=false;}
-        if(!valid){Plugins::content().runtimeFault="Invalid entity intent: "+definition->key;return;}
+        if(!valid){Plugins::mutableContentState().runtimeFault="Invalid entity intent: "+definition->key;return;}
         entity.pluginMovement={intent.movement[0],0,intent.movement[2]};entity.pluginAttack=intent.attack_player;
         if(intent.jump&&std::abs(entity.velocity.y)<.001f&&collides(entity,entity.position-glm::dvec3(0,.06,0)))entity.velocity.y=Config::AI_JUMP_SPEED;
     }
@@ -61,7 +63,7 @@ bool EntityManager::pluginAi(Entity& entity,float dt) {
     if((!definition||!definition->callback)&&m_aiTime>=entity.pluginIntentUntil)return false;
     if(definition&&definition->callback&&m_aiTime>=entity.ai.nextDecision){pluginEvent(entity,MC_ENTITY_DECIDE);double distance=std::numeric_limits<double>::max();for(const auto& player:m_framePlayers)distance=std::min(distance,glm::distance(entity.position,player.player->getPosition()));
         entity.ai.nextDecision=m_aiTime+(distance<=Config::AI_NEAR_DISTANCE?Config::AI_NEAR_INTERVAL:Config::AI_FAR_INTERVAL);}
-    if(!Plugins::content().runtimeFault.empty())return true;
+    if(!Plugins::mutableContentState().runtimeFault.empty())return true;
     moveWithTerrain(entity,entity.pluginMovement,dt);
     if(glm::length(entity.pluginMovement)>.001f)entity.facing=glm::normalize(entity.pluginMovement);
     m_modelRegistry.setLocomotion(entity.type,entity.id,glm::length(entity.pluginMovement));

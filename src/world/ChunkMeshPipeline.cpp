@@ -4,6 +4,7 @@
 #include "threading/ThreadPool.h"
 #include "world/Chunk.h"
 #include "world/ChunkMesh.h"
+#include "world/ChunkMeshBuilder.h"
 #include "world/ChunkStore.h"
 #include "world/World.h"
 

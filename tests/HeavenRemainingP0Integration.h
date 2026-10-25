@@ -1,5 +1,7 @@
 #pragma once
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include "HeavenNativeSkywayReference.h"
 #include "network/PlayerProfile.h"
 #include "network/StateProtocol.h"
@@ -8,6 +10,8 @@
 #include "world/WorldLighting.h"
 #include "world/ChunkStore.h"
 #include <fstream>
+#include <chrono>
+#include <thread>
 #include <tuple>
 
 namespace HeavenRemainingP0 {
@@ -21,6 +25,20 @@ inline auto snapshot(const std::filesystem::path& root){
         if(f.is_directory())result[key+"/"]={"",f.last_write_time()};
         else {std::ifstream stream(f.path(),std::ios::binary);result[key]={std::string(std::istreambuf_iterator<char>(stream),{}),f.last_write_time()};}
     }return result;
+}
+// World creation closes several files in a burst; NTFS may still be settling
+// directory timestamps when the first snapshot runs. Writes caused by the
+// refusal under test are still detected because the baseline is only taken
+// after two consecutive snapshots agree.
+inline auto quiescentSnapshot(const std::filesystem::path& root){
+    auto result=snapshot(root);
+    for(int attempt=0;attempt<20;++attempt){
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        auto next=snapshot(root);
+        if(next==result)return next;
+        result=std::move(next);
+    }
+    return result;
 }
 inline void solid(World& world,int x,int y,int z,BlockId id){
     auto* c=world.getChunk(HeavenPolicy::floorDiv(x,16),HeavenPolicy::floorDiv(z,16));
@@ -117,18 +135,20 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     AssetStore assetStore(assets);uint64_t originalSignature=0;
     {
         Plugins::PluginManager plugins({assets,root});plugins.initialize();
-        check(Plugins::validDimension(1)&&Plugins::content().requirements.size()==1&&Plugins::content().requirements[0].first=="official_heaven","official provider not default enabled");
-        const auto& held=Plugins::content().extensions.heldModels.at(static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER));
+        check(Plugins::validDimension(1)&&Plugins::mutableContentState().requirements.size()==1&&Plugins::mutableContentState().requirements[0].first=="official_heaven","official provider not default enabled");
+        const auto& held=Plugins::mutableContentState().extensions.heldModels.at(static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER));
         check(held.path.parent_path()==assets/"plugins/official_heaven"&&held.asset->primitives.size()==1&&held.asset->primitives[0].vertices.size()==120&&held.asset->primitives[0].indices.size()==180,"scepter package/geometry mismatch");
-        modelReference(*held.asset);originalSignature=Lan::contentSignature(Plugins::content().networkDescription);
+        modelReference(*held.asset);originalSignature=Lan::contentSignature(Plugins::mutableContentState().networkDescription);
         check(getLightDampening(BlockId::SKYROOT_LEAVES)==1&&isLeafBlock(BlockId::SKYROOT_LEAVES)&&fuelTicks(ItemId::SKYROOT_PLANKS)==300,"official semantic rules not published");
         WorldCatalog catalog(root/"saves");const auto id=catalog.create("Enabled",12,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
         check(SaveStore(root/"saves"/id).loadMetadata().generation.size()==3,"enabled save lost Heaven or native Nether");
         Lan::PlayerProfile profile;profile.identity={std::string(32,'a'),std::string(32,'b'),"P0"};profile.inventory.slot(0)={ItemId::STARSTEP_SCEPTER,1,0};
         Lan::ProfileStore(root/"saves"/id/"players").save(profile);
         (void)Lan::ProfileStore::localIdentity(root);
-        auto requirements=Plugins::content().requirements;Plugins::content().requirements.clear();WorldMetadata old;old.generationVersion=20;old.displayName="Old set";SaveStore(root/"saves/old-set").saveMetadata(old);Plugins::content().requirements=requirements;
-        const auto before=snapshot(root/"saves");rejects([&]{SaveStore(root/"saves/old-set").loadMetadata();},"old plugin set accepted");check(snapshot(root/"saves")==before,"old-set refusal wrote files");
+        auto requirements=Plugins::mutableContentState().requirements;Plugins::mutableContentState().requirements.clear();WorldMetadata old;old.generationVersion=20;old.displayName="Old set";SaveStore(root/"saves/old-set").saveMetadata(old);Plugins::mutableContentState().requirements=requirements;
+        const auto before=quiescentSnapshot(root/"saves");
+        rejects([&]{SaveStore(root/"saves/old-set").loadMetadata();},"old plugin set accepted");
+        check(snapshot(root/"saves")==before,"old-set refusal wrote files");
         actionEquivalence(root);plugins.shutdown();
     }
     {
@@ -137,12 +157,12 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         std::filesystem::copy(assets/"plugins/official_heaven",changedAssets/"plugins/official_heaven",std::filesystem::copy_options::recursive);
         std::ofstream(changedAssets/"plugins/official_heaven/LICENSE.md",std::ios::app)<<"\nChanged package identity\n";
         Plugins::PluginManager changed({changedAssets,root/"repacked-data"});changed.initialize();
-        check(Plugins::validDimension(1)&&Lan::contentSignature(Plugins::content().networkDescription)!=originalSignature,"official package fingerprint omitted from LAN identity");changed.shutdown();
+        check(Plugins::validDimension(1)&&Lan::contentSignature(Plugins::mutableContentState().networkDescription)!=originalSignature,"official package fingerprint omitted from LAN identity");changed.shutdown();
     }
     write(root/"plugins.json",R"({"official_heaven":false})");
     {
         Plugins::PluginManager plugins({assets,root});plugins.initialize();
-        check(!Plugins::validDimension(1)&&Plugins::content().requirements.empty(),"disabled Heaven retained registration");
+        check(!Plugins::validDimension(1)&&Plugins::mutableContentState().requirements.empty(),"disabled Heaven retained registration");
         check(!isValidItemId(ItemId::STARSTEP_SCEPTER)&&!isValidBlockId(BlockId::SKYROOT_LEAVES)&&!itemFromCommandName("starstep_scepter"),"disabled reserved content available");
         rejects([]{Plugins::resolveBlock("minecraftc:block_106");},"numeric key bypassed disabled owner");
         for(auto item:creativeInventoryItems())check(!Plugins::heavenItemSlot(item),"creative catalog leaked Heaven");
@@ -168,16 +188,16 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         plugins.shutdown();
     }
     {
-        Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::content().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&Plugins::content().requirements.empty(),"safe mode retained Heaven");safe.shutdown();
+        Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::mutableContentState().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&Plugins::mutableContentState().requirements.empty(),"safe mode retained Heaven");safe.shutdown();
     }
     write(root/"plugins.json","{}");
     {
         Plugins::PluginManager plugins({assets,root});plugins.initialize();
         const auto before=snapshot(root/"saves");
         rejects([&]{SaveStore(root/"saves/disabled").loadMetadata();},"off-world accepted after enabling provider");
-        const auto requirements=Plugins::content().requirements;Plugins::content().requirements[0].second+="-changed";
-        rejects([&]{SaveStore(root/"saves/enabled").loadMetadata();},"changed package fingerprint accepted");Plugins::content().requirements=requirements;
-        auto& revision=Plugins::content().extensions.dimensions.at(1).revision;const auto original=revision;revision="changed";
+        const auto requirements=Plugins::mutableContentState().requirements;Plugins::mutableContentState().requirements[0].second+="-changed";
+        rejects([&]{SaveStore(root/"saves/enabled").loadMetadata();},"changed package fingerprint accepted");Plugins::mutableContentState().requirements=requirements;
+        auto& revision=Plugins::mutableContentState().extensions.dimensions.at(1).revision;const auto original=revision;revision="changed";
         rejects([&]{SaveStore(root/"saves/enabled").loadMetadata();},"changed dimension revision accepted");revision=original;
         check(snapshot(root/"saves")==before,"compatibility refusals wrote files");
         size_t index=0;for(size_t i=0;i<plugins.plugins().size();++i)if(plugins.plugins()[i].manifest.id=="official_heaven")index=i;
@@ -187,7 +207,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     write(root/"plugins.json","{}");
     write(root/"missing/mods/dependent/mod.json",R"({"id":"dependent","api":1,"version":"1.0.0","dependencies":[{"id":"official_heaven"}]})");
     {
-        Plugins::PluginManager missing({root/"missing-assets",root/"missing"});missing.initialize();check(!Plugins::validDimension(1)&&Plugins::content().extensions.actions.empty()&&Plugins::content().requirements.empty(),"missing official resources left partial registration");
+        Plugins::PluginManager missing({root/"missing-assets",root/"missing"});missing.initialize();check(!Plugins::validDimension(1)&&Plugins::mutableContentState().extensions.actions.empty()&&Plugins::mutableContentState().requirements.empty(),"missing official resources left partial registration");
         for(const auto& info:missing.plugins())if(info.manifest.id=="dependent")check(!info.active&&!info.status.empty(),"failed provider did not block dependent");missing.shutdown();
     }
     const auto package=root/"mods/capability_native";
@@ -219,7 +239,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         const auto drops=getBlockDrops(ore,{ItemId::STONE_PICKAXE,1,0},2);check(drops.size()==1&&drops[0].id==plank&&drops[0].count==3,"deterministic range/probability mismatch");
         check(getLightDampening(plant)==0&&getBlockDrops(plant,{},0).empty()&&supportsBiomePlant(plant,ore)&&!supportsBiomePlant(plant,BlockId::STONE),"JSON explicit zero/empty/substrate mismatch");
         rejects([]{Plugins::resolveBlock("p0_bad:b");},"bad semantic registration did not roll back");
-        check(!Plugins::content().materials.count("p0_bad:m"),"bad semantic material survived rollback");
+        check(!Plugins::mutableContentState().materials.count("p0_bad:m"),"bad semantic material survived rollback");
         GameSession session(root/"native-session");GameSessionTestAccess::prepareLanScene(session);auto& p=GameSessionTestAccess::player(session);p.inventory().slot(0)={Plugins::resolveItem("capability_native:context_staff"),1,0};
         MC_ActionTarget target{};check(session.pluginActionTarget(0,"capability_native:context",true,target)&&target.valid&&target.position[0]==2.5,"native V2 view/services failed");
         InputState input;input.setVirtual(InputAction::Sneak,1);input.update({});p.handleMovement(input,0);check(session.pluginActionTarget(0,"capability_native:context",true,target)&&target.valid&&target.position[0]==-1.5,"native V2 did not receive sneak intent");
@@ -236,7 +256,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         check(actions->v1->request(&context,&request,&receipt)==0,"second V2 queue refused");++p.inventory().slot(0).damage;plugins.flushOperations();
         check(actions->v1->result(&context,receipt,&result)==0&&result.status==MC_ACTION_FAILED&&p.getPosition().x==-1.5,"changed held-item state survived queued action validation");
         check(Plugins::resolveDimension("capability_native:flat")>=2,"third-party dimension stole reserved handle");
-        const auto signature=Lan::contentSignature(Plugins::content().networkDescription);auto& b=Plugins::content().extensions.blockBehaviors.at(static_cast<uint16_t>(ore));++b.light;plugins.describeCapabilities();check(signature!=Lan::contentSignature(Plugins::content().networkDescription),"semantic change omitted from LAN identity");--b.light;plugins.describeCapabilities();
+        const auto signature=Lan::contentSignature(Plugins::mutableContentState().networkDescription);auto& b=Plugins::mutableContentState().extensions.blockBehaviors.at(static_cast<uint16_t>(ore));++b.light;plugins.describeCapabilities();check(signature!=Lan::contentSignature(Plugins::mutableContentState().networkDescription),"semantic change omitted from LAN identity");--b.light;plugins.describeCapabilities();
         session.abortPluginWorld();plugins.shutdown();
     }
     std::cout<<"Heaven remaining P0 integration passed\n";return 0;

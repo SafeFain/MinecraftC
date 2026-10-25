@@ -1,4 +1,4 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "world/BiomeBlockLogic.h"
 #include "world/Block.h"
 #include "core/AssetStore.h"

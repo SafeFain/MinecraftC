@@ -1,5 +1,6 @@
 #include "entity/EntityModelRegistry.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -53,19 +54,19 @@ int main() {
     Plugins::EntityContent plugin;
     plugin.key="registry_test:mob";plugin.id=4096;plugin.base=static_cast<uint16_t>(EntityType::Cow);
     plugin.model="unavailable/model.gltf";plugin.asset=supplied;
-    Plugins::content().extensions.entities.emplace(plugin.id,plugin);
+    Plugins::mutableContentState().extensions.entities.emplace(plugin.id,plugin);
     auto base=plugin;base.id=static_cast<uint16_t>(EntityType::Cow);base.key="registry_test:cow";
-    Plugins::content().extensions.entities.emplace(base.id,base);
+    Plugins::mutableContentState().extensions.entities.emplace(base.id,base);
     auto inherited=plugin;inherited.id=4097;inherited.key="registry_test:inherited";inherited.model.clear();inherited.asset.reset();
-    Plugins::content().extensions.entities.emplace(inherited.id,inherited);
+    Plugins::mutableContentState().extensions.entities.emplace(inherited.id,inherited);
     EntityModelRegistry isolated([](const auto&) {model::LoadResult failure;failure.error="independent cache has no alias";return failure;});
     isolated.loadAll("fixtures");
     require(isolated.definition(static_cast<EntityType>(plugin.id)).asset==supplied &&
         !isolated.definition(static_cast<EntityType>(plugin.id)).usesPlaceholder,"registered asset relied on a cache alias");
     require(isolated.definition(static_cast<EntityType>(inherited.id)).asset==supplied,
         "template model inheritance relied on a cache alias");
-    Plugins::content().extensions.entities.erase(plugin.id);
-    Plugins::content().extensions.entities.erase(base.id);
-    Plugins::content().extensions.entities.erase(inherited.id);
+    Plugins::mutableContentState().extensions.entities.erase(plugin.id);
+    Plugins::mutableContentState().extensions.entities.erase(base.id);
+    Plugins::mutableContentState().extensions.entities.erase(inherited.id);
     std::cout << "entity model registry tests passed\n";
 }

@@ -1,5 +1,7 @@
 #pragma once
 #include "world/NetherPortal.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/ContentMutation.h"
 
 namespace NetherSessionIntegration {
 inline void check(bool ok,const char* message){if(!ok)throw std::runtime_error(message);}
@@ -11,7 +13,7 @@ inline void frame(World& world,glm::ivec3 origin,bool alongZ=false,int width=2,i
     check(NetherPortal::ignite(world,origin),"session gate ignition");
 }
 inline int run() {
-    Plugins::content()=Plugins::ContentState{};
+    Plugins::mutableContentState()=Plugins::ContentState{};
     const auto root=std::filesystem::temp_directory_path()/"minecraftc-nether-session";
     std::filesystem::remove_all(root);Config::RENDER_DISTANCE=0;
     {

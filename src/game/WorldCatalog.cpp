@@ -1,4 +1,5 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/GenerationValidation.h"
 #include "game/WorldCatalog.h"
 
 #include "world/WorldGenContext.h"

@@ -1,13 +1,13 @@
 #include "ui/Menu.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 
 #include "core/Window.h"
 #include "core/RuntimeClock.h"
 #include <algorithm>
 #include <stdexcept>
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 #include "game/ArabicShaper.h"
 #include "game/TextWrap.h"
 

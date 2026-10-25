@@ -844,7 +844,7 @@ if(BUILD_TESTING)
         src/game/InventoryInteraction.cpp src/game/InventoryModel.cpp
         src/game/NetherProgression.cpp src/game/Item.cpp src/game/Language.cpp src/game/Localization.cpp
         src/game/SurvivalRules.cpp src/game/SurvivalStats.cpp
-        src/game/Utf8.cpp src/game/VillagerTrade.cpp src/game/SaveStore.cpp
+        src/core/Utf8.cpp src/game/VillagerTrade.cpp src/game/SaveStore.cpp
         src/model/ModelRenderer.cpp
         src/renderer/BlockAtlasData.cpp src/renderer/CloudRenderData.cpp
         src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp src/renderer/StbImageImpl.cpp
@@ -1267,7 +1267,7 @@ if(BUILD_TESTING)
         tests/CommandTests.cpp
         src/game/NetherProgression.cpp src/game/Item.cpp
         src/world/Block.cpp
-        src/game/Utf8.cpp
+        src/core/Utf8.cpp
         src/world/BiomeMap.cpp)
     target_include_directories(command_tests PRIVATE src)
     target_link_libraries(command_tests PRIVATE glm::glm minecraftc_platform)
@@ -1380,7 +1380,7 @@ if(BUILD_TESTING)
         src/debug/Log.cpp
         src/ui/TouchControls.cpp
         src/game/ClientSettings.cpp
-        src/game/Utf8.cpp
+        src/core/Utf8.cpp
         src/game/Language.cpp
         src/game/InventoryInteraction.cpp
         src/game/NetherProgression.cpp src/game/Item.cpp
@@ -1401,7 +1401,7 @@ if(BUILD_TESTING)
         src/debug/Log.cpp
         src/game/ClientSettings.cpp
         src/game/Language.cpp
-        src/game/Utf8.cpp
+        src/core/Utf8.cpp
         src/platform/sdl/SdlGamepadManager.cpp
         src/platform/sdl/SdlWindow.cpp
         src/ui/TouchControls.cpp)
@@ -1456,7 +1456,7 @@ if(BUILD_TESTING)
         src/game/SurvivalSession.cpp
         src/game/SurvivalStats.cpp
         src/game/VillagerTrade.cpp
-        src/game/Utf8.cpp
+        src/core/Utf8.cpp
         src/game/Weather.cpp
         src/game/WorldCatalog.cpp
         src/model/AnimationGraph.cpp
@@ -1671,7 +1671,7 @@ if(BUILD_TESTING)
         src/game/SurvivalSession.cpp
         src/game/SurvivalStats.cpp
         src/game/VillagerTrade.cpp
-        src/game/Utf8.cpp
+        src/core/Utf8.cpp
         src/game/Weather.cpp
         src/game/WorldCatalog.cpp
         src/model/AnimationGraph.cpp
@@ -1802,7 +1802,7 @@ if(BUILD_TESTING)
         src/game/NetherProgression.cpp src/game/Item.cpp
         src/game/Language.cpp
         src/game/Localization.cpp
-        src/game/Utf8.cpp
+        src/core/Utf8.cpp
         src/ui/StbTruetypeImpl.cpp
         src/world/Block.cpp
         src/world/BiomeMap.cpp)

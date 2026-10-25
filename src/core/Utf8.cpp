@@ -1,4 +1,4 @@
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 
 namespace {
 constexpr uint32_t replacement = 0xFFFD;

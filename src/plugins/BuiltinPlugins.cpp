@@ -6,6 +6,8 @@
 #include "plugins/official_heaven/HeavenDefinitions.h"
 #include "plugins/official_heaven/HeavenProvider.h"
 #include "plugins/OfficialHeavenActions.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/ContentMutation.h"
 #include <limits>
 #include <glm/gtc/matrix_transform.hpp>
 #ifdef MINECRAFTC_CONTENT_PACKAGES_HEADER
@@ -77,7 +79,7 @@ int32_t heavenLoad(const MC_Host* host,MC_PluginContext* ctx){
     if(actions->register_action(ctx,&definition))return -1;
     a.base.key="official_heaven:starstep";a.base.range=96;a.base.cooldown=3;a.base.durability=1;definition.target=Plugins::starstepTargetV3;a.range_from_eye=a.tool_pose=a.invalid_marker=1;a.use_cooldown=.15f;
     if(actions->register_action(ctx,&definition))return -1;
-    auto& dimension=Plugins::content().extensions.dimensions.at(1);
+    auto& dimension=Plugins::mutableContentState().extensions.dimensions.at(1);
     dimension.seedDomain=OfficialHeaven::HeavenGenerator::SEED_DOMAIN;
     dimension.generation={"official_heaven:heaven","9","{}",{}};
     dimension.spawn=MC_SPAWN_SAMPLED;dimension.sampleSpawn=OfficialHeaven::sampleSpawn;

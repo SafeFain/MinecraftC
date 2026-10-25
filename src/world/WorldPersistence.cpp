@@ -1,5 +1,5 @@
 #include "world/WorldPersistence.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 
 #include "Config.h"
 #include "debug/Log.h"

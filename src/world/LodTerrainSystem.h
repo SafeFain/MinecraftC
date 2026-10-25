@@ -1,5 +1,6 @@
 #pragma once
 
+#include "world/Block.h"
 #include "world/ChunkMesh.h"
 #include "world/LodSettings.h"
 

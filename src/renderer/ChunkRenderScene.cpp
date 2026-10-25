@@ -4,6 +4,7 @@
 #include "debug/Log.h"
 #include "world/Block.h"
 #include "world/Chunk.h"
+#include "world/ChunkMeshBuilder.h"
 #include "world/RegionGenerator.h"
 #include "world/WorldGenerator.h"
 

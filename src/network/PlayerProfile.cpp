@@ -1,7 +1,7 @@
 #include "network/StatusEffectProtocol.h"
 #include "network/PlayerProfile.h"
 #include "core/Platform.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include <set>
 #include <algorithm>
 #include <cmath>

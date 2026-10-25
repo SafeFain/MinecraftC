@@ -1,5 +1,7 @@
 #pragma once
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include "network/PlayerProfile.h"
 #include <fstream>
 
@@ -19,7 +21,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
     const auto id=Plugins::resolveDimension("dimension_demo:plateau"),rainId=Plugins::resolveDimension("dimension_data:rainland");
     const auto dimension=static_cast<DimensionId>(id),rain=static_cast<DimensionId>(rainId);
-    check(id>=3&&rainId>=3&&id!=rainId&&Plugins::content().extensions.dimensions.size()==5,"native/data dimensions and rollback");
+    check(id>=3&&rainId>=3&&id!=rainId&&Plugins::mutableContentState().extensions.dimensions.size()==5,"native/data dimensions and rollback");
     for(const auto& info:plugins.plugins())if(info.manifest.id=="dimension_bad"||info.manifest.id=="dimension_visual"||info.manifest.id=="dimension_dependency")check(!info.active,"invalid dimension package rejected");
     size_t index=0;for(;index<plugins.plugins().size();++index)if(plugins.plugins()[index].manifest.id=="dimension_demo")break;
     MC_PluginContext ctx;ctx.manager=&plugins;ctx.index=index;
@@ -38,7 +40,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     std::vector<RegionGenerationData::PendingBlock> pending;generator.generateRegion(-3,-3,3,6,region,pending);owned.back()->copyRawBlocks(b);check(a==b,"new dimension negative region/singleton equality");
     const auto lod=buildApproximateLodTile(generator,{-1,-1,0});check(!lod.at(0,0).spans.empty(),"plugin dimension LOD");
     WorldMetadata metadata;metadata.displayName="Dimensions";metadata.seed=12;metadata.generationVersion=WorldGenContext::GENERATION_VERSION;metadata.activeDimension=dimension;
-    for(const auto& entry:Plugins::content().extensions.dimensions)metadata.generation[entry.first]=entry.second.generation;
+    for(const auto& entry:Plugins::mutableContentState().extensions.dimensions)metadata.generation[entry.first]=entry.second.generation;
     metadata.dimensions[id].playerPosition={2.5,49.01,.5};metadata.dimensions[id].positioned=true;metadata.dimensions[id].hasSafePosition=true;metadata.dimensions[id].safePlayerPosition={2.5,49.5625,.5};metadata.dimensions[id].bedSpawn=glm::ivec3(1,49,2);
     SaveStore store(root/"keyed-world");store.saveMetadata(metadata);check(store.loadMetadata().activeDimension==dimension,"keyed save roundtrip");
     Lan::ChunkAddress address{dimension,-1,2};const auto chunkWire=Lan::encodeChunkSnapshot({address,1,1,a});
@@ -46,16 +48,16 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Lan::EntityBatch entities;entities.dimension=dimension;const auto entityWire=Lan::encodeEntityBatch(entities);
     Lan::PlayerProfile profile;profile.identity={Lan::randomToken(),Lan::randomToken(),"Dimension player"};profile.dimension=dimension;profile.positions[id]={2.5,49.01,.5};profile.positioned[id]=true;profile.safePositions[id]=profile.positions[id];profile.beds[id]={1,49,2};const auto profileWire=Lan::encodeProfile(profile);
     // A different local handle must resolve all persistent and wire identities correctly.
-    auto saved=Plugins::content().extensions.dimensions.at(id);Plugins::content().extensions.dimensions.erase(id);Plugins::content().extensions.dimensions.emplace(20,saved);
-    Plugins::content().extensions.generators.at(config.generator).dimension=20;
+    auto saved=Plugins::mutableContentState().extensions.dimensions.at(id);Plugins::mutableContentState().extensions.dimensions.erase(id);Plugins::mutableContentState().extensions.dimensions.emplace(20,saved);
+    Plugins::mutableContentState().extensions.generators.at(config.generator).dimension=20;
     const auto loaded=store.loadMetadata();check(static_cast<uint32_t>(loaded.activeDimension)==20&&loaded.dimensions.at(20).bedSpawn==metadata.dimensions.at(id).bedSpawn&&loaded.dimensions.at(20).safePlayerPosition==metadata.dimensions.at(id).safePlayerPosition,"save remaps dimension key");
     check(static_cast<uint32_t>(Lan::decodeChunkSnapshot(chunkWire).address.dimension)==20,"chunk protocol remaps key");
     check(Lan::decodeWorldInfo(worldWire).generation.count(20)&&static_cast<uint32_t>(Lan::decodeEntityBatch(entityWire).dimension)==20,"world/entity protocols remap key");
     const auto remapped=Lan::decodeProfile(profileWire);check(static_cast<uint32_t>(remapped.dimension)==20&&remapped.beds.at(20)==profile.beds.at(id),"profile remaps key and per-dimension state");
-    Plugins::content().extensions.dimensions.erase(20);Plugins::content().extensions.dimensions.emplace(id,saved);Plugins::content().extensions.generators.at(config.generator).dimension=id;
-    const auto before=bytes(root/"keyed-world"/"level.bin");Plugins::content().extensions.dimensions.erase(id);bool refused=false;try{store.loadMetadata();}catch(const std::exception&){refused=true;}check(refused&&bytes(root/"keyed-world"/"level.bin")==before,"missing dimension zero-write refusal");Plugins::content().extensions.dimensions.emplace(id,saved);
-    auto changed=Plugins::content().extensions.dimensions.at(id);Plugins::content().extensions.dimensions.at(id).revision="2";refused=false;
-    try{store.loadMetadata();}catch(const std::exception&){refused=true;}check(refused&&bytes(root/"keyed-world"/"level.bin")==before,"dimension policy revision zero-write refusal");Plugins::content().extensions.dimensions.at(id)=changed;
+    Plugins::mutableContentState().extensions.dimensions.erase(20);Plugins::mutableContentState().extensions.dimensions.emplace(id,saved);Plugins::mutableContentState().extensions.generators.at(config.generator).dimension=id;
+    const auto before=bytes(root/"keyed-world"/"level.bin");Plugins::mutableContentState().extensions.dimensions.erase(id);bool refused=false;try{store.loadMetadata();}catch(const std::exception&){refused=true;}check(refused&&bytes(root/"keyed-world"/"level.bin")==before,"missing dimension zero-write refusal");Plugins::mutableContentState().extensions.dimensions.emplace(id,saved);
+    auto changed=Plugins::mutableContentState().extensions.dimensions.at(id);Plugins::mutableContentState().extensions.dimensions.at(id).revision="2";refused=false;
+    try{store.loadMetadata();}catch(const std::exception&){refused=true;}check(refused&&bytes(root/"keyed-world"/"level.bin")==before,"dimension policy revision zero-write refusal");Plugins::mutableContentState().extensions.dimensions.at(id)=changed;
     auto oldProfile=profileWire;oldProfile[4]=3;oldProfile[5]=0;uint64_t checksum=14695981039346656037ULL;for(size_t i=0;i<oldProfile.size()-8;++i){checksum^=oldProfile[i];checksum*=1099511628211ULL;}for(int i=0;i<8;++i)oldProfile[oldProfile.size()-8+i]=static_cast<uint8_t>(checksum>>(i*8));
     refused=false;try{Lan::decodeProfile(oldProfile);}catch(const Lan::ProtocolError& error){refused=std::string(error.what())=="Unsupported player profile format";}check(refused,"old profile format explicitly refused");
     const int distance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=0;
@@ -93,7 +95,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     }
     plugins.travelPlayer={};
     Config::RENDER_DISTANCE=distance;
-    plugins.shutdown();Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::content().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&!Plugins::validDimension(1),"safe mode retains both native dimensions");safe.shutdown();
+    plugins.shutdown();Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::mutableContentState().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&!Plugins::validDimension(1),"safe mode retains both native dimensions");safe.shutdown();
     std::filesystem::remove_all(root);std::cout<<"Dimension registry/runtime integration passed\n";return 0;
 }
 }

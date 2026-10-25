@@ -1,6 +1,6 @@
 #pragma once
 
-#include "platform/Clipboard.h"
+#include "core/Clipboard.h"
 
 namespace platform::sdl {
 

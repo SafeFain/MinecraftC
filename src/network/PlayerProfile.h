@@ -1,7 +1,7 @@
 #pragma once
 
 #include "network/Session.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "game/GameRules.h"
 #include "game/StatusEffects.h"
 #include "game/InventoryModel.h"

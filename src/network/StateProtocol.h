@@ -2,7 +2,7 @@
 #pragma once
 
 #include "network/Protocol.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "game/InventoryCommands.h"
 #include "game/GameRuleRegistry.h"
 #include "game/GameRules.h"

@@ -13,7 +13,7 @@
 #include "game/GameRuleRegistry.h"
 #include "game/Item.h"
 #include "game/Weather.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "world/Biome.h"
 #include "world/Structure.h"
 

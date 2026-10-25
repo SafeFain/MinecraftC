@@ -1,5 +1,7 @@
 #pragma once
 
+#include "world/ChunkMeshBuilder.h"
+
 // Behavioral integration: power follows local geometry and survives disk/streaming.
 void testDoorsAndButtons() {
     size_t stateCount=0;

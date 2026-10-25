@@ -50,7 +50,7 @@
 #include "game/Localization.h"
 #include "game/SurvivalSession.h"
 #include "game/InventoryInteraction.h"
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 #include "game/TextWrap.h"
 #include "world/WorldGenContext.h"
 #include "entity/EntityManager.h"

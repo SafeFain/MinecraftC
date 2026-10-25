@@ -11,6 +11,7 @@
 
 #include <glm/glm.hpp>
 
+#include "entity/EntityRecord.h"
 #include "game/GameRules.h"
 #include "game/StatusEffects.h"
 #include "plugins/Extensions.h"
@@ -86,22 +87,10 @@ struct WorldMetadata {
     uint32_t foodTickTimer = 0;
     std::vector<ActiveStatusEffect> effects;
     InventoryModel inventory;
-    struct PersistedEntity {
-        uint16_t type = 0;
-        glm::dvec3 position{0.0};
-        glm::vec3 velocity{0.0f};
-        float health = 0.0f;
-        float ageSeconds = 0.0f;
-        ItemStack item;
-        uint32_t behaviorSeed = 0;
-        uint8_t flags = 0;
-        float projectileDamage = 0.0f;
-        VillagerData villager;
-        std::string pluginState="{}";
-        uint32_t pluginStateVersion=0;
-        NetherMobState nether;
-        std::vector<ActiveStatusEffect> effects;
-    };
+    // Durable entity partition shared with chunk persistence and transfers.
+    // The record contract lives in entity/EntityRecord.h; this alias preserves
+    // every existing WorldMetadata::PersistedEntity spelling and the save format.
+    using PersistedEntity = EntityRecord;
     std::vector<PersistedEntity> entities;
     WorldType worldType = WorldType::Normal;
     DimensionId activeDimension = DimensionId::Overworld;

@@ -1,5 +1,5 @@
 #include "HeavenContentFixture.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "game/SaveStore.h"
 #include "game/EntityTransferJournal.h"
 #include "Config.h"

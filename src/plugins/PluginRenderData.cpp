@@ -1,4 +1,6 @@
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include <cstring>
 #include <cmath>
 #include <stb_image.h>
@@ -9,7 +11,7 @@ void PluginManager::loadRenderData(MC_PluginContext& ctx,const Json& data) {
     auto number=[&](const Json& value,const char* key,uint32_t fallback){const double n=value.numeric(key,fallback);require(std::isfinite(n)&&n>=0&&n<=UINT32_MAX&&std::floor(n)==n,"Invalid render integer");return static_cast<uint32_t>(n);};
     auto handle=[&](const Json& value,const char* field)->MC_RenderHandle {
         const auto key=value.text(field);if(key.empty())return 0;if(key=="minecraftc:scene_color")return MC_RENDER_SCENE_COLOR;
-        for(const auto& r:content().extensions.renderResources)if(r.second.owner==ctx.index&&r.second.key==key)return r.first;
+        for(const auto& r:mutableContentState().extensions.renderResources)if(r.second.owner==ctx.index&&r.second.key==key)return r.first;
         throw std::runtime_error("Unknown render resource: "+key);
     };
     if(data.has("render_resources")) {
@@ -40,7 +42,7 @@ void PluginManager::loadRenderData(MC_PluginContext& ctx,const Json& data) {
         const auto& array=data.at("render_passes");require(array.type==Json::Type::Array,"Expected render pass array");
         for(const auto& value:array.array) {
             auto pass=std::make_shared<DeclarativeRenderPass>();pass->scenePipeline=handle(value,"scene_pipeline");
-            if(pass->scenePipeline)require(content().extensions.renderResources.at(pass->scenePipeline).descriptor.kind==MC_RENDER_PIPELINE,"Invalid scene pipeline");
+            if(pass->scenePipeline)require(mutableContentState().extensions.renderResources.at(pass->scenePipeline).descriptor.kind==MC_RENDER_PIPELINE,"Invalid scene pipeline");
             if(value.has("draws")) {const auto& draws=value.at("draws");require(draws.type==Json::Type::Array&&draws.array.size()<=512,"Invalid draw array");
                 for(const auto& command:draws.array){MC_RenderDraw d{};d.size=sizeof(d);d.mesh=handle(command,"mesh");d.pipeline=handle(command,"pipeline");d.target=handle(command,"target");d.uniforms=handle(command,"uniforms");d.clip_space=command.flag("clip_space",false);for(int i=0;i<4;++i){d.transform[i*5]=1;d.tint[i]=1;}
                     auto floats=[&](const char* field,float* out,size_t count){if(!command.has(field))return;const auto& values=command.at(field);require(values.type==Json::Type::Array&&values.array.size()==count,"Invalid draw vector");for(size_t i=0;i<count;++i){require(values.array[i].type==Json::Type::Number,"Expected draw number");out[i]=static_cast<float>(values.array[i].number);require(std::isfinite(out[i]),"Invalid draw float");}};
@@ -53,7 +55,7 @@ void PluginManager::loadRenderData(MC_PluginContext& ctx,const Json& data) {
                 for(const auto& draw:pass.draws)if(!manager.renderDraw||!manager.renderDraw(c->index,draw))return -1;
                 return 0;
             };
-            renderPass(ctx,descriptor);content().extensions.dataPasses.push_back(std::move(pass));
+            renderPass(ctx,descriptor);mutableContentState().extensions.dataPasses.push_back(std::move(pass));
         }
     }
 }

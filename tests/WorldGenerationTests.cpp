@@ -9,6 +9,7 @@
 #include "world/SurfaceRules.h"
 #include "world/Chunk.h"
 #include "world/ChunkMesh.h"
+#include "world/ChunkMeshBuilder.h"
 #include "world/BiomeLocator.h"
 #include "world/BiomeBlockLogic.h"
 #include "Config.h"

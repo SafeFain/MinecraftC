@@ -1,5 +1,8 @@
 #include "plugins/PluginManager.h"
 #include "plugins/ContentPackage.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/GenerationValidation.h"
 #include "core/AssetStore.h"
 #include "model/GltfLoader.h"
 #include "debug/Log.h"
@@ -283,7 +286,7 @@ PluginManager::PluginManager(RuntimePaths paths,std::shared_ptr<model::ModelAsse
     m_host.register_command=[](MC_PluginContext* c,const char* name,MC_EventCallback f,void* u){const int32_t result=checked(c,[&]{manager(c).addCommand(*c,name,f,u);});if(result&&c)c->registrationFailed=true;return result;};
     m_host.hud_rect=[](MC_PluginContext* c,float x,float y,float w,float h,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&m.operations.hudRect,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");m.operations.hudRect(x,y,w,h,{color[0],color[1],color[2],color[3]});});};
     m_host.hud_text=[](MC_PluginContext* c,float x,float y,const char* text,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&text&&m.operations.hudText,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::string(text).size()<=4096,"Invalid HUD text");m.operations.hudText(x,y,text,{color[0],color[1],color[2],color[3]});});};
-    m_host.hud_image=[](MC_PluginContext* c,float x,float y,float w,float h,const char* key,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&m.operations.hudImage,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");auto it=content().materials.find(required(key));check(it!=content().materials.end(),"Unknown HUD material");uint16_t tile=it->second.tile;m.operations.hudImage(x,y,w,h,tile,{color[0],color[1],color[2],color[3]});});};
+    m_host.hud_image=[](MC_PluginContext* c,float x,float y,float w,float h,const char* key,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&m.operations.hudImage,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");auto it=mutableContentState().materials.find(required(key));check(it!=mutableContentState().materials.end(),"Unknown HUD material");uint16_t tile=it->second.tile;m.operations.hudImage(x,y,w,h,tile,{color[0],color[1],color[2],color[3]});});};
     m_host.config_read=[](MC_PluginContext* c,char* out,uint32_t cap){return checked(c,[&]{manager(c).storage(*c,false,false,nullptr,out,cap);});};
     m_host.config_write=[](MC_PluginContext* c,const char* value){return checked(c,[&]{manager(c).storage(*c,false,true,value,nullptr,0);});};
     m_host.world_data_read=[](MC_PluginContext* c,char* out,uint32_t cap){return checked(c,[&]{manager(c).storage(*c,true,false,nullptr,out,cap);});};
@@ -322,7 +325,7 @@ PluginManager::PluginManager(RuntimePaths paths,std::shared_ptr<model::ModelAsse
 }
 PluginManager::~PluginManager(){shutdown();}
 void PluginManager::owned(MC_PluginContext& ctx,const std::string& key) const {
-    check(m_phase==MC_REGISTER&&!content().frozen,"Registration is closed");
+    check(m_phase==MC_REGISTER&&!mutableContentState().frozen,"Registration is closed");
     const auto& info=m_info.at(ctx.index);
     const auto block=builtinKeyId(key,"minecraftc:block_",static_cast<uint16_t>(BlockId::COUNT));
     const auto item=builtinKeyId(key,"minecraftc:item_",static_cast<uint16_t>(ItemId::COUNT));
@@ -355,13 +358,13 @@ int32_t PluginManager::item(MC_PluginContext& ctx,const MC_Item& v,uint16_t& out
     out=static_cast<uint16_t>(registerItem(std::move(item)));return 0;
 }
 int32_t PluginManager::material(MC_PluginContext& ctx,const MC_Material& v) {
-    check(v.size>=sizeof(v)&&m_phase==MC_REGISTER&&!content().frozen,"Material registration is closed");MaterialContent m;m.key=required(v.key);m.replace=v.replace!=0;
+    check(v.size>=sizeof(v)&&m_phase==MC_REGISTER&&!mutableContentState().frozen,"Material registration is closed");MaterialContent m;m.key=required(v.key);m.replace=v.replace!=0;
     const auto& info=m_info.at(ctx.index);
     check(m.replace||(validKey(m.key)&&m.key.rfind(info.manifest.id+":",0)==0),"Material must use its plugin namespace");
     bool foundation=false;
     for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)if(m.key==getBlockTextureAssetName(static_cast<BlockTexture>(i)))foundation=true;
-    if(m.replace)check(foundation||content().materials.count(m.key),"Unknown replacement material");
-    else check(!foundation&&!content().materials.count(m.key),"Duplicate material");
+    if(m.replace)check(foundation||mutableContentState().materials.count(m.key),"Unknown replacement material");
+    else check(!foundation&&!mutableContentState().materials.count(m.key),"Duplicate material");
     m.replace=foundation;
     if(v.image&&*v.image)m.image=containedPath(info.root,v.image);
     if(v.normal&&*v.normal)m.normal=containedPath(info.root,v.normal);
@@ -370,7 +373,7 @@ int32_t PluginManager::material(MC_PluginContext& ctx,const MC_Material& v) {
     m.color={v.color[0],v.color[1],v.color[2],v.color[3]};
     for(size_t i=0;i<4;++i)check(std::isfinite(v.color[i])&&v.color[i]>=0&&v.color[i]<=1,"Invalid material color");
     if(m.replace)LOG_INFO("Plugin "<<info.manifest.id<<" replaces material "<<m.key);
-    content().materials[m.key]=std::move(m);return 0;
+    mutableContentState().materials[m.key]=std::move(m);return 0;
 }
 void PluginManager::materialSequence(MC_PluginContext& ctx,const MC_MaterialSequenceDefinition& d) {
     check(d.size>=sizeof(d)&&d.variants>=1&&d.variants<=4&&d.frames>=1&&d.frames<=16&&d.variants*d.frames<=64&&d.fps_milli<=60000&&(d.frames==1||d.fps_milli)&&d.images,"Invalid material sequence");
@@ -382,17 +385,17 @@ void PluginManager::materialSequence(MC_PluginContext& ctx,const MC_MaterialSequ
         const auto property=d.properties&&d.properties[i]?containedPath(root,required(d.properties[i])):std::filesystem::path{};validateMaterialImage(property);properties.push_back(property);
     }
     auto base=d.base;base.image=d.images[0];base.normal=d.normals?d.normals[0]:nullptr;base.properties=d.properties?d.properties[0]:nullptr;
-    material(ctx,base);auto& value=content().materials.at(d.base.key);value.variants=d.variants;value.frames=d.frames;value.fpsMilli=d.fps_milli;value.seed=d.seed;
+    material(ctx,base);auto& value=mutableContentState().materials.at(d.base.key);value.variants=d.variants;value.frames=d.frames;value.fpsMilli=d.fps_milli;value.seed=d.seed;
     value.images=std::move(images);value.normals=std::move(normals);value.propertyFrames=std::move(properties);
 }
 void PluginManager::itemIcon(MC_PluginContext& ctx,const MC_ItemIcon& d) {
     check(d.size>=sizeof(d),"Invalid item icon descriptor");const auto key=required(d.item);owned(ctx,key);
-    const auto id=resolveItem(key);auto& item=content().items.at(static_cast<uint16_t>(id));
+    const auto id=resolveItem(key);auto& item=mutableContentState().items.at(static_cast<uint16_t>(id));
     item.icon=containedPath(m_info.at(ctx.index).root,required(d.path));validateMaterialImage(item.icon);
 }
 int32_t PluginManager::recipe(MC_PluginContext& ctx,const MC_Recipe& v) {
     check(v.size>=sizeof(v)&&v.operation<=2,"Invalid recipe descriptor");const auto key=required(v.key);owned(ctx,key);
-    auto& c=content();const std::string target=optional(v.target);
+    auto& c=mutableContentState();const std::string target=optional(v.target);
     if(v.operation) {
         check(validKey(target),"Recipe patch needs explicit target");
         if(v.smelting) {check(c.smelting.count(target)||isBuiltinRecipeKey(target,true),"Unknown recipe target");c.smelting.erase(target);c.removeSmelting.push_back(target);}
@@ -413,7 +416,7 @@ int32_t PluginManager::recipe(MC_PluginContext& ctx,const MC_Recipe& v) {
     return 0;
 }
 int32_t PluginManager::subscribe(MC_PluginContext& c,uint32_t kind,int32_t priority,MC_EventCallback callback,void* data) {
-    check(m_phase==MC_REGISTER&&!content().frozen&&kind<MC_EVENT_COUNT&&callback,"Invalid/late event subscription");
+    check(m_phase==MC_REGISTER&&!mutableContentState().frozen&&kind<MC_EVENT_COUNT&&callback,"Invalid/late event subscription");
     if(m_info[c.index].manifest.visual)check(kind<=MC_SHUTDOWN||kind==MC_ENVIRONMENT||kind==MC_HUD,"Visual-only plugin requested gameplay event");
     m_listeners.push_back({c.index,kind,priority,callback,data});return 0;
 }
@@ -422,7 +425,7 @@ int32_t PluginManager::addCommand(MC_PluginContext& c,const char* name,MC_EventC
 }
 int32_t PluginManager::enqueue(MC_PluginContext& c,std::function<bool()> operation) {
     check(!m_readOnly,"Read-only callback cannot mutate state");
-    check(content().runtimeFault.empty(),"Plugin runtime requires restart");
+    check(mutableContentState().runtimeFault.empty(),"Plugin runtime requires restart");
     check(context().role!=MC_CLIENT,"Client gameplay mutations are unavailable");
     check(m_world&&m_phase!=MC_ENVIRONMENT&&m_phase!=MC_HUD&&m_phase!=MC_WORLD_CLOSE,"World mutations are unavailable in this phase");
     check(!m_info[c.index].manifest.visual,"Visual-only plugins cannot modify gameplay");
@@ -483,8 +486,8 @@ void PluginManager::loadPackage(MC_PluginContext& ctx,const std::vector<PackageD
             if(d.value.has("name_key")) {
                 m_definitionSources.emplace(std::make_pair("names",d.identity),info.manifest.id+" / "+d.path+"/name_key");
                 const auto name=d.value.at("name_key").text();
-                const auto bound=content().extensions.nameKeys.find(d.identity);
-                if(bound==content().extensions.nameKeys.end()||bound->second!=name) localizedName(ctx,d.identity.c_str(),name.c_str());
+                const auto bound=mutableContentState().extensions.nameKeys.find(d.identity);
+                if(bound==mutableContentState().extensions.nameKeys.end()||bound->second!=name) localizedName(ctx,d.identity.c_str(),name.c_str());
             }
         }catch(const std::exception& e) {
             const std::string error=e.what();
@@ -567,7 +570,7 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
         g.height=coordinate("height",64);g.water=coordinate("water_level",62);
         check(validDimension(g.dimension)&&!g.revision.empty()&&g.revision.size()<=128&&Config::isValidWorldY(g.height)&&g.water>=Config::WORLD_MIN_Y-1&&g.water<Config::WORLD_MAX_Y,"Invalid data generator");
         g.surface=static_cast<uint16_t>(resolveBlock(value.text("surface","minecraftc:grass")));g.fill=static_cast<uint16_t>(resolveBlock(value.text("fill","minecraftc:stone")));
-        check(content().extensions.generators.emplace(g.key,g).second,"Duplicate generator");
+        check(mutableContentState().extensions.generators.emplace(g.key,g).second,"Duplicate generator");
     }
 
 
@@ -576,7 +579,7 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
 }
 void PluginManager::validateContent() {
     validateCapabilities();
-    for(const auto& entry:content().extensions.dimensions) {
+    for(const auto& entry:mutableContentState().extensions.dimensions) {
         validateDefinition("dimensions",entry.second.key,[&] {
         const auto& d=entry.second;
         if(entry.first!=0&&entry.first!=2){check(!d.generation.generator.empty(),"Dimension needs a default generator");validateGeneration(d.generation,entry.first);}
@@ -584,15 +587,15 @@ void PluginManager::validateContent() {
         if(!d.voidTarget.empty())resolveDimension(d.voidTarget);
         });
     }
-    const auto english=content().extensions.translations.find("en_us");
-    const auto translated=[&](const std::string& key){return english!=content().extensions.translations.end()&&english->second.count(key);};
-    for(const auto& entry:content().extensions.nameKeys) {
+    const auto english=mutableContentState().extensions.translations.find("en_us");
+    const auto translated=[&](const std::string& key){return english!=mutableContentState().extensions.translations.end()&&english->second.count(key);};
+    for(const auto& entry:mutableContentState().extensions.nameKeys) {
         validateDefinition("names",entry.first,[&]{check(translated(entry.second),"name_key requires English translation");});
     }
-    for(const auto& entry:content().extensions.dimensions)if(entry.first&&!entry.second.nameKey.empty())check(translated(entry.second.nameKey),"Localized dimension name requires English translation");
-    for(const auto& entry:content().extensions.bedTravel)check(translated(entry.second.nameKey),"Travel label requires English translation");
-    auto materialExists=[](const std::string& key){if(content().materials.count(key))return true;for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)if(key==getBlockTextureAssetName(static_cast<BlockTexture>(i)))return true;return false;};
-    for(auto& entry:content().blocks) {
+    for(const auto& entry:mutableContentState().extensions.dimensions)if(entry.first&&!entry.second.nameKey.empty())check(translated(entry.second.nameKey),"Localized dimension name requires English translation");
+    for(const auto& entry:mutableContentState().extensions.bedTravel)check(translated(entry.second.nameKey),"Travel label requires English translation");
+    auto materialExists=[](const std::string& key){if(mutableContentState().materials.count(key))return true;for(uint16_t i=0;i<static_cast<uint16_t>(BlockTexture::Count);++i)if(key==getBlockTextureAssetName(static_cast<BlockTexture>(i)))return true;return false;};
+    for(auto& entry:mutableContentState().blocks) {
         validateDefinition(entry.second.familyKind?"block_families":"blocks",entry.second.key,[&] {
         if(entry.second.familyKind==MC_SLAB_FAMILY) {
             const auto full=resolveBlock(entry.second.fullBlock);check(isFullCollisionBlock(full)&&getBlockProps(full).shape==RenderShape::Cube,"Slab full_block must be a full cube");
@@ -601,21 +604,21 @@ void PluginManager::validateContent() {
         if(!entry.second.dropKey.empty())entry.second.drop=resolveItem(entry.second.dropKey);
         });
     }
-    for(const auto& entry:content().items)validateDefinition("items",entry.second.key,[&]{check(materialExists(entry.second.material),"Unknown item material field material");});
-    for(const auto& entry:content().extensions.entities)validateDefinition("entities",entry.second.key,[&]{if(!entry.second.drop.empty())resolveItem(entry.second.drop);});
+    for(const auto& entry:mutableContentState().items)validateDefinition("items",entry.second.key,[&]{check(materialExists(entry.second.material),"Unknown item material field material");});
+    for(const auto& entry:mutableContentState().extensions.entities)validateDefinition("entities",entry.second.key,[&]{if(!entry.second.drop.empty())resolveItem(entry.second.drop);});
 }
 void PluginManager::buildNetworkDescription() {
     describeCapabilities();
-    for(const auto& entry:content().extensions.dimensions) {
+    for(const auto& entry:mutableContentState().extensions.dimensions) {
         const auto& d=entry.second;
-        content().networkDescription["dimension/"+d.key]=nlohmann::json::array({d.name,d.revision,d.generation.generator,d.generation.revision,d.generation.parameters,d.weather,d.natural,d.spawn,d.position,d.deathTarget,d.voidTarget,d.generation.modifiers,d.seedDomain,d.nameKey}).dump();
-        if(d.sampleSpawn) {auto description=nlohmann::json::parse(content().networkDescription["dimension/"+d.key]);description.push_back("sampled-v2");content().networkDescription["dimension/"+d.key]=description.dump();}
+        mutableContentState().networkDescription["dimension/"+d.key]=nlohmann::json::array({d.name,d.revision,d.generation.generator,d.generation.revision,d.generation.parameters,d.weather,d.natural,d.spawn,d.position,d.deathTarget,d.voidTarget,d.generation.modifiers,d.seedDomain,d.nameKey}).dump();
+        if(d.sampleSpawn) {auto description=nlohmann::json::parse(mutableContentState().networkDescription["dimension/"+d.key]);description.push_back("sampled-v2");mutableContentState().networkDescription["dimension/"+d.key]=description.dump();}
     }
-    for(const auto& entry:content().extensions.bedTravel) {
+    for(const auto& entry:mutableContentState().extensions.bedTravel) {
         const auto& t=entry.second;
-        content().networkDescription["bed-travel/"+entry.first]=nlohmann::json::array({dimensionContent(static_cast<DimensionId>(t.source)).key,dimensionContent(static_cast<DimensionId>(t.target)).key,t.nameKey}).dump();
+        mutableContentState().networkDescription["bed-travel/"+entry.first]=nlohmann::json::array({dimensionContent(static_cast<DimensionId>(t.source)).key,dimensionContent(static_cast<DimensionId>(t.target)).key,t.nameKey}).dump();
     }
-    auto& state=content();
+    auto& state=mutableContentState();
     for(const auto& entry:state.blocks) {
         const auto& b=entry.second;
         state.networkDescription["block/"+b.key]=nlohmann::json::array({b.properties.solid,b.properties.transparent,
@@ -653,24 +656,24 @@ void PluginManager::buildNetworkDescription() {
     if(!removed.empty())state.networkDescription["removed/crafting"]=nlohmann::json(removed).dump();
     removed=state.removeSmelting;std::sort(removed.begin(),removed.end());
     if(!removed.empty())state.networkDescription["removed/smelting"]=nlohmann::json(removed).dump();
-    for(const auto& entry:content().extensions.entities) {
+    for(const auto& entry:mutableContentState().extensions.entities) {
         const auto& e=entry.second;
-        content().networkDescription["entity/"+entityKey(entry.first)]=nlohmann::json::array({e.key,e.base,e.name,e.health,e.size,e.speed,e.damage,e.hostile,e.natural,e.drop,e.dropCount,e.stateVersion,static_cast<bool>(e.callback)}).dump();
+        mutableContentState().networkDescription["entity/"+entityKey(entry.first)]=nlohmann::json::array({e.key,e.base,e.name,e.health,e.size,e.speed,e.damage,e.hostile,e.natural,e.drop,e.dropCount,e.stateVersion,static_cast<bool>(e.callback)}).dump();
     }
-    for(const auto& entry:content().extensions.generators) {
-        const auto& g=entry.second;content().networkDescription["generator/"+g.key]=nlohmann::json::array({dimensionContent(g.dimension).key,g.revision,g.height,g.water,blockKey(static_cast<BlockId>(g.surface)),blockKey(static_cast<BlockId>(g.fill))}).dump();
-        if(g.batch||g.terrainLod||g.decorationLod)content().networkDescription["generator/"+g.key]=nlohmann::json::array({content().networkDescription["generator/"+g.key],g.lodRevision,bool(g.batch),bool(g.terrainLod),bool(g.decorationLod),bool(g.layers)}).dump();
+    for(const auto& entry:mutableContentState().extensions.generators) {
+        const auto& g=entry.second;mutableContentState().networkDescription["generator/"+g.key]=nlohmann::json::array({dimensionContent(g.dimension).key,g.revision,g.height,g.water,blockKey(static_cast<BlockId>(g.surface)),blockKey(static_cast<BlockId>(g.fill))}).dump();
+        if(g.batch||g.terrainLod||g.decorationLod)mutableContentState().networkDescription["generator/"+g.key]=nlohmann::json::array({mutableContentState().networkDescription["generator/"+g.key],g.lodRevision,bool(g.batch),bool(g.terrainLod),bool(g.decorationLod),bool(g.layers)}).dump();
     }
-    for(const auto& entry:content().extensions.modifiers) {
-        const auto& m=entry.second;content().networkDescription["modifier/"+m.key]=nlohmann::json::array({dimensionContent(m.dimension).key,m.revision,m.radius}).dump();
-        if(m.decorationLod)content().networkDescription["modifier/"+m.key]=nlohmann::json::array({content().networkDescription["modifier/"+m.key],m.lodRevision,true}).dump();
+    for(const auto& entry:mutableContentState().extensions.modifiers) {
+        const auto& m=entry.second;mutableContentState().networkDescription["modifier/"+m.key]=nlohmann::json::array({dimensionContent(m.dimension).key,m.revision,m.radius}).dump();
+        if(m.decorationLod)mutableContentState().networkDescription["modifier/"+m.key]=nlohmann::json::array({mutableContentState().networkDescription["modifier/"+m.key],m.lodRevision,true}).dump();
     }
 
 }
 void PluginManager::initialize(bool safeMode) {
     check(!m_initialized,"Plugin manager already initialized");m_initialized=true;
     {std::lock_guard<std::mutex> lock(generationFaultMutex());generationFault().clear();}
-    const uint64_t revision=content().revision;content()=ContentState{};content().revision=revision;
+    const uint64_t revision=mutableContentState().revision;mutableContentState()=ContentState{};mutableContentState().revision=revision;
     const auto config=m_paths.dataRoot/"plugins.json";
     if(std::filesystem::exists(config))try {const auto j=readJson(config);for(const auto& p:j.object){check(p.second.type==Json::Type::Boolean,"Plugin enable setting must be boolean");m_enabled[p.first]=p.second.boolean;}}catch(const std::exception& e){LOG_WARN("Ignoring invalid plugin enable settings: "<<e.what());}
     Json builtinDescriptions;
@@ -730,7 +733,7 @@ void PluginManager::initialize(bool safeMode) {
             if(!dependency.optional&&it==m_info.end())dependenciesActive=false;
         }
         if(!dependenciesActive){info.status="Blocked by failed dependency";continue;}
-        auto before=content();const auto definitionSources=m_definitionSources;const size_t listeners=m_listeners.size();const auto commands=m_commands;
+        auto before=mutableContentState();const auto definitionSources=m_definitionSources;const size_t listeners=m_listeners.size();const auto commands=m_commands;
         auto& loaded=m_loaded[i];loaded.context=std::make_unique<MC_PluginContext>();loaded.context->manager=this;loaded.context->index=i;
         const auto builtinRevision=[&](){for(const auto& d:m_builtins)if(info.manifest.id==d.id&&info.manifest.builtin)return std::string(d.revision);return std::string{};}();
         try {
@@ -759,20 +762,20 @@ void PluginManager::initialize(bool safeMode) {
             if(info.manifest.packageFormat)loadPackage(*loaded.context,packageDefinitions,false);
             check(!loaded.context->registrationFailed,"Plugin ignored a failed registration");
             validateContent();
-            if(!info.manifest.visual)content().requirements.push_back({info.manifest.id,info.manifest.version+":"+fingerprint(info.root,(info.manifest.builtin?builtinRevision:std::string{}) + ([&]{const auto config=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");if(!std::filesystem::exists(config))return std::string{};std::ifstream file(config);return std::string(std::istreambuf_iterator<char>(file),{});}()))});
+            if(!info.manifest.visual)mutableContentState().requirements.push_back({info.manifest.id,info.manifest.version+":"+fingerprint(info.root,(info.manifest.builtin?builtinRevision:std::string{}) + ([&]{const auto config=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");if(!std::filesystem::exists(config))return std::string{};std::ifstream file(config);return std::string(std::istreambuf_iterator<char>(file),{});}()))});
             if(!info.manifest.visual) {
                 const auto& m=info.manifest;
                 const auto config=m_paths.dataRoot/"config"/"plugins"/(m.id+".json");
                 const auto value=std::filesystem::exists(config)?([&]{readJson(config);std::ifstream file(config);return nlohmann::json::parse(file);}()):nlohmann::json::object();
                 const std::string behavior=m.builtin?builtinRevision+(info.root.empty()?std::string{}:":"+fingerprint(info.root,"")):m.entry.empty()?"data-api1":
                     !m.networkCompatibility.empty()?"declared:"+m.networkCompatibility:"package:"+fingerprint(info.root,"");
-                content().networkDescription["plugin/"+m.id]=nlohmann::json::array({m.version,behavior}).dump();
-                content().networkDescription["config/"+m.id]=value.dump();
+                mutableContentState().networkDescription["plugin/"+m.id]=nlohmann::json::array({m.version,behavior}).dump();
+                mutableContentState().networkDescription["config/"+m.id]=value.dump();
             }
             info.status="Loaded";
         }catch(const std::exception& e) {
             info.active=false;info.status=e.what();if(!loaded.context->error.empty())info.status+=" ("+loaded.context->error+")";
-            content()=std::move(before);m_listeners.resize(listeners);m_commands=commands;
+            mutableContentState()=std::move(before);m_listeners.resize(listeners);m_commands=commands;
             m_definitionSources=definitionSources;
             if(loaded.loadEntered&&loaded.api&&loaded.api->unload)loaded.api->unload(loaded.context.get());
             loaded.api=nullptr;loaded.library.reset();
@@ -780,7 +783,7 @@ void PluginManager::initialize(bool safeMode) {
         }
     }
     std::stable_sort(m_listeners.begin(),m_listeners.end(),[](const auto& a,const auto& b){return a.priority>b.priority;});
-    std::stable_sort(content().extensions.renderPasses.begin(),content().extensions.renderPasses.end(),
+    std::stable_sort(mutableContentState().extensions.renderPasses.begin(),mutableContentState().extensions.renderPasses.end(),
         [](const auto& a,const auto& b){return a.priority>b.priority;});
     freezeContent();
     buildNetworkDescription();m_phase=MC_INITIALIZE;dispatcher()=[this](MC_Event& e){dispatch(e);};commandDispatcher()=[this](const std::string& s){return command(s);};
@@ -791,7 +794,7 @@ void PluginManager::initialize(bool safeMode) {
         const auto path=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");
         if(std::filesystem::exists(path)) {
             readJson(path);std::ifstream file(path);
-            content().networkDescription["config/"+info.manifest.id]=nlohmann::json::parse(file).dump();
+            mutableContentState().networkDescription["config/"+info.manifest.id]=nlohmann::json::parse(file).dump();
         }
     }
 }
@@ -814,8 +817,8 @@ void PluginManager::dispatch(MC_Event& e) {
             const int32_t result=listener.callback(m_loaded[listener.plugin].context.get(),&candidate,listener.userdata);
             if(result!=0){
                 auto& info=m_info[listener.plugin];info.active=false;info.status="Callback failed; restart required";
-                content().runtimeFault="Plugin callback failed: "+info.manifest.id;
-                LOG_ERROR(content().runtimeFault);discardOperations();if(cancellable)e.cancelled=1;continue;
+                mutableContentState().runtimeFault="Plugin callback failed: "+info.manifest.id;
+                LOG_ERROR(mutableContentState().runtimeFault);discardOperations();if(cancellable)e.cancelled=1;continue;
             }
             if(cancellable)e.cancelled=cancelled||candidate.cancelled;
             if(e.kind==MC_DAMAGE_PRE&&std::isfinite(candidate.damage)&&candidate.damage>=0)e.damage=candidate.damage;
@@ -827,17 +830,17 @@ void PluginManager::dispatch(MC_Event& e) {
             }
         }catch(const std::exception& error){
             auto& info=m_info[listener.plugin];info.active=false;info.status="Exception across plugin ABI; restart required";
-            content().runtimeFault="Plugin exception: "+info.manifest.id+": "+error.what();
-            LOG_ERROR(content().runtimeFault);discardOperations();if(cancellable)e.cancelled=1;
+            mutableContentState().runtimeFault="Plugin exception: "+info.manifest.id+": "+error.what();
+            LOG_ERROR(mutableContentState().runtimeFault);discardOperations();if(cancellable)e.cancelled=1;
         }
     }
     m_dispatching=false;m_phase=previous;
-    if(!content().runtimeFault.empty()&&cancellable)e.cancelled=1;
+    if(!mutableContentState().runtimeFault.empty()&&cancellable)e.cancelled=1;
     if(e.kind==MC_WORLD_CLOSE){m_world=false;discardOperations();}
 }
 bool PluginManager::command(const std::string& line) {
     const auto split=line.find(' ');std::string name=line.substr(0,split);if(!name.empty()&&name[0]=='/')name.erase(0,1);
-    auto it=m_commands.find(name);if(it==m_commands.end()||!m_info[it->second.plugin].active||!content().runtimeFault.empty())return false;
+    auto it=m_commands.find(name);if(it==m_commands.end()||!m_info[it->second.plugin].active||!mutableContentState().runtimeFault.empty())return false;
     if(context().role==MC_CLIENT)return false;
     if(context().player && !(it->second.flags&MC_COMMAND_ALLOW_GUEST))return false;
     check(m_world&&!m_dispatching,"Plugin command requires a world");
@@ -847,7 +850,7 @@ bool PluginManager::command(const std::string& line) {
     int32_t result=-1;
     try {result=it->second.callback(m_loaded[it->second.plugin].context.get(),&e,it->second.userdata);}catch(const std::exception& error){LOG_ERROR(error.what());}
     m_dispatching=false;m_phase=phase;
-    if(result){auto& info=m_info[it->second.plugin];info.active=false;info.status="Command callback failed; restart required";content().runtimeFault="Plugin command failed: "+name;discardOperations();LOG_ERROR(content().runtimeFault);}
+    if(result){auto& info=m_info[it->second.plugin];info.active=false;info.status="Command callback failed; restart required";mutableContentState().runtimeFault="Plugin command failed: "+name;discardOperations();LOG_ERROR(mutableContentState().runtimeFault);}
     return true;
 }
 void PluginManager::flushOperations() {
@@ -858,7 +861,7 @@ void PluginManager::discardOperations(){m_queue.clear();for(auto& pair:m_actionR
 void PluginManager::pollFaults() {
     check(hostThread(),"Fault polling is main-thread only");
     std::lock_guard<std::mutex> lock(generationFaultMutex());
-    if(!generationFault().empty()){content().runtimeFault=generationFault();generationFault().clear();discardOperations();}
+    if(!generationFault().empty()){mutableContentState().runtimeFault=generationFault();generationFault().clear();discardOperations();}
 }
 void PluginManager::setEnabled(size_t i,bool enabled) {
     const auto& p=m_info.at(i);m_enabled[p.manifest.id]=enabled;

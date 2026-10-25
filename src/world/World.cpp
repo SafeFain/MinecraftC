@@ -1,4 +1,5 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/GenerationValidation.h"
 #include "world/World.h"
 #include "game/DimensionRules.h"
 #include "world/NetherPortal.h"

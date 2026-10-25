@@ -1,5 +1,7 @@
 #pragma once
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include "world/WorldGenerator.h"
 #include "world/LodTerrainSystem.h"
 #include "game/SaveStore.h"
@@ -110,7 +112,7 @@ inline void heavenComparison() {
         for(size_t i=0;i<spans.size();++i)out[i]={spans[i].bottom,spans[i].top,uint16_t(spans[i].block)};
         return 0;
     };
-    Plugins::content().extensions.generators.emplace(g.key,g);
+    Plugins::mutableContentState().extensions.generators.emplace(g.key,g);
     WorldGenerator adapter(123,WorldType::Normal,DimensionId::Heaven,{g.key,"9","{}",{}});
     std::vector<std::unique_ptr<Chunk>> owned;std::vector<Chunk*> chunks;
     for(int z=-3;z<0;++z)for(int x=-3;x<0;++x){owned.push_back(std::make_unique<Chunk>(x,z));chunks.push_back(owned.back().get());}
@@ -124,7 +126,7 @@ inline void heavenComparison() {
         const auto level=uint8_t(std::get<2>(pair.first));const auto tile=buildApproximateLodTile(adapter,{-1,-1,level});
         for(size_t i=0;i<tile.columns.size();++i)check(same(tile.columns[i],pair.second.columns[i]),"Heaven v9 generic LOD occupancy reference mismatch");
     }
-    Plugins::content().extensions.generators.erase(g.key);
+    Plugins::mutableContentState().extensions.generators.erase(g.key);
 }
 inline int run(const std::filesystem::path& assets,const std::filesystem::path& module,const std::filesystem::path& badModule) {
     for(int divisor:{1,2,3,16,48,256})for(unsigned offset=0;offset<256;++offset) {
@@ -136,10 +138,10 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     std::filesystem::create_directories(package);std::filesystem::copy_file(module,package/module.filename());
     {std::ofstream f(package/"mod.json");f<<"{\"id\":\"worldgen_v2_demo\",\"version\":\"1.0.0\",\"api\":1,\"network_compatibility\":\"worldgen-v2-1\",\"native\":{\"linux\":\""<<module.filename().string()<<"\",\"windows\":\""<<module.filename().string()<<"\",\"macos\":\""<<module.filename().string()<<"\"}}";}
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
-    check(Plugins::content().extensions.generators.count("worldgen_v2_demo:islands"),"V2 native registration failed");
+    check(Plugins::mutableContentState().extensions.generators.count("worldgen_v2_demo:islands"),"V2 native registration failed");
     check(plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,1)&&plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,2)&&
         plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,3)&&!plugins.extension(nullptr,MC_WORLDGEN_EXTENSION,4),"V1/V2 extension discovery mismatch");
-    auto& g=Plugins::content().extensions.generators.at("worldgen_v2_demo:islands");Counters counters;instrument(g,counters);
+    auto& g=Plugins::mutableContentState().extensions.generators.at("worldgen_v2_demo:islands");Counters counters;instrument(g,counters);
     Plugins::GenerationConfig config{g.key,"1","{}",{{"worldgen_v2_demo:markers","1"}}};
     WorldGenerator generator(12,WorldType::Normal,DimensionId::Overworld,config);
     auto singleton=std::make_unique<Chunk>(-1,-1);generator.generate(*singleton);
@@ -198,7 +200,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     // Revision identity, exact fallback, AIR overwrite and callback faults.
     const auto identity=generator.lodSamplingFingerprint();g.lodRevision="2";
     check(identity!=generator.lodSamplingFingerprint(),"LOD revision missing from cache identity");g.lodRevision="1";
-    auto& modifier=Plugins::content().extensions.modifiers.at(config.modifiers.front().first);
+    auto& modifier=Plugins::mutableContentState().extensions.modifiers.at(config.modifiers.front().first);
     modifier.lodRevision="2";check(identity!=generator.lodSamplingFingerprint(),"modifier LOD revision missing from identity");modifier.lodRevision="1";
     const auto fast=generator.samplePluginLodColumn(-15,-1,1);
     const auto savedTerrain=g.terrainLod,savedDecoration=g.decorationLod,savedModifier=modifier.decorationLod;
@@ -291,11 +293,11 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     g.terrainLod=savedTerrain;
     {std::lock_guard<std::mutex> lock(Plugins::generationFaultMutex());Plugins::generationFault().clear();}
     Plugins::LootContent loot;loot.key="worldgen_v2_demo:loot";loot.revision="1";
-    Plugins::content().extensions.loot.emplace(loot.key,loot);
+    Plugins::mutableContentState().extensions.loot.emplace(loot.key,loot);
     Plugins::StructureContent structure;structure.key="worldgen_v2_demo:structure";structure.revision="1";
     structure.cell=16;structure.chance=100;structure.radius=1;structure.height=2;structure.tolerance=4;
     structure.blocks={{0,0,0,uint16_t(BlockId::CHEST),loot.key},{0,1,0,0,""}};
-    Plugins::content().extensions.structures.emplace(structure.key,structure);
+    Plugins::mutableContentState().extensions.structures.emplace(structure.key,structure);
     generator.generateRegion(-3,-3,3,6,chunks,pending);
     bool foundChest=false;
     for(auto* c:chunks) {
@@ -310,7 +312,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         }
     }
     check(foundChest,"bulk structure fixture placed no chest");
-    Plugins::content().extensions.structures.erase(structure.key);Plugins::content().extensions.loot.erase(loot.key);
+    Plugins::mutableContentState().extensions.structures.erase(structure.key);Plugins::mutableContentState().extensions.loot.erase(loot.key);
     Plugins::ModifierContent clearing;clearing.key="worldgen_v2_demo:clearing";clearing.revision="1";clearing.lodRevision="1";
     clearing.decorate=[](const MC_GenerationContext*,int x,int z,MC_DecorationBlock* out,uint32_t cap,uint32_t* count,void*)->int32_t {
         if(cap<385)return -1;
@@ -323,7 +325,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         if((cell->x+int(cell->cell_size/2))%16||(cell->z+int(cell->cell_size/2))%16)return 0;
         out[(*count)++]={-64,319,0};out[(*count)++]={100,100,uint16_t(BlockId::WOOD)};return 0;
     };
-    Plugins::content().extensions.modifiers.emplace(clearing.key,clearing);
+    Plugins::mutableContentState().extensions.modifiers.emplace(clearing.key,clearing);
     WorldGenerator builtinModified(12,WorldType::Superflat,DimensionId::Overworld,{"","","{}",{{clearing.key,"1"}}});
     const auto painted=builtinModified.samplePluginLodColumn(0,0,2,{{0,5,uint16_t(BlockId::WOOD)},{3,8,uint16_t(BlockId::STONE)}});
     check(painted.size()==2&&painted.front().top==2&&at(painted,4)==uint16_t(BlockId::STONE),
@@ -338,22 +340,22 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         auto c=std::make_unique<Chunk>(-1,-1);builtinModified.generate(*c);const auto spans=builtinModified.samplePluginLodColumn(-16,-16,1);
         for(int y=-64;y<320;++y)check(at(spans,y)==uint16_t(c->getBlock(0,y,0)),"builtin modifier point/LOD authority mismatch");
     }
-    Plugins::content().extensions.modifiers.erase(clearing.key);
+    Plugins::mutableContentState().extensions.modifiers.erase(clearing.key);
     heavenComparison();
     Plugins::BlockContent plant;plant.key="worldgen_v2_demo:plant";plant.name="LOD plant";
     plant.properties.solid=false;plant.properties.shape=RenderShape::Cross;
     plant.properties.layer=RenderLayer::Cutout;
-    Plugins::content().blocks.emplace(4096,plant);
+    Plugins::mutableContentState().blocks.emplace(4096,plant);
     LodTileData plantTile;plantTile.at(0,0).spans.push_back({300,300,static_cast<BlockId>(4096)});
     check(buildLodTileMesh(plantTile,2,6).indexCount>0,"custom fine-cell plant decoration was filtered as builtin-only");
-    Plugins::content().blocks.erase(4096);
+    Plugins::mutableContentState().blocks.erase(4096);
     g=counters.original;
     plugins.shutdown();
     std::filesystem::copy_file(badModule,package/badModule.filename());
     {std::ofstream f(package/"mod.json");f<<"{\"id\":\"worldgen_v2_demo\",\"version\":\"1.0.0\",\"api\":1,\"native\":{\"linux\":\""<<badModule.filename().string()<<"\",\"windows\":\""<<badModule.filename().string()<<"\",\"macos\":\""<<badModule.filename().string()<<"\"}}";}
     Plugins::PluginManager rejected({assets,root});rejected.initialize();
-    check(!Plugins::content().extensions.generators.count("worldgen_v2_demo:islands")&&
-        !Plugins::content().extensions.modifiers.count("worldgen_v2_demo:markers"),"failed V2 registration did not roll back");
+    check(!Plugins::mutableContentState().extensions.generators.count("worldgen_v2_demo:islands")&&
+        !Plugins::mutableContentState().extensions.modifiers.count("worldgen_v2_demo:markers"),"failed V2 registration did not roll back");
     rejected.shutdown();std::filesystem::remove_all(root);
     std::cout<<"Worldgen V2 native bulk, multilayer LOD, faults and Heaven reference passed\n";return 0;
 }

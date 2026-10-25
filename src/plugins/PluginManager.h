@@ -1,13 +1,15 @@
 #pragma once
 #include "core/DynamicLibrary.h"
 #include "core/Platform.h"
-#include "plugins/ContentRegistry.h"
 #include "plugins/Json.h"
 #include "plugins/Runtime.h"
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <thread>
+
+#include <glm/glm.hpp>
 
 namespace model { class ModelAssetCache; }
 

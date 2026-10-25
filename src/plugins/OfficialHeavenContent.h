@@ -1,12 +1,13 @@
 #pragma once
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include "world/BiomeBlockLogic.h"
 
 namespace Plugins {
 inline void publishHeavenDimension(){
     DimensionContent d;d.key="minecraftc:heaven";d.name="Heaven";d.weather=MC_WEATHER_CLEAR;
     d.natural=false;d.deathTarget=d.voidTarget="minecraftc:overworld";
-    if(!content().extensions.dimensions.emplace(1,std::move(d)).second)throw std::runtime_error("Heaven slot already owned");
+    if(!mutableContentState().extensions.dimensions.emplace(1,std::move(d)).second)throw std::runtime_error("Heaven slot already owned");
 }
 // Production registration and standalone tests share provider-owned policies.
 template<class Block,class Item> void heavenSemantics(Block block,Item item){

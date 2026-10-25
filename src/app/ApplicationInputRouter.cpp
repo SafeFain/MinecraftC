@@ -7,7 +7,7 @@
 #include "app/GameUiController.h"
 #include "core/Window.h"
 #include "game/ClientSettings.h"
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 #include "player/Player.h"
 #include "ui/Menu.h"
 #include "ui/SettingsMenu.h"

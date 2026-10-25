@@ -6,7 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "game/Item.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "game/GameRules.h"
 #include "world/CaveGenerator.h"
 

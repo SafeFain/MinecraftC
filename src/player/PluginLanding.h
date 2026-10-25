@@ -1,6 +1,6 @@
 #pragma once
 #include "world/World.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include <algorithm>
 #include <cmath>
 #include <vector>

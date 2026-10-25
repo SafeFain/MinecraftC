@@ -66,7 +66,7 @@ nine generic staged chunks). Full coordinate/seed keys resolve cache collisions.
 |---|---|
 | `src/plugins/official_heaven/` | Provider-owned v9 generation, structures, spawn, LOD, ambient and sky policy, package definitions |
 | `OfficialHeavenContent.h`, `OfficialHeavenActions.h`, `HeavenSkywayPolicy.h`, Heaven registration in `BuiltinPlugins.cpp` | Compiled official plugin registration, semantics and pure action strategy |
-| `BuiltinOwnership.h`, `ContentRegistry.h`, `PluginManager.cpp`, `PluginExtensions.cpp` | Reserved serialized slots and trusted ownership checks; optional registries supply actual content |
+| `BuiltinOwnership.h`, `ContentTypes.h`/`ContentQueries.h`/`ContentMutation.h`, `PluginManager.cpp`, `PluginExtensions.cpp` | Reserved serialized slots and trusted ownership checks; optional registries supply actual content |
 | `Block.h`, `Item.h`, `Structure.h`, architectural table holes | Stable numeric IDs and historical enum/state layout |
 | `SaveStore.*`, legacy field mappings in `GameSession.cpp`, `dimensionDirectory` | Existing v21 prefix/Heaven directory and legacy state mirrors, with keyed runtime dimension state |
 | Generation/cache version constants in `WorldGenerator.h` | Historical v9/v20 cache identification |

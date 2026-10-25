@@ -1,5 +1,5 @@
 #include "audio/AudioSystem.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "plugins/Runtime.h"
 
 #include "core/AssetStore.h"

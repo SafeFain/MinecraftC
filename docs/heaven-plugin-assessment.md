@@ -26,7 +26,7 @@
 
 ## 当前实现依据
 
-- `src/plugins/PluginManager.cpp`、`ContentRegistry.h`：启动时加载，注册事务回滚，冻结注册表，
+- `src/plugins/PluginManager.cpp`、`ContentTypes.h`/`ContentQueries.h`/`ContentMutation.h`：启动时加载，注册事务回滚，冻结注册表，
   方块/物品运行时 ID 从 4096 起；已有配置、依赖、世界要求和 LAN 指纹。
 - `sdk/minecraftc/plugin.h`：现有 MC_Block 只有立方体或交叉植物描述，没有阶梯、门、按钮状态族注册。
   有发光和简单掉落，但没有叶片透光/燃烧/燃料/种植支撑等完整材料语义。

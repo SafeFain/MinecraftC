@@ -1,4 +1,6 @@
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include "game/SaveStore.h"
 #include "game/WorldCatalog.h"
 #include "renderer/BlockAtlasData.h"
@@ -86,8 +88,8 @@ int main(int argc,char** argv) {
         const auto dataMob=Plugins::resolveEntity("extension_data:mob");require(dataMob>=4096&&Plugins::entityContent(dataMob)->health==28,"data entity registry");
         rejects([]{Plugins::resolveEntity("extension_bad:first");},"extension registration failure rolls back all types");
         rejects([]{Plugins::resolveEntity("render_bad:first");},"invalid shader rolls back prior gameplay registration");
-        require(Plugins::content().extensions.generators.count("extension_data:flat"),"data generator registry");
-        require(Plugins::content().networkDescription.count("entity/extension_data:mob")&&Plugins::content().networkDescription.count("generator/extension_data:flat"),"extensions participate in network handshake");
+        require(Plugins::mutableContentState().extensions.generators.count("extension_data:flat"),"data generator registry");
+        require(Plugins::mutableContentState().networkDescription.count("entity/extension_data:mob")&&Plugins::mutableContentState().networkDescription.count("generator/extension_data:flat"),"extensions participate in network handshake");
         const auto block=Plugins::resolveBlock("example_content:blue_brick"),crystalBlock=Plugins::resolveBlock("official_content:crystal_block");
         const auto item=Plugins::resolveItem("example_content:blue_brick"),crystal=Plugins::resolveItem("official_content:crystal");
         require(isValidBlockId(block)&&isValidItemId(item)&&getItemProps(item).placedBlock==block,"registered content usable");
@@ -115,29 +117,29 @@ int main(int argc,char** argv) {
         WorldMetadata::PersistedEntity dropped;dropped.type=static_cast<uint8_t>(EntityType::Item);dropped.item={item,2,0};metadata.entities={dropped};store.saveMetadata(metadata);
         store.saveChunkOverrides(-1,-2,{{17,block}});std::vector<uint16_t> generated(Config::CHUNK_VOLUME,static_cast<uint16_t>(block));store.saveGeneratedChunk(-1,-2,generated,metadata.generationVersion);
         PersistedBlockEntity chest;chest.localIndex=1;chest.value.type=BlockEntityType::Chest;chest.value.chest[0]={item,8,0};store.saveBlockEntities(-1,-2,{chest});store.saveChunkEntities(-1,-2,{dropped});
-        const auto before=bytes(root/"world"/"level.bin");const auto savedState=Plugins::content();
+        const auto before=bytes(root/"world"/"level.bin");const auto savedState=Plugins::mutableContentState();
         // Simulate a different runtime allocation while keeping the same installed
         // package set. Every durable file must resolve names independently.
-        auto remapBlocks=Plugins::content().blocks;Plugins::content().blocks.clear();std::map<uint16_t,uint16_t> blockIds,itemIds;
-        for(auto& entry:remapBlocks){const uint16_t id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?100:0));blockIds[entry.first]=id;entry.second.properties.id=static_cast<BlockId>(id);Plugins::content().blocks.emplace(id,std::move(entry.second));}
-        auto remapItems=Plugins::content().items;Plugins::content().items.clear();
-        for(auto& entry:remapItems){const uint16_t id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?200:0));itemIds[entry.first]=id;if(entry.second.properties.placedBlock)entry.second.properties.placedBlock=static_cast<BlockId>(blockIds.at(static_cast<uint16_t>(*entry.second.properties.placedBlock)));Plugins::content().items.emplace(id,std::move(entry.second));}
-        for(auto& entry:Plugins::content().blocks)if(entry.second.drop!=ItemId::EMPTY)entry.second.drop=static_cast<ItemId>(itemIds.at(static_cast<uint16_t>(entry.second.drop)));
+        auto remapBlocks=Plugins::mutableContentState().blocks;Plugins::mutableContentState().blocks.clear();std::map<uint16_t,uint16_t> blockIds,itemIds;
+        for(auto& entry:remapBlocks){const uint16_t id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?100:0));blockIds[entry.first]=id;entry.second.properties.id=static_cast<BlockId>(id);Plugins::mutableContentState().blocks.emplace(id,std::move(entry.second));}
+        auto remapItems=Plugins::mutableContentState().items;Plugins::mutableContentState().items.clear();
+        for(auto& entry:remapItems){const uint16_t id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?200:0));itemIds[entry.first]=id;if(entry.second.properties.placedBlock)entry.second.properties.placedBlock=static_cast<BlockId>(blockIds.at(static_cast<uint16_t>(*entry.second.properties.placedBlock)));Plugins::mutableContentState().items.emplace(id,std::move(entry.second));}
+        for(auto& entry:Plugins::mutableContentState().blocks)if(entry.second.drop!=ItemId::EMPTY)entry.second.drop=static_cast<ItemId>(itemIds.at(static_cast<uint16_t>(entry.second.drop)));
         Plugins::freezeContent();const auto changedItem=Plugins::resolveItem("example_content:blue_brick");const auto changedBlock=Plugins::resolveBlock("example_content:blue_brick");
         auto loaded=store.loadMetadata();require(loaded.inventory.slot(0).id==changedItem&&loaded.entities[0].item.id==changedItem,"inventory and entity IDs remapped by name");
         require(store.loadChunkOverrides(-1,-2)[0].block==changedBlock,"block edits remapped");require(store.loadBlockEntities(-1,-2)[0].value.chest[0].id==changedItem,"containers remapped");require(store.loadChunkEntities(-1,-2)[0].item.id==changedItem,"chunk dropped items remapped");
         const auto cache=store.loadGeneratedChunk(-1,-2,metadata.generationVersion);require(cache&&cache->front()==static_cast<uint16_t>(changedBlock),"generated RLE remapped");
         Chunk restored(-1,-2);restored.loadRawBlocks(*cache);require(restored.getBlock(0,Config::WORLD_MIN_Y,0)==changedBlock,"runtime chunk accepts registered cache palette");
-        Plugins::content().requirements.clear();rejects([&]{store.loadMetadata();},"missing plugin set refuses load");require(bytes(root/"world"/"level.bin")==before,"refused load does not write");
+        Plugins::mutableContentState().requirements.clear();rejects([&]{store.loadMetadata();},"missing plugin set refuses load");require(bytes(root/"world"/"level.bin")==before,"refused load does not write");
         require(!store.loadMetadata(true).pluginCompatibilityError.empty(),"inspection retains incompatible world metadata");
-        Plugins::content()=savedState;Plugins::freezeContent();
+        Plugins::mutableContentState()=savedState;Plugins::freezeContent();
         if(Platform::DynamicLibrary::supported()) {
             manager.command("/native_demo:gift");const int beforeFault=operations;
             auto update=Plugins::event(MC_UPDATE_POST);manager.dispatch(update);manager.flushOperations();
-            require(!Plugins::content().runtimeFault.empty()&&operations==beforeFault,"callback fault discards pending world mutations");
+            require(!Plugins::mutableContentState().runtimeFault.empty()&&operations==beforeFault,"callback fault discards pending world mutations");
         }
         manager.shutdown();
-        Plugins::PluginManager safe(paths);safe.initialize(true);require(Plugins::content().blocks.empty()&&Plugins::content().requirements.empty(),"safe mode loads no optional content");
+        Plugins::PluginManager safe(paths);safe.initialize(true);require(Plugins::mutableContentState().blocks.empty()&&Plugins::mutableContentState().requirements.empty(),"safe mode loads no optional content");
         for(const auto& p:safe.plugins())if(p.manifest.builtin)require(!p.enabled&&!p.manifest.description("zh_cn").empty(),"safe mode retains disabled official descriptions");
         for(auto id:creativeInventoryItemsIn(CreativeItemCategory::BuildingBlocks))require(isValidItemId(id),"registry reset removes stale creative items");
         safe.shutdown();

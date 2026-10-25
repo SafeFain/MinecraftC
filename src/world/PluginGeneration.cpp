@@ -1,6 +1,6 @@
 #include "world/WorldGenerator.h"
 #include "world/BiomeBlockLogic.h"
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include <algorithm>
 #include <cmath>
 #include <set>

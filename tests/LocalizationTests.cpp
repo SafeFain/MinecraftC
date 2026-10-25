@@ -1,8 +1,10 @@
 #include "HeavenContentFixture.h"
 #include "game/ArabicShaper.h"
 #include "game/Localization.h"
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 #include "world/Biome.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 
 #include <nlohmann/json.hpp>
 #include <stb_truetype.h>
@@ -192,7 +194,7 @@ int main() {
         nlohmann::json json;
         file >> json;
         require(json.is_object(), "language file parses");
-        const auto& extensions=Plugins::content().extensions;
+        const auto& extensions=Plugins::mutableContentState().extensions;
         const auto& bundle=extensions.translations.at(std::string(languageCode(language)));
         for(const auto& alias:extensions.translationAliases)
             if(const auto value=bundle.find(alias.second);value!=bundle.end())json[alias.first]=value->second;
@@ -272,10 +274,10 @@ int main() {
             "Arabic UI strings are shaped for display");
     localization.setLanguage(Language::English);
 
-    const auto savedContent=Plugins::content();
+    const auto savedContent=Plugins::mutableContentState();
     for(const auto language:languagesByEnglishName()) {
         localization.setLanguage(language);
-        const auto& dictionary=Plugins::content().extensions.translations.at(std::string(languageCode(language)));
+        const auto& dictionary=Plugins::mutableContentState().extensions.translations.at(std::string(languageCode(language)));
         const auto expected=language==Language::SimplifiedChinese?std::string("天境"):
             dictionary.at("official_heaven:dimension.heaven");
         require(localization.dimensionName(DimensionId::Heaven)==(language==Language::Arabic?shapeArabic(expected):expected),
@@ -284,32 +286,32 @@ int main() {
     }
     localization.setLanguage(Language::Arabic);
     require(localization.format("loading.enter_dimension",{localization.dimensionName(DimensionId::Heaven)})==
-            shapeArabic("جارٍ الدخول إلى "+Plugins::content().extensions.translations.at("ar_sa").at("official_heaven:dimension.heaven")),
+            shapeArabic("جارٍ الدخول إلى "+Plugins::mutableContentState().extensions.translations.at("ar_sa").at("official_heaven:dimension.heaven")),
             "formatting a localized Arabic dimension shapes it exactly once");
-    Plugins::content().extensions.translations["en_us"]["p1_test:english_only"]="English fallback 42";
+    Plugins::mutableContentState().extensions.translations["en_us"]["p1_test:english_only"]="English fallback 42";
     localization.setLanguage(Language::SimplifiedChinese);
     require(localization.text("p1_test:english_only")=="English fallback 42","partial plugin dictionary falls back to English");
     localization.setLanguage(Language::Arabic);
     require(localization.text("p1_test:english_only")==shapeArabic("English fallback 42"),"plugin English fallback uses Arabic shaping path");
     Plugins::DimensionContent third;third.key="p1_test:realm";third.name="Third realm";third.nameKey="p1_test:realm_name";
-    Plugins::content().extensions.dimensions.emplace(3,third);
-    Plugins::content().extensions.translations["en_us"][third.nameKey]="Third realm";
-    Plugins::content().extensions.translations["zh_cn"][third.nameKey]=u8"第三维度";
-    Plugins::content().extensions.translations["ar_sa"][third.nameKey]=u8"عالم ثالث";
+    Plugins::mutableContentState().extensions.dimensions.emplace(3,third);
+    Plugins::mutableContentState().extensions.translations["en_us"][third.nameKey]="Third realm";
+    Plugins::mutableContentState().extensions.translations["zh_cn"][third.nameKey]=u8"第三维度";
+    Plugins::mutableContentState().extensions.translations["ar_sa"][third.nameKey]=u8"عالم ثالث";
     localization.setLanguage(Language::SimplifiedChinese);
     require(localization.dimensionName(static_cast<DimensionId>(3))==u8"第三维度","third registered dimension uses localized UI name");
     localization.setLanguage(Language::Arabic);
     require(localization.dimensionName(static_cast<DimensionId>(3))==shapeArabic(u8"عالم ثالث"),"third dimension uses Arabic shaping");
     localization.setLanguage(Language::Japanese);
     require(localization.dimensionName(static_cast<DimensionId>(3))=="Third realm","third dimension name falls back to English");
-    const auto& aliases=Plugins::content().extensions.translationAliases;
+    const auto& aliases=Plugins::mutableContentState().extensions.translationAliases;
     require(!aliases.empty(),"official package preserves historical translation aliases");
     for(const auto& alias:aliases)require(localization.text(alias.first)==localization.text(alias.second),"historical translation alias differs from namespaced value");
-    Plugins::content()={};
+    Plugins::mutableContentState()={};
     localization.setLanguage(Language::English);
     require(localization.text("official_heaven:dimension.heaven")=="[official_heaven:dimension.heaven]"&&
             !Plugins::availableItem(ItemId::STARSTEP_SCEPTER),"disabled provider retained translations or content");
-    Plugins::content()=savedContent;
+    Plugins::mutableContentState()=savedContent;
     localization.setLanguage(Language::English);
 
     std::string name = "World";
@@ -400,7 +402,7 @@ int main() {
             for(const auto language:languagesByEnglishName())
                 require(plugin.value().contains(std::string(languageCode(language))),"official descriptions cover all ten languages");
         else for(const auto& entry:extra.items()) {
-            const auto& en=Plugins::content().extensions.translations.at("en_us");
+            const auto& en=Plugins::mutableContentState().extensions.translations.at("en_us");
             require(en.count(entry.key())!=0,"host correction only targets registered provider keys");
             require(placeholders(entry.value().get<std::string>())==placeholders(en.at(entry.key())),"host correction preserves placeholders");
         }

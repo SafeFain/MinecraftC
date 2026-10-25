@@ -12,7 +12,7 @@
 #include <SDL3/SDL.h>
 #include "core/TextEditBuffer.h"
 #include "core/Window.h"
-#include "platform/Clipboard.h"
+#include "core/Clipboard.h"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>

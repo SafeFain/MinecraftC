@@ -2,6 +2,8 @@
 #include "world/BlockEntityLogic.h"
 #include "network/ContentIds.h"
 #include "network/StateProtocol.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/GenerationValidation.h"
 #include <cmath>
 #include <set>
 

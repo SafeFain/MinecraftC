@@ -1,11 +1,13 @@
 #pragma once
 #include "plugins/PluginManager.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/ContentMutation.h"
 #include "network/ContentIds.h"
 #include "network/LodProtocol.h"
 
 namespace PluginLanIntegration {
 inline void codecs() {
-    const auto saved=Plugins::content();
+    const auto saved=Plugins::mutableContentState();
     const auto block=Plugins::resolveBlock("official_content:crystal_block");
     const auto item=Plugins::resolveItem("official_content:crystal_block");
     Lan::ChunkSnapshot chunk;chunk.revision=1;chunk.epoch=1;chunk.blocks.assign(Config::CHUNK_VOLUME,static_cast<uint16_t>(block));
@@ -24,7 +26,7 @@ inline void codecs() {
     const auto actionBytes=Lan::encodeGameAction(action);
     Lan::PlayerProfile profile;profile.identity={Lan::randomToken(),Lan::randomToken(),"Palette"};profile.inventory.slot(0)={item,7,0};
     const auto profileBytes=Lan::encodeProfile(profile);
-    auto& c=Plugins::content();auto blocks=std::move(c.blocks);auto items=std::move(c.items);c.blocks.clear();c.items.clear();
+    auto& c=Plugins::mutableContentState();auto blocks=std::move(c.blocks);auto items=std::move(c.items);c.blocks.clear();c.items.clear();
     for(auto& entry:blocks){const auto id=static_cast<uint16_t>(entry.first+100);entry.second.properties.id=static_cast<BlockId>(id);c.blocks.emplace(id,std::move(entry.second));}
     for(auto& entry:items)c.items.emplace(static_cast<uint16_t>(entry.first+200),std::move(entry.second));
     Plugins::freezeContent();const auto mappedBlock=Plugins::resolveBlock("official_content:crystal_block");const auto mappedItem=Plugins::resolveItem("official_content:crystal_block");
@@ -150,7 +152,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         require(!profileBeforeFault.empty(),"guest profile exists before fault");
         require(plugins.command("/legacy_fixture:gift"),"operation queued before fault");
         require(plugins.command("/lan_fixture:fault"),"faulting command found");
-        require(!Plugins::content().runtimeFault.empty(),"callback failure marks runtime fault");
+        require(!Plugins::mutableContentState().runtimeFault.empty(),"callback failure marks runtime fault");
         faultGuest.player.inventory().slot(0)={ItemId::DIAMOND,64,0};
         GameSessionTestAccess::pluginRemoveGuest(host,GameSessionTestAccess::replicaPeer(client));
         require(bytes(savedProfile)==profileBeforeFault,"faulted departure does not overwrite guest profile");

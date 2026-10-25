@@ -1,4 +1,4 @@
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 #include "renderer/BlockAtlasData.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
@@ -8,7 +8,7 @@
 #include "core/AssetStore.h"
 #include "game/Language.h"
 #include "game/SurvivalRules.h"
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 
 #include <algorithm>

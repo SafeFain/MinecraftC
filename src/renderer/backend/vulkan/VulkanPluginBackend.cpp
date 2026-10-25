@@ -1,6 +1,7 @@
 #include "renderer/backend/vulkan/VulkanPluginBackend.h"
 #include "renderer/backend/vulkan/VulkanHelpers.h"
 #include "renderer/RenderDevice.h"
+#include "plugins/ContentQueries.h"
 #include "Config.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>

@@ -5,6 +5,8 @@
 #include "player/PlayerRenderer.h"
 #include "renderer/HeldItemRenderer.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
@@ -31,7 +33,7 @@ int main(int argc,char** argv) {
         Plugins::HeldModelContent scepter;scepter.asset=loaded.asset;
         const auto first=glm::mat4(1),third=glm::rotate(glm::mat4(1),glm::radians(-120.f),glm::vec3(1,0,0));
         for(int i=0;i<16;++i){scepter.first[i]=first[i/4][i%4];scepter.third[i]=third[i/4][i%4];}
-        Plugins::content().extensions.heldModels.emplace(static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER),scepter);
+        Plugins::mutableContentState().extensions.heldModels.emplace(static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER),scepter);
         Window window(width,720,"MinecraftC held tool smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,root);
         renderer.setVisualQuality(VisualQuality::Low);renderer.setEnhancedVisuals(false);

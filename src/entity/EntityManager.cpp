@@ -6,6 +6,7 @@
 #include "world/World.h"
 #include "game/SurvivalSession.h"
 #include "game/SurvivalRules.h"
+#include "game/SaveStore.h"
 #include "game/NetherProgression.h"
 #include "world/NetherGenerator.h"
 #include "world/NetherPortal.h"
@@ -62,8 +63,8 @@ void EntityManager::clear() {
     m_modelRegistry.clearInstances();
 }
 
-std::vector<WorldMetadata::PersistedEntity> EntityManager::saveEntities() const {
-    std::vector<WorldMetadata::PersistedEntity> saved;
+std::vector<EntityRecord> EntityManager::saveEntities() const {
+    std::vector<EntityRecord> saved;
     saved.reserve(m_entities.size());
     for (const auto& entity : m_entities) {
         saved.push_back({
@@ -78,7 +79,7 @@ std::vector<WorldMetadata::PersistedEntity> EntityManager::saveEntities() const 
 }
 
 void EntityManager::loadEntities(
-    const std::vector<WorldMetadata::PersistedEntity>& saved) {
+    const std::vector<EntityRecord>& saved) {
     for (const auto& source : saved) {
         Entity entity;
         entity.id = m_nextId++;
@@ -117,7 +118,7 @@ void EntityManager::syncChunks() {
         // because movement carried the chunk outside the active radius.
         if (m_dirtyEntityChunks.count(key) != 0 ||
             m_pendingEntitySaves.count(key) != 0) {
-            std::vector<WorldMetadata::PersistedEntity> saved;
+            std::vector<EntityRecord> saved;
             for (const auto& entity : m_entities) if (entityChunk(entity.position)==key) {
                 saved.push_back({static_cast<uint16_t>(entity.type),entity.position,entity.velocity,
                     entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
@@ -179,7 +180,7 @@ void EntityManager::syncChunks() {
                 }
             }
             if (!requests.empty() || nativePopulation) {
-                std::vector<WorldMetadata::PersistedEntity> populated;
+                std::vector<EntityRecord> populated;
                 for (const Entity& entity : m_entities) {
                     if (entityChunk(entity.position) != key) continue;
                     populated.push_back({static_cast<uint16_t>(entity.type),
@@ -227,7 +228,7 @@ bool EntityManager::flushChunkEntities(size_t maxFiles, bool includeAllLoaded) {
     size_t savedFiles = 0;
     while (!m_pendingEntitySaves.empty() && savedFiles < maxFiles) {
         const auto key = *m_pendingEntitySaves.begin();
-        std::vector<WorldMetadata::PersistedEntity> saved;
+        std::vector<EntityRecord> saved;
         for(const auto& entity:m_entities) if(entityChunk(entity.position)==key)
             saved.push_back({static_cast<uint16_t>(entity.type),entity.position,entity.velocity,
                 entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,

@@ -9,7 +9,7 @@
 #include "game/ClientSettings.h"
 #include "game/SurvivalRules.h"
 #include "game/TextWrap.h"
-#include "platform/Clipboard.h"
+#include "core/Clipboard.h"
 #include "player/Player.h"
 
 #include <algorithm>

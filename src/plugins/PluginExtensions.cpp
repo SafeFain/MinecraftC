@@ -1,4 +1,6 @@
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include "Config.h"
 #include "model/GltfLoader.h"
 #include <algorithm>
@@ -29,16 +31,16 @@ int32_t PluginManager::blockFamily(MC_PluginContext& ctx,const MC_BlockFamily& d
     const std::string full=d.full_block?d.full_block:"";
     require(d.kind!=MC_SLAB_FAMILY||validKey(full),"Slab requires full_block key");
     const uint32_t count=d.kind==MC_SLAB_FAMILY?2:d.kind==MC_STAIR_FAMILY?8:d.kind==MC_DOOR_FAMILY?64:24;
-    require(FIRST_CONTENT_ID+content().blocks.size()+count<=INVALID_CONTENT_ID,"Block registry full");
+    require(FIRST_CONTENT_ID+mutableContentState().blocks.size()+count<=INVALID_CONTENT_ID,"Block registry full");
     for(uint32_t n=0;n<count;++n) {
         const auto stateKey=n?key+"/state/"+std::to_string(n):key;
         require(validKey(stateKey),"State key exceeds key limit");
-        for(const auto& b:content().blocks)require(b.second.key!=stateKey,"Duplicate state key");
+        for(const auto& b:mutableContentState().blocks)require(b.second.key!=stateKey,"Duplicate state key");
     }
     for(uint32_t n=0;n<count;++n) {
         MC_Block b=d.block;const std::string stateKey=n?key+"/state/"+std::to_string(n):key;b.key=stateKey.c_str();
         uint16_t raw;block(ctx,b,raw);if(!n)id=raw;
-        auto& state=content().blocks.at(raw);state.family=id;state.familyKind=d.kind;state.stateIndex=n;
+        auto& state=mutableContentState().blocks.at(raw);state.family=id;state.familyKind=d.kind;state.stateIndex=n;
         state.properties.shape=d.kind==MC_SLAB_FAMILY?RenderShape::Slab:d.kind==MC_STAIR_FAMILY?RenderShape::Stair:d.kind==MC_DOOR_FAMILY?RenderShape::Door:RenderShape::Button;
         state.fullBlock=full;state.manualOpen=d.manual_open;state.villagerOpen=d.villager_open;
         state.releaseTicks=d.release_ticks;state.arrowTrigger=d.arrow_trigger;
@@ -47,7 +49,7 @@ int32_t PluginManager::blockFamily(MC_PluginContext& ctx,const MC_BlockFamily& d
 }
 int32_t PluginManager::blockGeometry(MC_PluginContext& ctx,const MC_BlockGeometry& d) {
     require(d.size>=sizeof(d),"Invalid geometry descriptor");owned(ctx,text(d.block));
-    auto id=resolveBlock(d.block);auto& b=content().blocks.at(static_cast<uint16_t>(id));
+    auto id=resolveBlock(d.block);auto& b=mutableContentState().blocks.at(static_cast<uint16_t>(id));
     require(!b.family,"Template geometry cannot be overridden");
     auto group=[](const MC_BlockBox* boxes,uint32_t count)->std::optional<BlockCollisionBoxes> {
         require(count<=MC_MAX_BLOCK_BOXES&&(!count||boxes),"Invalid box count/buffer");
@@ -112,7 +114,7 @@ BlockId composeState(const MC_BlockState& s) {
 }
 void PluginManager::callbackFault(size_t i,const std::string& reason) {
     m_info.at(i).active=false;m_info.at(i).status=reason+"; restart required";
-    content().runtimeFault="Plugin "+m_info.at(i).manifest.id+": "+reason;
+    mutableContentState().runtimeFault="Plugin "+m_info.at(i).manifest.id+": "+reason;
     discardOperations();
 }
 int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d,uint16_t& id) {
@@ -134,7 +136,7 @@ int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d
         require(bool(loadedModel),loadedModel.error.c_str());
         e.asset=loadedModel.asset;
     }
-    auto& entries=content().extensions.entities;
+    auto& entries=mutableContentState().extensions.entities;
     for(const auto& it:entries)require(it.second.key!=e.key,"Duplicate entity key");
     if(d.target&&*d.target) {
         id=resolveEntity(d.target);require(id<MC_BUILTIN_ENTITY_COUNT&&id!=0&&id!=9&&id!=10,"Only builtin mobs may be overridden");
@@ -147,7 +149,7 @@ int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d
     if(d.callback) {
         auto f=d.callback;auto u=d.userdata;auto* c=&ctx;const size_t i=ctx.index;
         e.callback=[this,f,u,c,i](uint32_t kind,const MC_EntitySnapshot& s,MC_EntityIntent& intent){
-            if(!m_info[i].active||!content().runtimeFault.empty())return;
+            if(!m_info[i].active||!mutableContentState().runtimeFault.empty())return;
             const auto previous=m_phase;m_phase=MC_UPDATE_PRE;
             try {if(f(c,kind,&s,&intent,u))callbackFault(i,"Entity callback failed");}
             catch(const std::exception&){callbackFault(i,"Exception across entity ABI");}
@@ -175,7 +177,7 @@ int32_t PluginManager::dimensionDefinition(MC_PluginContext& ctx,const MC_Dimens
     value.deathTarget=d.death_target?d.death_target:"";value.voidTarget=d.void_target?d.void_target:"";
     if(!value.deathTarget.empty())reference(value.deathTarget);
     if(!value.voidTarget.empty())reference(value.voidTarget);
-    auto& entries=content().extensions.dimensions;
+    auto& entries=mutableContentState().extensions.dimensions;
     for(const auto& entry:entries)require(entry.second.key!=value.key,"Duplicate dimension");
     require(entries.size()<Config::PLUGIN_MAX_DIMENSIONS,"Too many dimensions");
     const auto& provider=m_info.at(ctx.index).manifest;
@@ -188,7 +190,7 @@ int32_t PluginManager::dimensionDefinitionV2(MC_PluginContext& ctx,const MC_Dime
     require(d.size>=sizeof(d)&&d.sample_spawn,"Dimension V2 requires spawn callback");
     auto base=d.base;base.spawn=MC_SPAWN_SAFE_SURFACE;
     dimensionDefinition(ctx,base,id);
-    auto& value=content().extensions.dimensions.at(id);
+    auto& value=mutableContentState().extensions.dimensions.at(id);
     value.spawn=MC_SPAWN_SAMPLED;value.sampleSpawn=d.sample_spawn;value.spawnUserdata=d.userdata;
     return 0;
 }
@@ -198,7 +200,7 @@ int32_t PluginManager::dimensionDefinitionV3(MC_PluginContext& ctx,const MC_Dime
     require(validKey(name)&&name.rfind(prefix,0)==0,"Dimension name key must use own namespace");
     if(d.base.sample_spawn)dimensionDefinitionV2(ctx,d.base,id);
     else dimensionDefinition(ctx,d.base.base,id);
-    auto& value=content().extensions.dimensions.at(id);value.nameKey=name;value.seedDomain=d.seed_domain;
+    auto& value=mutableContentState().extensions.dimensions.at(id);value.nameKey=name;value.seedDomain=d.seed_domain;
     return 0;
 }
 void PluginManager::bedTravel(MC_PluginContext& ctx,const MC_DimensionTravelEntry& d) {
@@ -207,10 +209,10 @@ void PluginManager::bedTravel(MC_PluginContext& ctx,const MC_DimensionTravelEntr
     const auto prefix=m_info.at(ctx.index).manifest.id+":";
     require(validKey(name)&&name.rfind(prefix,0)==0,"Travel name key must use own namespace");
     reference(ctx,dimensionContent(d.source).key);reference(ctx,dimensionContent(d.target).key);
-    require(content().extensions.bedTravel.size()<128&&content().extensions.bedTravel.emplace(key,DimensionTravelContent{d.source,d.target,key,name}).second,"Duplicate/too many travel entries");
+    require(mutableContentState().extensions.bedTravel.size()<128&&mutableContentState().extensions.bedTravel.emplace(key,DimensionTravelContent{d.source,d.target,key,name}).second,"Duplicate/too many travel entries");
 }
 void PluginManager::localizationBundle(MC_PluginContext& ctx,const char* directory) {
-    require(m_phase==MC_REGISTER&&!content().frozen,"Localization registration closed");
+    require(m_phase==MC_REGISTER&&!mutableContentState().frozen,"Localization registration closed");
     const auto& info=m_info.at(ctx.index);const auto root=containedPath(info.root,text(directory));
     require(std::filesystem::is_directory(root),"Localization bundle must be a directory");
     const auto prefix=info.manifest.id+":";bool english=false;size_t entries=0;
@@ -226,7 +228,7 @@ void PluginManager::localizationBundle(MC_PluginContext& ctx,const char* directo
         for(const auto& value:data.object) {
             if(!(++entries<=65536&&validKey(value.first)&&value.first.rfind(prefix,0)==0))throw std::runtime_error("Language key must use own namespace/entry limit: "+value.first);
             if(value.second.type!=Json::Type::String||value.second.string.size()>16384)throw std::runtime_error("Invalid language value: "+value.first);
-            if(!content().extensions.translations[language].emplace(value.first,value.second.string).second)throw std::runtime_error("Duplicate language key: "+value.first);
+            if(!mutableContentState().extensions.translations[language].emplace(value.first,value.second.string).second)throw std::runtime_error("Duplicate language key: "+value.first);
         }
         english=english||language=="en_us";
         }catch(const std::exception& e) {
@@ -239,49 +241,49 @@ void PluginManager::localizationBundle(MC_PluginContext& ctx,const char* directo
 void PluginManager::localizedName(MC_PluginContext& ctx,const char* contentKey,const char* nameKey) {
     const auto key=text(contentKey),name=text(nameKey);owned(ctx,key);
     require(validKey(name)&&name.rfind(m_info.at(ctx.index).manifest.id+":",0)==0,"Localized name must use own namespace");
-    reference(ctx,key);require(content().extensions.nameKeys.emplace(key,name).second,"Duplicate localized content name");
+    reference(ctx,key);require(mutableContentState().extensions.nameKeys.emplace(key,name).second,"Duplicate localized content name");
 }
 int32_t PluginManager::generator(MC_PluginContext& ctx,const MC_GeneratorDefinition& d) {
     require(d.size>=sizeof(d),"Generator descriptor size mismatch");owned(ctx,text(d.key));
     require(validDimension(d.dimension)&&d.column&&d.voxel,"Generator requires column and voxel callbacks");
     GeneratorContent g;g.key=d.key;g.name=text(d.name);g.revision=text(d.revision);
     require(g.revision.size()<=128,"Generator revision too long");g.dimension=d.dimension;g.column=d.column;g.voxel=d.voxel;g.userdata=d.userdata;
-    require(content().extensions.generators.emplace(g.key,g).second,"Duplicate generator");return 0;
+    require(mutableContentState().extensions.generators.emplace(g.key,g).second,"Duplicate generator");return 0;
 }
 int32_t PluginManager::modifier(MC_PluginContext& ctx,const MC_ModifierDefinition& d) {
     require(d.size>=sizeof(d),"Modifier descriptor size mismatch");owned(ctx,text(d.key));
     require(validDimension(d.dimension)&&d.radius<=64&&d.decorate,"Invalid modifier");
     ModifierContent m;m.key=d.key;m.revision=text(d.revision);require(m.revision.size()<=128,"Modifier revision too long");
     m.dimension=d.dimension;m.radius=d.radius;m.decorate=d.decorate;m.userdata=d.userdata;
-    require(content().extensions.modifiers.emplace(m.key,m).second,"Duplicate modifier");return 0;
+    require(mutableContentState().extensions.modifiers.emplace(m.key,m).second,"Duplicate modifier");return 0;
 }
 int32_t PluginManager::generatorV2(MC_PluginContext& ctx,const MC_GeneratorDefinitionV2& d) {
     require(d.size>=sizeof(d),"Generator V2 descriptor size mismatch");
     const std::string revision=(d.terrain_lod||d.decoration_lod)?text(d.lod_revision):"";
     require(revision.size()<=128,"LOD revision too long");
     generator(ctx,d.base);
-    auto& g=content().extensions.generators.at(d.base.key);
+    auto& g=mutableContentState().extensions.generators.at(d.base.key);
     g.batch=d.batch;g.terrainLod=d.terrain_lod;g.decorationLod=d.decoration_lod;g.lodRevision=revision;
     return 0;
 }
 int32_t PluginManager::generatorV3(MC_PluginContext& ctx,const MC_GeneratorDefinitionV3& d) {
     require(d.size>=sizeof(d)&&d.layers,"Invalid generator V3");
-    generatorV2(ctx,d.base);content().extensions.generators.at(d.base.base.key).layers=d.layers;return 0;
+    generatorV2(ctx,d.base);mutableContentState().extensions.generators.at(d.base.base.key).layers=d.layers;return 0;
 }
 int32_t PluginManager::modifierV2(MC_PluginContext& ctx,const MC_ModifierDefinitionV2& d) {
     require(d.size>=sizeof(d),"Modifier V2 descriptor size mismatch");
     const std::string revision=d.decoration_lod?text(d.lod_revision):"";
     require(revision.size()<=128,"LOD revision too long");
     modifier(ctx,d.base);
-    auto& m=content().extensions.modifiers.at(d.base.key);
+    auto& m=mutableContentState().extensions.modifiers.at(d.base.key);
     m.decorationLod=d.decoration_lod;m.lodRevision=revision;
     return 0;
 }
 int32_t PluginManager::renderResource(MC_PluginContext& ctx,const MC_RenderResource& d,MC_RenderHandle& id) {
     require(d.size>=sizeof(d)&&d.kind<=MC_RENDER_PIPELINE,"Invalid render resource");
-    const auto key=text(d.key);require(m_phase==MC_REGISTER&&!content().frozen,"Render registration is closed");
+    const auto key=text(d.key);require(m_phase==MC_REGISTER&&!mutableContentState().frozen,"Render registration is closed");
     require(validKey(key)&&key.rfind(m_info.at(ctx.index).manifest.id+":",0)==0,"Render key must use plugin namespace");
-    auto& resources=content().extensions.renderResources;
+    auto& resources=mutableContentState().extensions.renderResources;
     require(resources.size()<256,"Too many render resources");
     for(const auto& r:resources)require(r.second.key!=key,"Duplicate render resource");
     RenderResourceContent r;r.key=key;r.owner=ctx.index;r.descriptor=d;r.descriptor.key=nullptr;r.descriptor.path=nullptr;r.descriptor.data=nullptr;r.descriptor.indices=nullptr;
@@ -326,18 +328,18 @@ int32_t PluginManager::renderResource(MC_PluginContext& ctx,const MC_RenderResou
 }
 int32_t PluginManager::renderPass(MC_PluginContext& ctx,const MC_RenderPass& d) {
     require(d.size>=sizeof(d)&&d.stage<MC_RENDER_STAGE_COUNT&&d.replace<=1&&d.callback,"Invalid render pass");
-    const auto key=text(d.key);require(m_phase==MC_REGISTER&&!content().frozen,"Render registration is closed");
+    const auto key=text(d.key);require(m_phase==MC_REGISTER&&!mutableContentState().frozen,"Render registration is closed");
     require(validKey(key)&&key.rfind(m_info.at(ctx.index).manifest.id+":",0)==0,"Render key must use plugin namespace");
-    for(const auto& p:content().extensions.renderPasses){require(p.key!=key,"Duplicate render pass");require(!(d.replace&&p.replace&&p.stage==d.stage),"Conflicting render replacement");}
+    for(const auto& p:mutableContentState().extensions.renderPasses){require(p.key!=key,"Duplicate render pass");require(!(d.replace&&p.replace&&p.stage==d.stage),"Conflicting render replacement");}
     auto f=d.callback;auto u=d.userdata;auto* c=&ctx;const size_t i=ctx.index;
     RenderPassContent p;p.key=key;p.owner=i;p.stage=d.stage;p.replace=d.replace;p.priority=d.priority;
     p.callback=[this,f,u,c,i](const MC_RenderFrame& frame){
-        if(!m_info[i].active||!content().runtimeFault.empty())return;
+        if(!m_info[i].active||!mutableContentState().runtimeFault.empty())return;
         const auto previous=m_phase;m_phase=MC_HUD;
         try{if(f(c,&frame,u))callbackFault(i,"Render callback failed");}
         catch(...){callbackFault(i,"Exception across render ABI");}
         m_phase=previous;
-    };content().extensions.renderPasses.push_back(std::move(p));return 0;
+    };mutableContentState().extensions.renderPasses.push_back(std::move(p));return 0;
 }
 const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t version) {
     if(const auto* result=capability(name,version))return result;
@@ -397,7 +399,7 @@ const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t
         ,[](MC_PluginContext* c,const MC_SpawnEggDefinition* d,uint16_t* id){return call(c,[&]{require(d&&d->size>=sizeof(*d)&&id,"Invalid spawn egg descriptor");
             const auto type=resolveEntity(text(d->entity));require(type!=0&&type!=9&&type!=10,"Invalid spawn egg mob");
             auto item=d->item;item.kind=MC_MATERIAL;owner(c).item(*c,item,*id);
-            auto& entry=content().items.at(*id);entry.properties.kind=ItemKind::SpawnEgg;entry.spawnEntity=type;
+            auto& entry=mutableContentState().items.at(*id);entry.properties.kind=ItemKind::SpawnEgg;entry.spawnEntity=type;
         },true);}
     };
     static const MC_WorldgenV1 worldgen{sizeof(MC_WorldgenV1),1,
@@ -412,7 +414,7 @@ const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t
     static const MC_DimensionsV1 dimensions{sizeof(MC_DimensionsV1),1,
         [](MC_PluginContext* c,const MC_DimensionDefinition* d,uint32_t* id){return call(c,[&]{require(d&&id,"Missing dimension arguments");owner(c).dimensionDefinition(*c,*d,*id);},true);},
         [](MC_PluginContext* c,const char* key)->uint32_t {uint32_t result=MC_INVALID_DIMENSION;call(c,[&]{result=resolveDimension(text(key));});return result;},
-        [](MC_PluginContext* c,uint32_t id,MC_DimensionDefinition* out){return call(c,[&]{require(content().frozen&&out&&out->size>=sizeof(*out),"Dimension query requires frozen registry and sized output");const auto& d=dimensionContent(id);
+        [](MC_PluginContext* c,uint32_t id,MC_DimensionDefinition* out){return call(c,[&]{require(mutableContentState().frozen&&out&&out->size>=sizeof(*out),"Dimension query requires frozen registry and sized output");const auto& d=dimensionContent(id);
             *out={};out->size=sizeof(*out);out->key=d.key.c_str();out->name=d.name.c_str();out->revision=d.revision.c_str();out->generator=d.generation.generator.c_str();out->generator_revision=d.generation.revision.c_str();out->parameters=d.generation.parameters.c_str();out->weather=d.weather;out->disable_natural_spawning=!d.natural;out->spawn=d.spawn;std::copy(d.position.begin(),d.position.end(),out->spawn_position);out->death_target=d.deathTarget.c_str();out->void_target=d.voidTarget.c_str();if(d.modifierView.empty())for(const auto& m:d.generation.modifiers)d.modifierView.push_back({m.first.c_str(),m.second.c_str()});out->modifiers=d.modifierView.data();out->modifier_count=static_cast<uint32_t>(d.modifierView.size());});},
         [](MC_PluginContext* c,uint64_t player,uint32_t dim){return call(c,[&]{require(validDimension(dim),"Invalid dimension");auto& m=owner(c);require(context().player==0||context().player==player,"Cannot travel another player as guest");m.enqueue(*c,[&m,player,dim]{return m.travelPlayer&&m.travelPlayer(player,dim);});});}};
     const std::string key=name;

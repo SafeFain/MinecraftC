@@ -1,7 +1,10 @@
 #pragma once
 #include "plugins/PluginManager.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
 #include "network/ChunkProtocol.h"
 #include "entity/GroundNavigation.h"
+#include "world/ChunkMeshBuilder.h"
 namespace BlockShapesIntegration {
 inline void check(bool ok,const char* message){if(!ok)throw std::runtime_error(message);}
 inline int run(const std::filesystem::path& assets,const std::filesystem::path& module) {
@@ -30,11 +33,11 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     bool rejected=false;try{Plugins::resolveBlock("shape_bad:first");}catch(const std::exception&){rejected=true;}check(rejected,"geometry registration did not roll back");
     MC_PluginContext ctx;ctx.manager=&plugins;ctx.index=index;const auto* api=static_cast<const MC_BlockShapesV1*>(plugins.extension(&ctx,MC_BLOCK_SHAPES_EXTENSION,1));
     check(api&&api->version==1&&!plugins.extension(&ctx,MC_BLOCK_SHAPES_EXTENSION,2),"shape extension negotiation");
-    for(const auto& entry:Plugins::content().blocks)if(entry.second.family) {
+    for(const auto& entry:Plugins::mutableContentState().blocks)if(entry.second.family) {
         MC_BlockState state{};state.size=sizeof(state);uint16_t output=0;
         check(!api->state(&ctx,entry.first,&state)&&!api->compose(&ctx,&state,&output)&&output==entry.first,"template state roundtrip");
         check(itemForBlock(static_cast<BlockId>(entry.first))!=ItemId::EMPTY,"template state lost drop");
-        check(Plugins::content().networkDescription.count("shape/"+entry.second.key),"shape definition absent from handshake");
+        check(Plugins::mutableContentState().networkDescription.count("shape/"+entry.second.key),"shape definition absent from handshake");
     }
     const auto slab=Plugins::resolveBlock("block_shapes_data:slab"),stair=Plugins::resolveBlock("block_shapes_data:stair"),door=Plugins::resolveBlock("block_shapes_data:door"),button=Plugins::resolveBlock("block_shapes_data:button"),box=Plugins::resolveBlock("block_shapes_data:box");
     ArchitecturalBlockState a;check(decodeArchitecturalBlock(slab,a),"slab decoding");a.half=BlockHalf::Top;
@@ -65,21 +68,21 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         check(p.alpha==.5f,"model alpha lost");
     }
     check(std::abs(area-6)<.0001,"box union contains internal or duplicate faces");
-    auto altered=Plugins::content().networkDescription;const auto signature=Lan::contentSignature(altered);
+    auto altered=Plugins::mutableContentState().networkDescription;const auto signature=Lan::contentSignature(altered);
     altered["shape/block_shapes_data:button"]="different release policy";check(Lan::contentSignature(altered)!=signature,"behavior mismatch leaves handshake unchanged");
     // Namespaced palettes and canonical wire IDs survive a different local allocation order.
-    const auto original=Plugins::content();
+    const auto original=Plugins::mutableContentState();
     WorldMetadata metadata;metadata.displayName="Shape palette";metadata.generationVersion=WorldGenContext::GENERATION_VERSION;
     SaveStore palette(root/"palette");palette.saveMetadata(metadata);palette.saveChunkOverrides(-1,-1,{{0,architecturalStateBlock(a)}});
     std::vector<uint16_t> raw;chunk.copyRawBlocks(raw);const auto wire=Lan::encodeChunkSnapshot({{DimensionId::Overworld,-1,-1},1,1,raw});
-    auto blocks=Plugins::content().blocks;Plugins::content().blocks.clear();
-    for(auto& entry:blocks){const auto id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?500:0));entry.second.properties.id=static_cast<BlockId>(id);if(entry.second.family>=Plugins::FIRST_CONTENT_ID)entry.second.family+=500;Plugins::content().blocks.emplace(id,std::move(entry.second));}
-    for(auto& entry:Plugins::content().items)if(entry.second.properties.placedBlock&&static_cast<uint16_t>(*entry.second.properties.placedBlock)>=Plugins::FIRST_CONTENT_ID)entry.second.properties.placedBlock=static_cast<BlockId>(static_cast<uint16_t>(*entry.second.properties.placedBlock)+500);
+    auto blocks=Plugins::mutableContentState().blocks;Plugins::mutableContentState().blocks.clear();
+    for(auto& entry:blocks){const auto id=static_cast<uint16_t>(entry.first+(entry.first>=Plugins::FIRST_CONTENT_ID?500:0));entry.second.properties.id=static_cast<BlockId>(id);if(entry.second.family>=Plugins::FIRST_CONTENT_ID)entry.second.family+=500;Plugins::mutableContentState().blocks.emplace(id,std::move(entry.second));}
+    for(auto& entry:Plugins::mutableContentState().items)if(entry.second.properties.placedBlock&&static_cast<uint16_t>(*entry.second.properties.placedBlock)>=Plugins::FIRST_CONTENT_ID)entry.second.properties.placedBlock=static_cast<BlockId>(static_cast<uint16_t>(*entry.second.properties.placedBlock)+500);
     Plugins::freezeContent();
     check(static_cast<uint16_t>(palette.loadChunkOverrides(-1,-1)[0].block)==static_cast<uint16_t>(architecturalStateBlock(a))+500,"save palette state remapping");
     const auto decoded=Lan::decodeChunkSnapshot(wire);check(decoded.blocks[(211-Config::WORLD_MIN_Y)*256+15+15*16]==static_cast<uint16_t>(box)+500,"wire state remapping");
     MC_BlockState remapped{};remapped.size=sizeof(remapped);check(!api->state(&ctx,static_cast<uint16_t>(stair)+507,&remapped)&&remapped.family==static_cast<uint16_t>(stair)+500,"remapped state family identity");
-    const auto revision=Plugins::content().revision;Plugins::content()=original;Plugins::content().revision=revision;Plugins::freezeContent();
+    const auto revision=Plugins::mutableContentState().revision;Plugins::mutableContentState()=original;Plugins::mutableContentState().revision=revision;Plugins::freezeContent();
     const int oldDistance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=1;
     {
         GameSession session(root/"saves");EntityAiTestRenderer renderer;session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});

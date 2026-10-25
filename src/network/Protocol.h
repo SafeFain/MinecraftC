@@ -1,5 +1,5 @@
 #pragma once
-#include "plugins/ContentRegistry.h"
+#include "plugins/ContentQueries.h"
 
 #include <cstddef>
 #include <cstdint>

@@ -2,13 +2,15 @@
 
 #include "game/DimensionRules.h"
 #include "world/NetherPortal.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/ContentMutation.h"
 #include <map>
 #include <set>
 #include <tuple>
 
 void testNether() {
     // This scenario deliberately runs without installing any optional provider.
-    Plugins::content()=Plugins::ContentState{};
+    Plugins::mutableContentState()=Plugins::ContentState{};
     require(Plugins::validDimension(DimensionId::Nether),"Nether missing with all plugins disabled");
     require(!Plugins::validDimension(DimensionId::Heaven),"plugin-off fixture unexpectedly retained Heaven");
     require(Plugins::resolveDimension("minecraftc:nether")==2,"native Nether handle changed");

@@ -1,5 +1,8 @@
 #include "plugins/PluginManager.h"
 #include "plugins/EnvironmentPresentation.h"
+#include "plugins/ContentMutation.h"
+#include "plugins/ContentQueries.h"
+#include "plugins/GenerationValidation.h"
 #include "renderer/HeldItemRenderer.h"
 #include "renderer/ParticleSystem.h"
 #include "audio/AudioSystem.h"
@@ -13,7 +16,7 @@
 #include "model/ModelRenderer.h"
 #include "game/SessionAccess.h"
 #include "game/Command.h"
-#include "game/Utf8.h"
+#include "core/Utf8.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
 #include "ui/UIRenderer.h"
@@ -93,23 +96,23 @@ int main(int argc,char** argv) {
         plugins.renderBuffer=[&](size_t owner,MC_RenderHandle handle,const void* data,uint32_t size){return renderer.pluginUpdateBuffer(owner,handle,data,size);};
         if(extensions) {
             for(const auto& info:plugins.plugins())if(info.enabled&&!info.active)throw std::runtime_error("Render package failed: "+info.status);
-            const auto passes=Plugins::content().extensions.renderPasses;
+            const auto passes=Plugins::mutableContentState().extensions.renderPasses;
             model::ModelInstance posed;model::ModelHandle posedModel{};
             auto image=[&] {std::vector<uint8_t> pixels;for(int frame=0;frame<4;++frame){FrameData state;state.clearColor={.2f,.4f,.6f,1};renderer.beginFrame(state);
                 if(posedModel){model::ModelDraw model;model.model=posedModel;model.instance=&posed;renderer.modelRenderer().queue(model);renderer.flushModels(glm::mat4(1));}
                 renderer.finishScene(PostProcessState{});if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Plugin image readback unavailable");return pixels;};
-            Plugins::content().extensions.renderPasses.clear();const auto baseline=image();Plugins::content().extensions.renderPasses=passes;const auto custom=image();
-            if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
+            Plugins::mutableContentState().extensions.renderPasses.clear();const auto baseline=image();Plugins::mutableContentState().extensions.renderPasses=passes;const auto custom=image();
+            if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
             if(custom==baseline)throw std::runtime_error("Custom SPIR-V post pass did not affect pixels");
             renderer.resize(width,height);image();renderer.suspendPresentation();renderer.resumePresentation();image();
-            if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
+            if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
             MC_RenderHandle scenePipeline=0;size_t owner=0;
-            for(const auto& resource:Plugins::content().extensions.renderResources)if(resource.second.key=="render_demo:offscreen"){scenePipeline=resource.first;owner=resource.second.owner;}
+            for(const auto& resource:Plugins::mutableContentState().extensions.renderResources)if(resource.second.key=="render_demo:offscreen"){scenePipeline=resource.first;owner=resource.second.owner;}
             if(!scenePipeline)throw std::runtime_error("Scene test pipeline unavailable");
             Plugins::RenderPassContent entityPass;entityPass.stage=MC_RENDER_ENTITIES;entityPass.replace=true;
             bool sawScene=false;
             entityPass.callback=[&](const MC_RenderFrame& frame){for(uint64_t index=0;index<frame.scene_count;++index){sawScene=true;if(!renderer.pluginSceneDraw(owner,index,scenePipeline))throw std::runtime_error("Scene redraw rejected");}};
-            Plugins::content().extensions.renderPasses.push_back(std::move(entityPass));
+            Plugins::mutableContentState().extensions.renderPasses.push_back(std::move(entityPass));
             auto model=std::make_shared<model::ModelAsset>();model->materials.emplace_back();
             model::Primitive triangle;triangle.material=0;
             for(const auto& position:{glm::vec3(-.4f,-.4f,0),glm::vec3(.4f,-.4f,0),glm::vec3(0,.4f,0)}){model::Vertex vertex;vertex.position=position;triangle.vertices.push_back(vertex);}
@@ -117,9 +120,9 @@ int main(int argc,char** argv) {
             model::Node node;node.skin=0;node.primitives={0};model->nodes.push_back(node);model->sceneRoots={0};model->skins.push_back({{0},{glm::mat4(1)}});
             posed.jointPalettes={{glm::mat4(1)}};posedModel=renderer.modelRenderer().upload(model);
             const auto unshifted=image();posed.jointPalettes[0][0][3][0]=.5f;const auto shifted=image();
-            if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
+            if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
             if(!sawScene||unshifted==shifted)throw std::runtime_error("Custom scene redraw lost skeletal pose");
-            posedModel={};Plugins::content().extensions.renderPasses=passes;
+            posedModel={};Plugins::mutableContentState().extensions.renderPasses=passes;
             std::cout<<"Plugin Vulkan posed scene redraw passed\n";
             std::cout<<"Plugin Vulkan shader/post pass, rebuild and resume passed\n";
         }
@@ -132,10 +135,10 @@ int main(int argc,char** argv) {
             Plugins::contextProvider()=[dimension]{return Plugins::ActorContext{0,dimension,MC_LOCAL};};audio.setMusicMode(AudioMusicMode::Overworld,dimension);
             if(heavenModel){renderer.setVisualQuality(VisualQuality::Medium);renderer.setEnhancedVisuals(true);}
             HeldItemRenderer held;held.initialize(renderer,assets);
-            const auto& type=Plugins::content().extensions.particles.at("capability_demo:spark");
+            const auto& type=Plugins::mutableContentState().extensions.particles.at("capability_demo:spark");
             std::vector<ParticleRenderData> particles;
             for(int i=0;i<8;++i){
-                const auto& visual=heavenModel?Plugins::content().extensions.particles.at(std::array<const char*,3>{{"official_heaven:mote","official_heaven:pollen","official_heaven:sparkle"}}[size_t(i%3)]):type;
+                const auto& visual=heavenModel?Plugins::mutableContentState().extensions.particles.at(std::array<const char*,3>{{"official_heaven:mote","official_heaven:pollen","official_heaven:sparkle"}}[size_t(i%3)]):type;
                 ParticleRenderData p;p.position={.6f+(i%4)*.1f,(i/4)*.1f,0};p.kind=visual.shape?float(5+visual.shape):static_cast<float>(ParticleKind::Plugin);
                 p.texture=Plugins::materialTile(visual.material);p.size=visual.definition.scale;p.phase=.5f;p.color={visual.definition.color[0],visual.definition.color[1],visual.definition.color[2],visual.definition.color[3]};particles.push_back(p);
             }
@@ -170,7 +173,7 @@ int main(int argc,char** argv) {
         // Font-file coverage alone cannot catch translations omitted from the
         // actual GPU atlas. Verify both layout and emitted glyph geometry.
         std::set<uint32_t> pluginCjk;
-        for(const auto& bundle:Plugins::content().extensions.translations)
+        for(const auto& bundle:Plugins::mutableContentState().extensions.translations)
             for(const auto& entry:bundle.second)
                 for(uint32_t cp:decodeUtf8(entry.second))
                     if(cp>=0x3400 && cp<=0x9FFF)pluginCjk.insert(cp);
@@ -372,7 +375,7 @@ int main(int argc,char** argv) {
         warning.onKeyPress(Key::Enter);
         draw("plugin-mismatch-no-backup-failure",[&]{warning.render(ui,width,height);});
         draw("plugin-content",[&]{UiTheme::menuBackground(ui,width,height);ui.drawItemIcon(40,40,64,64,{Plugins::resolveItem("official_content:crystal_block"),1,0});ui.drawItemIcon(120,40,64,64,{Plugins::resolveItem("official_content:crystal"),1,0});});
-        const auto iconPasses=Plugins::content().extensions.renderPasses;Plugins::content().extensions.renderPasses.clear();
+        const auto iconPasses=Plugins::mutableContentState().extensions.renderPasses;Plugins::mutableContentState().extensions.renderPasses.clear();
         auto iconImage=[&](const std::function<void()>& render) {
             for(int frame=0;frame<3;++frame) {
                 if(frame==2)VulkanGiSmokeProbe::requestCapture(renderer);
@@ -412,7 +415,7 @@ int main(int argc,char** argv) {
         const auto itemPixels=iconImage([&]{ui.drawItemIcon(16,16,64,64,{legacyItem,1,0});});
         const auto materialPixels=iconImage([&]{ui.drawAtlasIcon(16,16,64,64,legacyTile,glm::vec4(1));});
         if(itemPixels!=materialPixels)throw std::runtime_error("Legacy cube item lost its independent icon material");
-        Plugins::content().extensions.renderPasses=iconPasses;
+        Plugins::mutableContentState().extensions.renderPasses=iconPasses;
         std::cout<<"Plugin block shape Vulkan icon readback passed\n";
 
         main.onKeyPress(Key::Down);main.onKeyPress(Key::Down);main.onKeyPress(Key::Enter);
@@ -435,15 +438,15 @@ int main(int argc,char** argv) {
         for (int i=0;i<std::clamp((height-192)/46,1,6)+2;++i) main.onKeyPress(Key::Down);
         main.onKeyPress(Key::Enter);
         draw("create",[&]{main.render(ui,width,height);});
-        const bool configurableGeneration=std::any_of(Plugins::content().extensions.generators.begin(),Plugins::content().extensions.generators.end(),
+        const bool configurableGeneration=std::any_of(Plugins::mutableContentState().extensions.generators.begin(),Plugins::mutableContentState().extensions.generators.end(),
             [](const auto& generator){return generator.second.dimension!=2&&generator.first!="official_heaven:heaven";})||
-            std::any_of(Plugins::content().extensions.modifiers.begin(),Plugins::content().extensions.modifiers.end(),
+            std::any_of(Plugins::mutableContentState().extensions.modifiers.begin(),Plugins::mutableContentState().extensions.modifiers.end(),
             [](const auto& modifier){return modifier.second.dimension!=2;});
         if(!configurableGeneration) {
             bool created=false;
             auto fixedCallbacks=callbacks;
             fixedCallbacks.onGenerationConfig=[&](const auto& config) {
-                for(const auto& dimension:Plugins::content().extensions.dimensions)
+                for(const auto& dimension:Plugins::mutableContentState().extensions.dimensions)
                     if(!(config.at(dimension.first)==dimension.second.generation))
                         throw std::runtime_error("Hiding fixed dimension controls changed generation defaults");
             };
@@ -469,25 +472,25 @@ int main(int argc,char** argv) {
             int generatorRow=6; // Name, mode, type, seed, cheats and advanced toggle.
             int firstParameterRow=-1;
             uint32_t firstParameterDimension=0;
-            for(const auto& dimension:Plugins::content().extensions.dimensions) {
+            for(const auto& dimension:Plugins::mutableContentState().extensions.dimensions) {
                 if(dimension.first==2)continue;
                 MainMenu generatorMenu(createCallbacks,{},settings,localization,nullptr);
                 generatorMenu.onKeyPress(Key::Enter);generatorMenu.onKeyPress(Key::Down);
                 generatorMenu.onKeyPress(Key::Down);generatorMenu.onKeyPress(Key::Enter);
                 std::vector<std::string> choices;
                 if(dimension.first==0||dimension.first==2)choices.emplace_back();
-                for(const auto& generator:Plugins::content().extensions.generators)
+                for(const auto& generator:Plugins::mutableContentState().extensions.generators)
                     if(generator.second.dimension==dimension.first)choices.push_back(generator.first);
-                const bool editable=std::any_of(Plugins::content().extensions.generators.begin(),Plugins::content().extensions.generators.end(),
+                const bool editable=std::any_of(Plugins::mutableContentState().extensions.generators.begin(),Plugins::mutableContentState().extensions.generators.end(),
                     [&](const auto& generator){return generator.second.dimension==dimension.first&&generator.first!="official_heaven:heaven";})||
-                    std::any_of(Plugins::content().extensions.modifiers.begin(),Plugins::content().extensions.modifiers.end(),
+                    std::any_of(Plugins::mutableContentState().extensions.modifiers.begin(),Plugins::mutableContentState().extensions.modifiers.end(),
                     [&](const auto& modifier){return modifier.second.dimension==dimension.first;});
                 if(firstParameterRow<0&&editable) {
                     firstParameterRow=generatorRow+(choices.size()>1?1:0);
                     firstParameterDimension=dimension.first;
                 }
                 if(choices.size()<=1) {
-                    for(const auto& modifier:Plugins::content().extensions.modifiers)
+                    for(const auto& modifier:Plugins::mutableContentState().extensions.modifiers)
                         if(modifier.second.dimension==dimension.first)++generatorRow;
                     continue;
                 }
@@ -512,7 +515,7 @@ int main(int argc,char** argv) {
                 if(selected.generator.empty()&&!selected.revision.empty())
                     throw std::runtime_error("Native generator retained a plugin revision");
                 ++generatorRow;
-                for(const auto& modifier:Plugins::content().extensions.modifiers)
+                for(const auto& modifier:Plugins::mutableContentState().extensions.modifiers)
                     if(modifier.second.dimension==dimension.first)++generatorRow;
             }
             if(firstParameterRow<0)throw std::runtime_error("Configurable generation has no editable parameter field");
@@ -527,7 +530,7 @@ int main(int argc,char** argv) {
             draw("create-default-zh_cn",[&]{createMenu.render(ui,width,height);},3);
             createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Up);createMenu.onKeyPress(Key::Enter);
             if(createdName!="N")throw std::runtime_error("Default creation focused a hidden parameter field");
-            for(const auto& dimension:Plugins::content().extensions.dimensions)
+            for(const auto& dimension:Plugins::mutableContentState().extensions.dimensions)
                 if(createdGeneration.at(dimension.first).parameters!=dimension.second.generation.parameters)
                     throw std::runtime_error("Default creation changed generator parameters");
             // Advanced access remains optional, and collapsing while editing
