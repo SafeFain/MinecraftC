@@ -1,0 +1,19 @@
+{
+  "key": "cracked_stone_bricks",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1481283084,
+    "images": [
+      "textures/materials/cracked_stone_bricks-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cracked_stone_bricks-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cracked_stone_bricks-0-properties.png"
+    ]
+  }
+}

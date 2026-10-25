@@ -1,0 +1,19 @@
+{
+  "key": "reed_flower",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3700653455,
+    "images": [
+      "textures/materials/reed_flower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/reed_flower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/reed_flower-0-properties.png"
+    ]
+  }
+}

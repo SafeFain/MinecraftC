@@ -1,0 +1,19 @@
+{
+  "key": "nether_wart_block",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3308091580,
+    "images": [
+      "textures/materials/nether_wart_block-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/nether_wart_block-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/nether_wart_block-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "key": "aether_moss",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4056064200,
+    "images": [
+      "textures/materials/aether_moss-0-images.png",
+      "textures/materials/aether_moss-1-images.png",
+      "textures/materials/aether_moss-2-images.png",
+      "textures/materials/aether_moss-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/aether_moss-0-normals.png",
+      "textures/materials/aether_moss-1-normals.png",
+      "textures/materials/aether_moss-2-normals.png",
+      "textures/materials/aether_moss-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/aether_moss-0-properties.png",
+      "textures/materials/aether_moss-1-properties.png",
+      "textures/materials/aether_moss-2-properties.png",
+      "textures/materials/aether_moss-3-properties.png"
+    ]
+  }
+}

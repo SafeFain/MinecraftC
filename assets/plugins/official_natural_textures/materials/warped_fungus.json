@@ -1,0 +1,19 @@
+{
+  "key": "warped_fungus",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2746490242,
+    "images": [
+      "textures/materials/warped_fungus-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/warped_fungus-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/warped_fungus-0-properties.png"
+    ]
+  }
+}

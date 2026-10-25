@@ -1,0 +1,28 @@
+{
+  "key": "quartz_block",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2195179920,
+    "images": [
+      "textures/materials/quartz_block-0-images.png",
+      "textures/materials/quartz_block-1-images.png",
+      "textures/materials/quartz_block-2-images.png",
+      "textures/materials/quartz_block-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/quartz_block-0-normals.png",
+      "textures/materials/quartz_block-1-normals.png",
+      "textures/materials/quartz_block-2-normals.png",
+      "textures/materials/quartz_block-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/quartz_block-0-properties.png",
+      "textures/materials/quartz_block-1-properties.png",
+      "textures/materials/quartz_block-2-properties.png",
+      "textures/materials/quartz_block-3-properties.png"
+    ]
+  }
+}

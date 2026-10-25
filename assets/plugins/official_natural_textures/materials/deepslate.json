@@ -1,0 +1,28 @@
+{
+  "key": "deepslate",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 595184436,
+    "images": [
+      "textures/materials/deepslate-0-images.png",
+      "textures/materials/deepslate-1-images.png",
+      "textures/materials/deepslate-2-images.png",
+      "textures/materials/deepslate-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/deepslate-0-normals.png",
+      "textures/materials/deepslate-1-normals.png",
+      "textures/materials/deepslate-2-normals.png",
+      "textures/materials/deepslate-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/deepslate-0-properties.png",
+      "textures/materials/deepslate-1-properties.png",
+      "textures/materials/deepslate-2-properties.png",
+      "textures/materials/deepslate-3-properties.png"
+    ]
+  }
+}

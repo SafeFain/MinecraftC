@@ -1,0 +1,19 @@
+{
+  "key": "soul_sand",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2649507270,
+    "images": [
+      "textures/materials/soul_sand-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/soul_sand-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/soul_sand-0-properties.png"
+    ]
+  }
+}

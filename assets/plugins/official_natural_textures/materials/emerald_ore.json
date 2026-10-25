@@ -1,0 +1,28 @@
+{
+  "key": "emerald_ore",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1291055621,
+    "images": [
+      "textures/materials/emerald_ore-0-images.png",
+      "textures/materials/emerald_ore-1-images.png",
+      "textures/materials/emerald_ore-2-images.png",
+      "textures/materials/emerald_ore-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/emerald_ore-0-normals.png",
+      "textures/materials/emerald_ore-1-normals.png",
+      "textures/materials/emerald_ore-2-normals.png",
+      "textures/materials/emerald_ore-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/emerald_ore-0-properties.png",
+      "textures/materials/emerald_ore-1-properties.png",
+      "textures/materials/emerald_ore-2-properties.png",
+      "textures/materials/emerald_ore-3-properties.png"
+    ]
+  }
+}

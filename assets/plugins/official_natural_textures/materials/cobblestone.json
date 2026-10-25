@@ -1,0 +1,28 @@
+{
+  "key": "cobblestone",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3510124506,
+    "images": [
+      "textures/materials/cobblestone-0-images.png",
+      "textures/materials/cobblestone-1-images.png",
+      "textures/materials/cobblestone-2-images.png",
+      "textures/materials/cobblestone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/cobblestone-0-normals.png",
+      "textures/materials/cobblestone-1-normals.png",
+      "textures/materials/cobblestone-2-normals.png",
+      "textures/materials/cobblestone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cobblestone-0-properties.png",
+      "textures/materials/cobblestone-1-properties.png",
+      "textures/materials/cobblestone-2-properties.png",
+      "textures/materials/cobblestone-3-properties.png"
+    ]
+  }
+}

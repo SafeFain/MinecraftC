@@ -1,0 +1,19 @@
+{
+  "key": "oak_sapling",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2080833598,
+    "images": [
+      "textures/materials/oak_sapling-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/oak_sapling-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/oak_sapling-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "desert_flower",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4120848021,
+    "images": [
+      "textures/materials/desert_flower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/desert_flower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/desert_flower-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "key": "volcanic_ash",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3169155758,
+    "images": [
+      "textures/materials/volcanic_ash-0-images.png",
+      "textures/materials/volcanic_ash-1-images.png",
+      "textures/materials/volcanic_ash-2-images.png",
+      "textures/materials/volcanic_ash-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/volcanic_ash-0-normals.png",
+      "textures/materials/volcanic_ash-1-normals.png",
+      "textures/materials/volcanic_ash-2-normals.png",
+      "textures/materials/volcanic_ash-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/volcanic_ash-0-properties.png",
+      "textures/materials/volcanic_ash-1-properties.png",
+      "textures/materials/volcanic_ash-2-properties.png",
+      "textures/materials/volcanic_ash-3-properties.png"
+    ]
+  }
+}

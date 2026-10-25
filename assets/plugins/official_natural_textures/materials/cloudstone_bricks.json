@@ -1,0 +1,28 @@
+{
+  "key": "cloudstone_bricks",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 588026929,
+    "images": [
+      "textures/materials/cloudstone_bricks-0-images.png",
+      "textures/materials/cloudstone_bricks-1-images.png",
+      "textures/materials/cloudstone_bricks-2-images.png",
+      "textures/materials/cloudstone_bricks-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/cloudstone_bricks-0-normals.png",
+      "textures/materials/cloudstone_bricks-1-normals.png",
+      "textures/materials/cloudstone_bricks-2-normals.png",
+      "textures/materials/cloudstone_bricks-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cloudstone_bricks-0-properties.png",
+      "textures/materials/cloudstone_bricks-1-properties.png",
+      "textures/materials/cloudstone_bricks-2-properties.png",
+      "textures/materials/cloudstone_bricks-3-properties.png"
+    ]
+  }
+}

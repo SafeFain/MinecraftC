@@ -1,0 +1,28 @@
+{
+  "key": "calcite",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1979094789,
+    "images": [
+      "textures/materials/calcite-0-images.png",
+      "textures/materials/calcite-1-images.png",
+      "textures/materials/calcite-2-images.png",
+      "textures/materials/calcite-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/calcite-0-normals.png",
+      "textures/materials/calcite-1-normals.png",
+      "textures/materials/calcite-2-normals.png",
+      "textures/materials/calcite-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/calcite-0-properties.png",
+      "textures/materials/calcite-1-properties.png",
+      "textures/materials/calcite-2-properties.png",
+      "textures/materials/calcite-3-properties.png"
+    ]
+  }
+}

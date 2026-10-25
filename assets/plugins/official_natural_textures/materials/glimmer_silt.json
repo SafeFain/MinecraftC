@@ -1,0 +1,28 @@
+{
+  "key": "glimmer_silt",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3664449833,
+    "images": [
+      "textures/materials/glimmer_silt-0-images.png",
+      "textures/materials/glimmer_silt-1-images.png",
+      "textures/materials/glimmer_silt-2-images.png",
+      "textures/materials/glimmer_silt-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/glimmer_silt-0-normals.png",
+      "textures/materials/glimmer_silt-1-normals.png",
+      "textures/materials/glimmer_silt-2-normals.png",
+      "textures/materials/glimmer_silt-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/glimmer_silt-0-properties.png",
+      "textures/materials/glimmer_silt-1-properties.png",
+      "textures/materials/glimmer_silt-2-properties.png",
+      "textures/materials/glimmer_silt-3-properties.png"
+    ]
+  }
+}

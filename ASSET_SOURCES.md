@@ -7,6 +7,23 @@ retain their original versions and licenses; consult generated manifests for the
 current seed, formats and hashes. Optional Heaven authoring resources now live
 under `assets/plugins/official_heaven/`; shared atlases are derived output.
 
+## Natural Pixels (2026-10-25)
+
+- Logical names: all 297 runtime block materials and 433 item icons, including
+  native Nether and optional Heaven. The authoring set also retains the legacy
+  copper-ore tile for comparisons; it is not a runtime replacement.
+- Paths: `assets/plugins/official_natural_textures/`; independent authoring data
+  in `authoring.json`, packaged definitions in `materials/` and `item_icons/`.
+- Creator/tool: original MinecraftC procedural pixel artwork,
+  `tools/natural_pixels.py` with shared semantic drawing/map/PNG helpers.
+- Seed: 645108391; authoring revision 1; shared generator v5 contracts.
+- References: broad modern voxel pixel-art conventions; no external images,
+  Mojang assets, downloaded textures, or copied official palettes/pixel layouts.
+- License: artwork/palettes CC0-1.0; tool code GPL-3.0-only.
+- Reproduce: `python3 tools/natural_pixels.py`; add
+  `--review build-local/natural-pixels-review` for paginated comparisons, 3x3
+  repeats, native/enlarged tiles, item boards and mip previews.
+
 ## Template
 
 - Logical names:

@@ -1,0 +1,19 @@
+{
+  "key": "wild_mint",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 317840975,
+    "images": [
+      "textures/materials/wild_mint-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/wild_mint-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/wild_mint-0-properties.png"
+    ]
+  }
+}

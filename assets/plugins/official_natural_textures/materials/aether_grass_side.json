@@ -1,0 +1,19 @@
+{
+  "key": "aether_grass_side",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 135540863,
+    "images": [
+      "textures/materials/aether_grass_side-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/aether_grass_side-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/aether_grass_side-0-properties.png"
+    ]
+  }
+}

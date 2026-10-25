@@ -1,0 +1,19 @@
+{
+  "key": "sunflower_top",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1143323698,
+    "images": [
+      "textures/materials/sunflower_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/sunflower_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sunflower_top-0-properties.png"
+    ]
+  }
+}

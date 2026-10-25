@@ -1,0 +1,19 @@
+{
+  "key": "cartography_table",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3594214566,
+    "images": [
+      "textures/materials/cartography_table-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cartography_table-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cartography_table-0-properties.png"
+    ]
+  }
+}

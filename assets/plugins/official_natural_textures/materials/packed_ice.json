@@ -1,0 +1,19 @@
+{
+  "key": "packed_ice",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1949140851,
+    "images": [
+      "textures/materials/packed_ice-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/packed_ice-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/packed_ice-0-properties.png"
+    ]
+  }
+}

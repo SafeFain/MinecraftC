@@ -1,0 +1,19 @@
+{
+  "key": "nether_quartz_ore",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 950639673,
+    "images": [
+      "textures/materials/nether_quartz_ore-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/nether_quartz_ore-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/nether_quartz_ore-0-properties.png"
+    ]
+  }
+}

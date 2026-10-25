@@ -1,0 +1,19 @@
+{
+  "key": "acacia_sapling",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1557655521,
+    "images": [
+      "textures/materials/acacia_sapling-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/acacia_sapling-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/acacia_sapling-0-properties.png"
+    ]
+  }
+}

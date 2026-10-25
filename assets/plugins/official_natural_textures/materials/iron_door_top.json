@@ -1,0 +1,19 @@
+{
+  "key": "iron_door_top",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3867647968,
+    "images": [
+      "textures/materials/iron_door_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/iron_door_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/iron_door_top-0-properties.png"
+    ]
+  }
+}

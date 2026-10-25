@@ -1,0 +1,19 @@
+{
+  "key": "acacia_log_top",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2015207098,
+    "images": [
+      "textures/materials/acacia_log_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/acacia_log_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/acacia_log_top-0-properties.png"
+    ]
+  }
+}

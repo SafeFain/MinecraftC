@@ -1,0 +1,28 @@
+{
+  "key": "permafrost",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2001266747,
+    "images": [
+      "textures/materials/permafrost-0-images.png",
+      "textures/materials/permafrost-1-images.png",
+      "textures/materials/permafrost-2-images.png",
+      "textures/materials/permafrost-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/permafrost-0-normals.png",
+      "textures/materials/permafrost-1-normals.png",
+      "textures/materials/permafrost-2-normals.png",
+      "textures/materials/permafrost-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/permafrost-0-properties.png",
+      "textures/materials/permafrost-1-properties.png",
+      "textures/materials/permafrost-2-properties.png",
+      "textures/materials/permafrost-3-properties.png"
+    ]
+  }
+}

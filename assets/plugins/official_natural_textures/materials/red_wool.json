@@ -1,0 +1,19 @@
+{
+  "key": "red_wool",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3181450460,
+    "images": [
+      "textures/materials/red_wool-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/red_wool-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/red_wool-0-properties.png"
+    ]
+  }
+}

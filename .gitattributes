@@ -6,4 +6,5 @@
 
 # Resource fingerprints and frozen source hashes require identical checkout bytes.
 /assets/plugins/official_heaven/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
+/assets/plugins/official_natural_textures/** -text whitespace=trailing-space,space-before-tab,cr-at-eol
 /tests/reference/heaven_v9/*.ref -text whitespace=trailing-space,space-before-tab,cr-at-eol

@@ -1,0 +1,19 @@
+{
+  "key": "spruce_sapling",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 324577936,
+    "images": [
+      "textures/materials/spruce_sapling-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/spruce_sapling-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/spruce_sapling-0-properties.png"
+    ]
+  }
+}

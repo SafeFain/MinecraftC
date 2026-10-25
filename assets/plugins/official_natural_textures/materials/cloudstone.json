@@ -1,0 +1,28 @@
+{
+  "key": "cloudstone",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2422799842,
+    "images": [
+      "textures/materials/cloudstone-0-images.png",
+      "textures/materials/cloudstone-1-images.png",
+      "textures/materials/cloudstone-2-images.png",
+      "textures/materials/cloudstone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/cloudstone-0-normals.png",
+      "textures/materials/cloudstone-1-normals.png",
+      "textures/materials/cloudstone-2-normals.png",
+      "textures/materials/cloudstone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cloudstone-0-properties.png",
+      "textures/materials/cloudstone-1-properties.png",
+      "textures/materials/cloudstone-2-properties.png",
+      "textures/materials/cloudstone-3-properties.png"
+    ]
+  }
+}

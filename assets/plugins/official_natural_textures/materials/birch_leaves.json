@@ -1,0 +1,19 @@
+{
+  "key": "birch_leaves",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3954130333,
+    "images": [
+      "textures/materials/birch_leaves-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/birch_leaves-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/birch_leaves-0-properties.png"
+    ]
+  }
+}

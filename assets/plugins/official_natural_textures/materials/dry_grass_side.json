@@ -1,0 +1,19 @@
+{
+  "key": "dry_grass_side",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3834703338,
+    "images": [
+      "textures/materials/dry_grass_side-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/dry_grass_side-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/dry_grass_side-0-properties.png"
+    ]
+  }
+}

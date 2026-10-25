@@ -1,0 +1,19 @@
+{
+  "key": "lectern",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2785504840,
+    "images": [
+      "textures/materials/lectern-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/lectern-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/lectern-0-properties.png"
+    ]
+  }
+}

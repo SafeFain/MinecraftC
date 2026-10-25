@@ -1,0 +1,28 @@
+{
+  "key": "skystone",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1851447878,
+    "images": [
+      "textures/materials/skystone-0-images.png",
+      "textures/materials/skystone-1-images.png",
+      "textures/materials/skystone-2-images.png",
+      "textures/materials/skystone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/skystone-0-normals.png",
+      "textures/materials/skystone-1-normals.png",
+      "textures/materials/skystone-2-normals.png",
+      "textures/materials/skystone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skystone-0-properties.png",
+      "textures/materials/skystone-1-properties.png",
+      "textures/materials/skystone-2-properties.png",
+      "textures/materials/skystone-3-properties.png"
+    ]
+  }
+}

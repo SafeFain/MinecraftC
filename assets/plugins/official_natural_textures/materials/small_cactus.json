@@ -1,0 +1,19 @@
+{
+  "key": "small_cactus",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 761212927,
+    "images": [
+      "textures/materials/small_cactus-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/small_cactus-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/small_cactus-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "key": "diorite",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2108599410,
+    "images": [
+      "textures/materials/diorite-0-images.png",
+      "textures/materials/diorite-1-images.png",
+      "textures/materials/diorite-2-images.png",
+      "textures/materials/diorite-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/diorite-0-normals.png",
+      "textures/materials/diorite-1-normals.png",
+      "textures/materials/diorite-2-normals.png",
+      "textures/materials/diorite-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/diorite-0-properties.png",
+      "textures/materials/diorite-1-properties.png",
+      "textures/materials/diorite-2-properties.png",
+      "textures/materials/diorite-3-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "warped_stem",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2084034088,
+    "images": [
+      "textures/materials/warped_stem-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/warped_stem-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/warped_stem-0-properties.png"
+    ]
+  }
+}

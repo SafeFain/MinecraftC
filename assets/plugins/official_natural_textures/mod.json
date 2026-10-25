@@ -1,0 +1,24 @@
+{
+  "id": "official_natural_textures",
+  "name": "自然像素 / Natural Pixels",
+  "version": "1.0.0",
+  "api": 1,
+  "package_format": 1,
+  "visual_only": true,
+  "enabled_by_default": false,
+  "after": [
+    "official_heaven"
+  ],
+  "description": {
+    "en_us": "Original 16x16 natural pixel textures for blocks and items. Enable and restart to apply.",
+    "zh_cn": "原创16×16自然像素方块与物品材质。启用后重启游戏生效。",
+    "ar_sa": "خامات بكسل طبيعية أصلية بدقة 16×16 للكتل والعناصر. فعّلها وأعد تشغيل اللعبة لتطبيقها.",
+    "fr_fr": "Textures originales en pixels naturels 16×16 pour les blocs et les objets. Activez puis redémarrez le jeu.",
+    "de_de": "Originale natürliche 16×16-Pixeltexturen für Blöcke und Gegenstände. Zum Anwenden aktivieren und das Spiel neu starten.",
+    "es_es": "Texturas originales de píxeles naturales de 16×16 para bloques y objetos. Activa el paquete y reinicia el juego.",
+    "pt_br": "Texturas originais de pixels naturais 16×16 para blocos e itens. Ative o pacote e reinicie o jogo.",
+    "ru_ru": "Оригинальные естественные пиксельные текстуры 16×16 для блоков и предметов. Включите пакет и перезапустите игру.",
+    "ja_jp": "ブロックとアイテム用のオリジナル16×16自然なピクセルテクスチャ。適用には有効化してゲームを再起動してください。",
+    "ko_kr": "블록과 아이템용 오리지널 16×16 자연스러운 픽셀 텍스처입니다. 적용하려면 활성화한 뒤 게임을 다시 시작하세요."
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "hanging_cloud_vine",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1310307523,
+    "images": [
+      "textures/materials/hanging_cloud_vine-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/hanging_cloud_vine-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/hanging_cloud_vine-0-properties.png"
+    ]
+  }
+}

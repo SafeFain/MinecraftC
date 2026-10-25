@@ -1,0 +1,19 @@
+{
+  "key": "blue_orchid",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 271439685,
+    "images": [
+      "textures/materials/blue_orchid-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/blue_orchid-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/blue_orchid-0-properties.png"
+    ]
+  }
+}

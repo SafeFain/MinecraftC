@@ -138,7 +138,8 @@ public:
     }
     void drawItemIcon(float x,float y,float w,float h,const ItemStack& stack)override{
         if(stack.empty())return;
-        if(const auto* item=Plugins::pluginItem(stack.id);item&&item->icon.empty()) {
+        const bool overlay=Plugins::content().itemIconOverrides.count(static_cast<uint16_t>(stack.id))!=0;
+        if(const auto* item=Plugins::pluginItem(stack.id);item&&item->icon.empty()&&!overlay) {
             if(item->properties.placedBlock) {
                 const auto shape=getBlockProps(*item->properties.placedBlock).shape;
                 if(shape==RenderShape::Slab||shape==RenderShape::Stair||shape==RenderShape::Door||shape==RenderShape::Button||shape==RenderShape::Boxes){drawBlockIcon(x,y,w,h,*item->properties.placedBlock);return;}
@@ -147,6 +148,7 @@ public:
         }
         std::string name=stack.id>=ItemId::NETHERRACK&&stack.id<ItemId::COUNT?itemCommandName(stack.id):getItemProps(stack.id).name;
         if(const auto* item=Plugins::pluginItem(stack.id);item&&!item->icon.empty())name=item->key;
+        if(overlay)name=Plugins::itemKey(stack.id);
         if(name.find(':')==std::string::npos)for(char& c:name)c=std::isalnum(static_cast<unsigned char>(c))?
             static_cast<char>(std::tolower(static_cast<unsigned char>(c))):'_';
         if(const auto found=m_itemIndices.find(name);found!=m_itemIndices.end()&&m_itemMaterial){

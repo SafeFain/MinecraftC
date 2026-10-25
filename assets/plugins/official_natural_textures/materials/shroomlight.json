@@ -1,0 +1,19 @@
+{
+  "key": "shroomlight",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1325925324,
+    "images": [
+      "textures/materials/shroomlight-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/shroomlight-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/shroomlight-0-properties.png"
+    ]
+  }
+}

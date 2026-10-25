@@ -1,0 +1,19 @@
+{
+  "key": "weeping_vines",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3313187929,
+    "images": [
+      "textures/materials/weeping_vines-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/weeping_vines-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/weeping_vines-0-properties.png"
+    ]
+  }
+}

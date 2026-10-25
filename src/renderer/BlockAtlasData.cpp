@@ -561,14 +561,15 @@ VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas) {
 void appendPluginItemIcons(TextureData& atlas,std::unordered_map<std::string,int>& indices,int columns,int& rows) {
     if(columns<=0||rows<=0||atlas.width!=uint32_t(columns*16)||atlas.height!=uint32_t(rows*16))throw std::runtime_error("Invalid item atlas dimensions");
     int next=columns*rows;
-    for(const auto& entry:Plugins::mutableContentState().items) {
-        const auto& item=entry.second;if(item.icon.empty())continue;
-        const auto legacy=indices.find(item.command);const int slot=legacy==indices.end()?next++:legacy->second;
+    auto insert=[&](ItemId id,const std::filesystem::path& image) {
+        const auto key=Plugins::itemKey(id);const auto& command=itemCommandName(id);
+        auto found=indices.find(key);if(found==indices.end())found=indices.find(command);
+        const int slot=found==indices.end()?next++:found->second;
         if(slot<0||slot>=256*256||columns>256||slot/columns>=256)throw std::runtime_error("Item icon atlas capacity exceeded");
         const int requiredRows=slot/columns+1;
         if(requiredRows>rows){rows=requiredRows;atlas.height=uint32_t(rows*16);atlas.pixels.resize(size_t(atlas.width)*atlas.height*4);}
-        indices[item.key]=slot;
-        std::ifstream file(item.icon,std::ios::binary);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
+        indices[key]=slot;if(!command.empty())indices[command]=slot;
+        std::ifstream file(image,std::ios::binary);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});
         stbi_set_flip_vertically_on_load(0);int w=0,h=0,channels=0;
         stbi_uc* pixels=stbi_load_from_memory(bytes.data(),int(bytes.size()),&w,&h,&channels,4);
         if(!pixels||w!=16||h!=16){stbi_image_free(pixels);throw std::runtime_error("Invalid registered item icon");}
@@ -577,5 +578,9 @@ void appendPluginItemIcons(TextureData& atlas,std::unordered_map<std::string,int
             std::copy_n(pixels+y*16*4,16*4,atlas.pixels.begin()+std::ptrdiff_t(offset));
         }
         stbi_image_free(pixels);
-    }
+    };
+    for(const auto& entry:Plugins::content().items)if(!entry.second.icon.empty())insert(static_cast<ItemId>(entry.first),entry.second.icon);
+    // Apply the final visual overlay after every gameplay provider, irrespective
+    // of where its icon was initially placed in the atlas.
+    for(const auto& entry:Plugins::content().itemIconOverrides)insert(static_cast<ItemId>(entry.first),entry.second);
 }

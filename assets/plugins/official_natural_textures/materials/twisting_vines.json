@@ -1,0 +1,19 @@
+{
+  "key": "twisting_vines",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3592136950,
+    "images": [
+      "textures/materials/twisting_vines-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/twisting_vines-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/twisting_vines-0-properties.png"
+    ]
+  }
+}

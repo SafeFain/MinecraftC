@@ -1,0 +1,19 @@
+{
+  "key": "nether_sprouts",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2718555790,
+    "images": [
+      "textures/materials/nether_sprouts-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/nether_sprouts-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/nether_sprouts-0-properties.png"
+    ]
+  }
+}

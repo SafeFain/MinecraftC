@@ -1,5 +1,10 @@
 # Block texture sources
 
+The optional Natural Pixels plugin is independently authored original 16×16
+procedural artwork under CC0-1.0; see
+[`official_natural_textures/LICENSE.md`](../plugins/official_natural_textures/LICENSE.md).
+Its textures do not replace these default assets and include no Mojang images.
+
 The directory layout and generation workflow are documented in
 `ASSET_PIPELINE.md`. New generated-asset provenance is recorded in the root
 `ASSET_SOURCES.md`; imported asset licenses are recorded in

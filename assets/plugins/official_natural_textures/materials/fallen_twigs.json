@@ -1,0 +1,19 @@
+{
+  "key": "fallen_twigs",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3143486152,
+    "images": [
+      "textures/materials/fallen_twigs-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/fallen_twigs-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/fallen_twigs-0-properties.png"
+    ]
+  }
+}

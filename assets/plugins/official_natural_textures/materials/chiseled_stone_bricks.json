@@ -1,0 +1,19 @@
+{
+  "key": "chiseled_stone_bricks",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1633893742,
+    "images": [
+      "textures/materials/chiseled_stone_bricks-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/chiseled_stone_bricks-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/chiseled_stone_bricks-0-properties.png"
+    ]
+  }
+}

@@ -40,6 +40,7 @@ TextureData decode(const std::filesystem::path& path) {
 }
 
 std::string itemKey(ItemId id) {
+    if(Plugins::content().itemIconOverrides.count(static_cast<uint16_t>(id)))return Plugins::itemKey(id);
     if(const auto* item=Plugins::pluginItem(id);item&&!item->icon.empty())return item->key;
     std::string key = id>=ItemId::NETHERRACK&&id<ItemId::COUNT?itemCommandName(id):getItemProps(id).name;
     for (char& c : key) c = std::isalnum(static_cast<unsigned char>(c))
@@ -120,7 +121,29 @@ void HeldItemRenderer::initialize(IGameRenderer& renderer,
     MaterialDesc fishingMaterial; fishingMaterial.baseColorTexture=m_fishingTexture;
     m_fishingMaterial=renderer.createMaterial(fishingMaterial);
     m_fishingCube=renderer.createMesh(buildHeldCubeMesh({0,0,0,0,0,0},1,false));
-    m_toolTexture = renderer.createTexture(buildHeldToolTexture(), sampler);
+    auto toolPixels=buildHeldToolTexture();
+    // Cuboid tools keep their animated geometry and face shading. Derive their
+    // material swatches from the selected icon pack rather than fixed colors.
+    const std::array<ItemId,9> swatches{{ItemId::STICK,ItemId::OAK_PLANKS,ItemId::COBBLESTONE,
+        ItemId::IRON_INGOT,ItemId::GOLD_INGOT,ItemId::DIAMOND,ItemId::STAR_CRYSTAL,ItemId::NETHERITE_INGOT,ItemId::STRING}};
+    const std::array<float,6> faceShade{{.90f,.78f,.70f,.84f,1.f,.60f}};
+    for(size_t p=0;p<swatches.size();++p) {
+        const auto id=swatches[p];if(!Plugins::content().itemIconOverrides.count(static_cast<uint16_t>(id)))continue;
+        const auto found=m_itemIndices.find(itemCommandName(id));if(found==m_itemIndices.end())continue;
+        glm::vec3 color(0);float weight=0;
+        for(int y=0;y<16;++y)for(int x=0;x<16;++x) {
+            const size_t pixel=(size_t(found->second/m_itemColumns*16+y)*items.width+found->second%m_itemColumns*16+x)*4;
+            if(items.pixels[pixel+3]){color+=glm::vec3(items.pixels[pixel],items.pixels[pixel+1],items.pixels[pixel+2]);++weight;}
+        }
+        if(weight==0)continue;
+        color/=weight;
+        for(size_t face=0;face<6;++face)for(int y=0;y<8;++y)for(int x=0;x<8;++x) {
+            const size_t tile=p*6+face,pixel=((tile/8*8+y)*toolPixels.width+tile%8*8+x)*4;
+            const float grain=(x*3+y*5)%7==0?.91f:1.f;
+            for(int c=0;c<3;++c)toolPixels.pixels[pixel+c]=static_cast<uint8_t>(color[c]*faceShade[face]*grain);
+        }
+    }
+    m_toolTexture = renderer.createTexture(toolPixels, sampler);
     TextureData arm = decode(root / "textures/generated/entity_skins/player.png");
     m_armTexture = renderer.createTexture(arm, sampler);
     MaterialDesc material; material.pipeline=MaterialPipeline::UnlitTextured;
@@ -195,7 +218,7 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
               getBlockProps(*props.placedBlock).shape==RenderShape::Button ||
               getBlockProps(*props.placedBlock).shape==RenderShape::Boxes)) {
         mesh=buildHeldBlockShapeMesh(*props.placedBlock,m_blockTiles);block=true;
-    }else if(const auto* item=Plugins::pluginItem(id);item&&item->icon.empty()) {
+    }else if(const auto* item=Plugins::pluginItem(id);item&&item->icon.empty()&&!Plugins::content().itemIconOverrides.count(static_cast<uint16_t>(id))) {
         const float s=static_cast<float>(m_blockTiles);const int tile=item->tile;
         const float u0=(tile%m_blockTiles+.5f/16)/s,u1=(tile%m_blockTiles+1-.5f/16)/s;
         const float v0=(tile/m_blockTiles+.5f/16)/s,v1=(tile/m_blockTiles+1-.5f/16)/s;

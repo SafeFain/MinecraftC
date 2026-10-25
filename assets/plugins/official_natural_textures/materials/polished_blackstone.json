@@ -1,0 +1,19 @@
+{
+  "key": "polished_blackstone",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2198280308,
+    "images": [
+      "textures/materials/polished_blackstone-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/polished_blackstone-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/polished_blackstone-0-properties.png"
+    ]
+  }
+}

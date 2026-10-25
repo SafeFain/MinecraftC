@@ -1,0 +1,28 @@
+{
+  "key": "star_crystal_lamp",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 528933195,
+    "images": [
+      "textures/materials/star_crystal_lamp-0-images.png",
+      "textures/materials/star_crystal_lamp-1-images.png",
+      "textures/materials/star_crystal_lamp-2-images.png",
+      "textures/materials/star_crystal_lamp-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/star_crystal_lamp-0-normals.png",
+      "textures/materials/star_crystal_lamp-1-normals.png",
+      "textures/materials/star_crystal_lamp-2-normals.png",
+      "textures/materials/star_crystal_lamp-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/star_crystal_lamp-0-properties.png",
+      "textures/materials/star_crystal_lamp-1-properties.png",
+      "textures/materials/star_crystal_lamp-2-properties.png",
+      "textures/materials/star_crystal_lamp-3-properties.png"
+    ]
+  }
+}

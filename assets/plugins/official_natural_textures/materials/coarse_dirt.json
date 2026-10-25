@@ -1,0 +1,28 @@
+{
+  "key": "coarse_dirt",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3315348889,
+    "images": [
+      "textures/materials/coarse_dirt-0-images.png",
+      "textures/materials/coarse_dirt-1-images.png",
+      "textures/materials/coarse_dirt-2-images.png",
+      "textures/materials/coarse_dirt-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/coarse_dirt-0-normals.png",
+      "textures/materials/coarse_dirt-1-normals.png",
+      "textures/materials/coarse_dirt-2-normals.png",
+      "textures/materials/coarse_dirt-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/coarse_dirt-0-properties.png",
+      "textures/materials/coarse_dirt-1-properties.png",
+      "textures/materials/coarse_dirt-2-properties.png",
+      "textures/materials/coarse_dirt-3-properties.png"
+    ]
+  }
+}

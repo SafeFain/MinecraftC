@@ -1,0 +1,19 @@
+{
+  "key": "loom_side",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1062794588,
+    "images": [
+      "textures/materials/loom_side-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/loom_side-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/loom_side-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "oxeye_daisy",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 547867876,
+    "images": [
+      "textures/materials/oxeye_daisy-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/oxeye_daisy-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/oxeye_daisy-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "key": "sulfur_rock",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2795297953,
+    "images": [
+      "textures/materials/sulfur_rock-0-images.png",
+      "textures/materials/sulfur_rock-1-images.png",
+      "textures/materials/sulfur_rock-2-images.png",
+      "textures/materials/sulfur_rock-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/sulfur_rock-0-normals.png",
+      "textures/materials/sulfur_rock-1-normals.png",
+      "textures/materials/sulfur_rock-2-normals.png",
+      "textures/materials/sulfur_rock-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sulfur_rock-0-properties.png",
+      "textures/materials/sulfur_rock-1-properties.png",
+      "textures/materials/sulfur_rock-2-properties.png",
+      "textures/materials/sulfur_rock-3-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "glimmer_reed",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2731030707,
+    "images": [
+      "textures/materials/glimmer_reed-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/glimmer_reed-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/glimmer_reed-0-properties.png"
+    ]
+  }
+}

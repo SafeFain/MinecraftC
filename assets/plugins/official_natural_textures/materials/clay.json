@@ -1,0 +1,28 @@
+{
+  "key": "clay",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 446737447,
+    "images": [
+      "textures/materials/clay-0-images.png",
+      "textures/materials/clay-1-images.png",
+      "textures/materials/clay-2-images.png",
+      "textures/materials/clay-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/clay-0-normals.png",
+      "textures/materials/clay-1-normals.png",
+      "textures/materials/clay-2-normals.png",
+      "textures/materials/clay-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/clay-0-properties.png",
+      "textures/materials/clay-1-properties.png",
+      "textures/materials/clay-2-properties.png",
+      "textures/materials/clay-3-properties.png"
+    ]
+  }
+}

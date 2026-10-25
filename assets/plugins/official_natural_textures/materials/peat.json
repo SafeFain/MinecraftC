@@ -1,0 +1,28 @@
+{
+  "key": "peat",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 708032550,
+    "images": [
+      "textures/materials/peat-0-images.png",
+      "textures/materials/peat-1-images.png",
+      "textures/materials/peat-2-images.png",
+      "textures/materials/peat-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/peat-0-normals.png",
+      "textures/materials/peat-1-normals.png",
+      "textures/materials/peat-2-normals.png",
+      "textures/materials/peat-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/peat-0-properties.png",
+      "textures/materials/peat-1-properties.png",
+      "textures/materials/peat-2-properties.png",
+      "textures/materials/peat-3-properties.png"
+    ]
+  }
+}

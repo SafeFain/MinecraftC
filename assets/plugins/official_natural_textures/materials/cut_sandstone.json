@@ -1,0 +1,19 @@
+{
+  "key": "cut_sandstone",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 585046834,
+    "images": [
+      "textures/materials/cut_sandstone-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cut_sandstone-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cut_sandstone-0-properties.png"
+    ]
+  }
+}

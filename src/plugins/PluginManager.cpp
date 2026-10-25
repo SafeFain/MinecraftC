@@ -389,9 +389,20 @@ void PluginManager::materialSequence(MC_PluginContext& ctx,const MC_MaterialSequ
     value.images=std::move(images);value.normals=std::move(normals);value.propertyFrames=std::move(properties);
 }
 void PluginManager::itemIcon(MC_PluginContext& ctx,const MC_ItemIcon& d) {
-    check(d.size>=sizeof(d),"Invalid item icon descriptor");const auto key=required(d.item);owned(ctx,key);
-    const auto id=resolveItem(key);auto& item=mutableContentState().items.at(static_cast<uint16_t>(id));
-    item.icon=containedPath(m_info.at(ctx.index).root,required(d.path));validateMaterialImage(item.icon);
+    check(d.size>=sizeof(d)&&m_phase==MC_REGISTER&&!mutableContentState().frozen,"Item icon registration is closed");
+    const auto key=required(d.item);const auto& info=m_info.at(ctx.index);
+    const auto image=containedPath(info.root,required(d.path));validateMaterialImage(image);
+    if(info.manifest.visual) {
+        // Reserved Heaven identities remain recognizable while their optional provider
+        // is disabled. A visual pack must never make unavailable items valid.
+        const auto raw=builtinKeyId(key,"minecraftc:item_",static_cast<uint16_t>(ItemId::COUNT));
+        if(raw!=INVALID_CONTENT_ID&&heavenItemSlot(static_cast<ItemId>(raw))&&!availableItem(static_cast<ItemId>(raw)))return;
+        const auto id=resolveItem(key);check(id!=ItemId::EMPTY,"Cannot override the empty item");
+        mutableContentState().itemIconOverrides[static_cast<uint16_t>(id)]=image;
+    } else {
+        owned(ctx,key);
+        mutableContentState().items.at(static_cast<uint16_t>(resolveItem(key))).icon=image;
+    }
 }
 int32_t PluginManager::recipe(MC_PluginContext& ctx,const MC_Recipe& v) {
     check(v.size>=sizeof(v)&&v.operation<=2,"Invalid recipe descriptor");const auto key=required(v.key);owned(ctx,key);
@@ -502,7 +513,31 @@ void PluginManager::loadPackage(MC_PluginContext& ctx,const std::vector<PackageD
 void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     auto each=[&](const char* key,auto apply){if(!data.has(key))return;check(data.at(key).type==Json::Type::Array,"Content field must be an array");for(const auto& value:data.at(key).array)apply(value);};
     auto integer=[](const Json& j,const char* key,uint32_t fallback)->uint32_t {const double v=j.numeric(key,fallback);check(v>=0&&v<=65535&&std::floor(v)==v,"Expected bounded integer");return static_cast<uint32_t>(v);};
-    each("materials",[&](const Json& j){MC_Material m{};m.size=sizeof(m);std::string key=j.at("key").text(),image=j.text("image"),normal=j.text("normal"),properties=j.text("properties");m.key=key.c_str();m.image=image.c_str();m.normal=normal.c_str();m.properties=properties.c_str();m.replace=j.flag("replace",false);std::fill(m.color,m.color+4,1.0f);if(j.has("color")){const auto& c=j.at("color");check(c.type==Json::Type::Array&&c.array.size()==4,"Material color requires four numbers");for(size_t i=0;i<4;++i){check(c.array[i].type==Json::Type::Number,"Invalid color");m.color[i]=static_cast<float>(c.array[i].number);}}material(ctx,m);});
+    each("materials",[&](const Json& j){
+        MC_Material m{};m.size=sizeof(m);
+        const auto key=j.at("key").text(),image=j.text("image"),normal=j.text("normal"),properties=j.text("properties");
+        m.key=key.c_str();m.image=image.c_str();m.normal=normal.c_str();m.properties=properties.c_str();m.replace=j.flag("replace",false);
+        std::fill(m.color,m.color+4,1.0f);
+        if(j.has("color")){const auto& c=j.at("color");check(c.type==Json::Type::Array&&c.array.size()==4,"Material color requires four numbers");for(size_t i=0;i<4;++i){check(c.array[i].type==Json::Type::Number,"Invalid color");m.color[i]=static_cast<float>(c.array[i].number);}}
+        if(!j.has("sequence")){material(ctx,m);return;}
+        check(!j.has("image")&&!j.has("normal")&&!j.has("properties"),"Sequence cannot be combined with single images");
+        const auto& s=j.at("sequence");check(s.type==Json::Type::Object,"Material sequence requires an object");
+        MC_MaterialSequenceDefinition d{};d.size=sizeof(d);d.base=m;
+        d.variants=integer(s,"variants",1);d.frames=integer(s,"frames",1);d.fps_milli=integer(s,"fps_milli",0);
+        const double seed=s.numeric("seed",0);check(seed>=0&&seed<=UINT32_MAX&&std::floor(seed)==seed,"Invalid material selection seed");d.seed=static_cast<uint32_t>(seed);
+        check(d.variants>=1&&d.variants<=4&&d.frames>=1&&d.frames<=16,"Invalid sequence dimensions");
+        const size_t count=d.variants*d.frames;
+        std::vector<std::string> images,normals,propertyFrames;
+        auto paths=[&](const char* field,std::vector<std::string>& out,bool requiredField){
+            if(!s.has(field)){check(!requiredField,"Sequence requires images");return;}
+            const auto& a=s.at(field);check(a.type==Json::Type::Array&&a.array.size()==count,"Sequence image count mismatch");
+            for(const auto& p:a.array)out.push_back(p.text());
+        };
+        paths("images",images,true);paths("normals",normals,false);paths("properties",propertyFrames,false);
+        std::vector<const char*> a,b,c;
+        for(const auto& p:images)a.push_back(p.c_str());for(const auto& p:normals)b.push_back(p.c_str());for(const auto& p:propertyFrames)c.push_back(p.c_str());
+        d.images=a.data();d.normals=b.empty()?nullptr:b.data();d.properties=c.empty()?nullptr:c.data();materialSequence(ctx,d);
+    });
     auto loadBlock=[&](const Json& j,bool family){MC_Block b{};b.size=sizeof(b);std::string key=j.at("key").text(),name=j.at("name").text(),drop=j.text("drop");b.key=key.c_str();b.name=name.c_str();b.drop_item=drop.c_str();b.hardness=static_cast<float>(j.numeric("hardness",1));b.alpha=static_cast<float>(j.numeric("alpha",1));b.solid=j.flag("solid",true);b.cross=j.flag("cross",false);b.layer=integer(j,"layer",0);b.emission=integer(j,"emission",0);b.preferred_tool=integer(j,"preferred_tool",integer(j,"tool",0));b.minimum_tier=integer(j,"minimum_tier",integer(j,"tier",0));b.unbreakable=j.flag("unbreakable",false);std::fill(b.color,b.color+3,1.0f);if(j.has("color")){const auto& c=j.at("color");check(c.type==Json::Type::Array&&c.array.size()==3,"Block color requires three numbers");for(size_t i=0;i<3;++i){check(c.array[i].type==Json::Type::Number,"Invalid block color");b.color[i]=static_cast<float>(c.array[i].number);}}std::array<std::string,6> faces;const auto& mats=j.at("materials");if(mats.type==Json::Type::String)faces.fill(mats.text());else {check(mats.type==Json::Type::Array&&mats.array.size()==6,"Block needs six materials");for(size_t i=0;i<6;++i)faces[i]=mats.array[i].text();}for(size_t i=0;i<6;++i)b.materials[i]=faces[i].c_str();uint16_t id=0;
         if(!family)block(ctx,b,id);
         else {
@@ -532,6 +567,7 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
         blockGeometry(ctx,d);
     });
     each("items",[&](const Json& j){MC_Item item{};item.size=sizeof(item);std::string key=j.at("key").text(),name=j.at("name").text(),mat=j.at("material").text(),placed=j.text("placed_block");item.key=key.c_str();item.name=name.c_str();item.material=mat.c_str();item.placed_block=placed.c_str();item.kind=integer(j,"kind",placed.empty()?0:1);item.category=integer(j,"category",placed.empty()?6:0);item.max_stack=integer(j,"max_stack",64);item.durability=integer(j,"durability",0);item.tool=integer(j,"tool",0);item.tier=integer(j,"tier",0);item.food=integer(j,"food",0);item.saturation=static_cast<float>(j.numeric("saturation",0));item.attack_damage=static_cast<float>(j.numeric("attack_damage",0));item.attack_speed=static_cast<float>(j.numeric("attack_speed",0));uint16_t id=0;this->item(ctx,item,id);});
+    each("item_icons",[&](const Json& j){const auto item=j.at("item").text(),image=j.at("image").text();const MC_ItemIcon d{sizeof(d),item.c_str(),image.c_str()};itemIcon(ctx,d);});
     each("recipes",[&](const Json& j){MC_Recipe r{};r.size=sizeof(r);std::string key=j.at("key").text(),target=j.text("target"),output=j.text("output");r.key=key.c_str();r.target=target.c_str();r.output=output.c_str();r.operation=integer(j,"operation",0);r.smelting=j.flag("smelting",false);r.width=integer(j,"width",1);r.height=integer(j,"height",1);r.mirror=j.flag("mirror",true);r.count=integer(j,"count",1);r.cook_ticks=integer(j,"cook_ticks",200);std::array<std::string,9> ingredients;if(j.has("ingredients")){const auto& a=j.at("ingredients");check(a.type==Json::Type::Array&&a.array.size()<=9,"Invalid ingredient array");for(size_t i=0;i<a.array.size();++i){ingredients[i]=a.array[i].text();r.ingredients[i]=ingredients[i].c_str();}}recipe(ctx,r);});
     each("dimensions",[&](const Json& j){
         MC_DimensionDefinition d{};d.size=sizeof(d);

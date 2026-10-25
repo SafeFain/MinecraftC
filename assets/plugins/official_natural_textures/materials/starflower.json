@@ -1,0 +1,19 @@
+{
+  "key": "starflower",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1480539542,
+    "images": [
+      "textures/materials/starflower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/starflower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/starflower-0-properties.png"
+    ]
+  }
+}

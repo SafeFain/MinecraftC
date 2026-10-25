@@ -1,0 +1,19 @@
+{
+  "key": "glow_fern",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2695516966,
+    "images": [
+      "textures/materials/glow_fern-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/glow_fern-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/glow_fern-0-properties.png"
+    ]
+  }
+}

@@ -13,7 +13,7 @@ inline const std::vector<std::string>& packageCategories() {
         "materials","blocks","block_families","block_geometry","items","dimensions",
         "recipes","entities","generators","block_behaviors","item_behaviors",
         "loot_tables","structures","player_actions","environments","particles",
-        "held_models","playlists","render_resources","render_passes"};
+        "held_models","playlists","render_resources","render_passes","item_icons"};
     return names;
 }
 struct PackageDefinition {
@@ -22,7 +22,7 @@ struct PackageDefinition {
 };
 inline std::string packageIdentity(const Json& j,const std::string& category) {
     const char* field=category=="block_geometry"||category=="block_behaviors"?"block":
-        category=="item_behaviors"||category=="held_models"?"item":"key";
+        category=="item_behaviors"||category=="held_models"||category=="item_icons"?"item":"key";
     return j.at(field).text();
 }
 inline void packageSource(Json& j,const std::string& source) {

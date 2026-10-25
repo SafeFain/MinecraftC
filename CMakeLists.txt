@@ -961,6 +961,7 @@ if(BUILD_TESTING)
 
     add_executable(vulkan_model_fog_smoke EXCLUDE_FROM_ALL
         tests/VulkanModelFogSmoke.cpp
+        src/game/Item.cpp
         src/debug/Log.cpp
         src/model/ModelRenderer.cpp src/model/ModelAnimation.cpp
         src/renderer/BlockAtlasData.cpp
@@ -1132,6 +1133,8 @@ if(BUILD_TESTING)
     target_compile_definitions(plugin_tests PRIVATE MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
     target_link_libraries(plugin_tests PRIVATE glm::glm minecraftc_platform)
+    add_test(NAME natural_texture_plugin COMMAND plugin_tests --natural-textures)
+    add_test(NAME natural_texture_assets COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_natural_pixels.py)
     minecraftc_add_content_package(package_fixture
         ROOT "${CMAKE_SOURCE_DIR}/examples/plugins/package_demo" MODE BUILTIN)
     target_link_libraries(plugin_tests PRIVATE package_fixture)
@@ -1562,6 +1565,11 @@ if(BUILD_TESTING)
         add_dependencies(vulkan_ui_smoke plugin_render_demo)
         if(MINECRAFTC_VULKAN_TESTS)
             set_property(TARGET vulkan_ui_smoke PROPERTY EXCLUDE_FROM_ALL FALSE)
+            add_test(NAME natural_texture_vulkan_readback COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
+                ${CMAKE_SOURCE_DIR}/assets natural_textures)
+            set_tests_properties(natural_texture_vulkan_readback PROPERTIES
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
             add_test(NAME content_package_vulkan_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_content_package.py
                 --plugin-tests $<TARGET_FILE:plugin_tests>

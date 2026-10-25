@@ -1,0 +1,19 @@
+{
+  "key": "soul_soil",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 217244958,
+    "images": [
+      "textures/materials/soul_soil-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/soul_soil-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/soul_soil-0-properties.png"
+    ]
+  }
+}

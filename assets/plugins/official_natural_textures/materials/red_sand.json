@@ -1,0 +1,28 @@
+{
+  "key": "red_sand",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1194890587,
+    "images": [
+      "textures/materials/red_sand-0-images.png",
+      "textures/materials/red_sand-1-images.png",
+      "textures/materials/red_sand-2-images.png",
+      "textures/materials/red_sand-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/red_sand-0-normals.png",
+      "textures/materials/red_sand-1-normals.png",
+      "textures/materials/red_sand-2-normals.png",
+      "textures/materials/red_sand-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/red_sand-0-properties.png",
+      "textures/materials/red_sand-1-properties.png",
+      "textures/materials/red_sand-2-properties.png",
+      "textures/materials/red_sand-3-properties.png"
+    ]
+  }
+}

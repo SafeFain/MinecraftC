@@ -1,0 +1,19 @@
+{
+  "key": "crimson_roots",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2146573038,
+    "images": [
+      "textures/materials/crimson_roots-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/crimson_roots-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/crimson_roots-0-properties.png"
+    ]
+  }
+}

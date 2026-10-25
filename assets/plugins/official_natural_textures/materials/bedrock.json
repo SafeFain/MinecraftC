@@ -1,0 +1,19 @@
+{
+  "key": "bedrock",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3180567098,
+    "images": [
+      "textures/materials/bedrock-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/bedrock-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/bedrock-0-properties.png"
+    ]
+  }
+}

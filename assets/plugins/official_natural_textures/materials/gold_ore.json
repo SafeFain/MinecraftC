@@ -1,0 +1,28 @@
+{
+  "key": "gold_ore",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 258295286,
+    "images": [
+      "textures/materials/gold_ore-0-images.png",
+      "textures/materials/gold_ore-1-images.png",
+      "textures/materials/gold_ore-2-images.png",
+      "textures/materials/gold_ore-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/gold_ore-0-normals.png",
+      "textures/materials/gold_ore-1-normals.png",
+      "textures/materials/gold_ore-2-normals.png",
+      "textures/materials/gold_ore-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/gold_ore-0-properties.png",
+      "textures/materials/gold_ore-1-properties.png",
+      "textures/materials/gold_ore-2-properties.png",
+      "textures/materials/gold_ore-3-properties.png"
+    ]
+  }
+}

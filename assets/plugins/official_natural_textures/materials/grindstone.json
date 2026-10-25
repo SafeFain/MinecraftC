@@ -1,0 +1,19 @@
+{
+  "key": "grindstone",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 697033301,
+    "images": [
+      "textures/materials/grindstone-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/grindstone-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/grindstone-0-properties.png"
+    ]
+  }
+}

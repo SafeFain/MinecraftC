@@ -1,0 +1,28 @@
+{
+  "key": "gneiss",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 145989329,
+    "images": [
+      "textures/materials/gneiss-0-images.png",
+      "textures/materials/gneiss-1-images.png",
+      "textures/materials/gneiss-2-images.png",
+      "textures/materials/gneiss-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/gneiss-0-normals.png",
+      "textures/materials/gneiss-1-normals.png",
+      "textures/materials/gneiss-2-normals.png",
+      "textures/materials/gneiss-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/gneiss-0-properties.png",
+      "textures/materials/gneiss-1-properties.png",
+      "textures/materials/gneiss-2-properties.png",
+      "textures/materials/gneiss-3-properties.png"
+    ]
+  }
+}

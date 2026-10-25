@@ -24,9 +24,9 @@ def refresh(package):
                                              indent=2) + "\n", encoding="utf-8")
 
 
-def check(target, expected):
+def check(target, expected, package_id="official_heaven"):
     def verify(names, read):
-        manifests = [name for name in names if name.endswith("plugins/official_heaven/" + MANIFEST)]
+        manifests = [name for name in names if name.endswith("plugins/" + package_id + "/" + MANIFEST)]
         if len(manifests) != 1:
             raise ValueError(f"expected one official package, found {len(manifests)}")
         prefix = manifests[0][:-len(MANIFEST)]
@@ -66,10 +66,12 @@ def main():
     try:
         if args.refresh:
             refresh(package)
-        expected = json.loads((package / MANIFEST).read_text(encoding="utf-8"))
-        if expected != {"version": 1, "sha256": inventory(package)}:
-            raise ValueError("source resources changed without manifest refresh")
-        check(args.target, expected)
+        for identifier in ("official_heaven", "official_natural_textures"):
+            source = package.parent / identifier
+            expected = json.loads((source / MANIFEST).read_text(encoding="utf-8"))
+            if expected != {"version": 1, "sha256": inventory(source)}:
+                raise ValueError(identifier + ": source resources changed without manifest refresh")
+            check(args.target, expected, identifier)
     except (OSError, ValueError, KeyError, tarfile.TarError, zipfile.BadZipFile) as error:
         parser.exit(1, str(error) + "\n")
 

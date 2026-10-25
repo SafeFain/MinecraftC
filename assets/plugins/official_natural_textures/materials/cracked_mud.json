@@ -1,0 +1,28 @@
+{
+  "key": "cracked_mud",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2685279993,
+    "images": [
+      "textures/materials/cracked_mud-0-images.png",
+      "textures/materials/cracked_mud-1-images.png",
+      "textures/materials/cracked_mud-2-images.png",
+      "textures/materials/cracked_mud-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/cracked_mud-0-normals.png",
+      "textures/materials/cracked_mud-1-normals.png",
+      "textures/materials/cracked_mud-2-normals.png",
+      "textures/materials/cracked_mud-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cracked_mud-0-properties.png",
+      "textures/materials/cracked_mud-1-properties.png",
+      "textures/materials/cracked_mud-2-properties.png",
+      "textures/materials/cracked_mud-3-properties.png"
+    ]
+  }
+}

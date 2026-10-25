@@ -1,0 +1,19 @@
+{
+  "key": "tundra_moss",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4257066229,
+    "images": [
+      "textures/materials/tundra_moss-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/tundra_moss-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/tundra_moss-0-properties.png"
+    ]
+  }
+}

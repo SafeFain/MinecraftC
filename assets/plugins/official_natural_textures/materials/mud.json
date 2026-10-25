@@ -1,0 +1,28 @@
+{
+  "key": "mud",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1101402698,
+    "images": [
+      "textures/materials/mud-0-images.png",
+      "textures/materials/mud-1-images.png",
+      "textures/materials/mud-2-images.png",
+      "textures/materials/mud-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/mud-0-normals.png",
+      "textures/materials/mud-1-normals.png",
+      "textures/materials/mud-2-normals.png",
+      "textures/materials/mud-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/mud-0-properties.png",
+      "textures/materials/mud-1-properties.png",
+      "textures/materials/mud-2-properties.png",
+      "textures/materials/mud-3-properties.png"
+    ]
+  }
+}

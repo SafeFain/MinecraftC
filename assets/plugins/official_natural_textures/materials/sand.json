@@ -1,0 +1,28 @@
+{
+  "key": "sand",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2503092068,
+    "images": [
+      "textures/materials/sand-0-images.png",
+      "textures/materials/sand-1-images.png",
+      "textures/materials/sand-2-images.png",
+      "textures/materials/sand-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/sand-0-normals.png",
+      "textures/materials/sand-1-normals.png",
+      "textures/materials/sand-2-normals.png",
+      "textures/materials/sand-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sand-0-properties.png",
+      "textures/materials/sand-1-properties.png",
+      "textures/materials/sand-2-properties.png",
+      "textures/materials/sand-3-properties.png"
+    ]
+  }
+}

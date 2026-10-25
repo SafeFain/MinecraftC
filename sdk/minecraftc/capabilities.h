@@ -374,6 +374,8 @@ typedef struct MC_AmbientDefinition {
     void* userdata;
 } MC_AmbientDefinition;
 typedef struct MC_ItemIcon {uint32_t size;const char* item;const char* path;} MC_ItemIcon;
+/* Visual-only packages may target existing items; overlays never register items.
+ * Gameplay packages retain ownership restrictions. Images are package-local 16x16 PNGs. */
 typedef struct MC_PresentationV2 {
     uint32_t size,version;
     int32_t (*register_particle)(MC_PluginContext*,const MC_ParticleDefinitionV2*);

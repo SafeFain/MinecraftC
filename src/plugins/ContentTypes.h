@@ -76,6 +76,8 @@ struct ContentState {
     std::string runtimeFault;
     std::map<uint16_t,BlockContent> blocks;
     std::map<uint16_t,ItemContent> items;
+    // Presentation overlays never create or mutate gameplay item definitions.
+    std::map<uint16_t,std::filesystem::path> itemIconOverrides;
     std::map<std::string,MaterialContent> materials;
     std::map<std::string,CraftingRecipe> crafting;
     std::map<std::string,SmeltingRecipe> smelting;

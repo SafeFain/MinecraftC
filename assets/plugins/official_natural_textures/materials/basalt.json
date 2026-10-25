@@ -1,0 +1,28 @@
+{
+  "key": "basalt",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2292913504,
+    "images": [
+      "textures/materials/basalt-0-images.png",
+      "textures/materials/basalt-1-images.png",
+      "textures/materials/basalt-2-images.png",
+      "textures/materials/basalt-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/basalt-0-normals.png",
+      "textures/materials/basalt-1-normals.png",
+      "textures/materials/basalt-2-normals.png",
+      "textures/materials/basalt-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/basalt-0-properties.png",
+      "textures/materials/basalt-1-properties.png",
+      "textures/materials/basalt-2-properties.png",
+      "textures/materials/basalt-3-properties.png"
+    ]
+  }
+}

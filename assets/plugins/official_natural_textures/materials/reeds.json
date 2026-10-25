@@ -1,0 +1,19 @@
+{
+  "key": "reeds",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3069804546,
+    "images": [
+      "textures/materials/reeds-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/reeds-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/reeds-0-properties.png"
+    ]
+  }
+}

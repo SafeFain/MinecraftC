@@ -1,0 +1,19 @@
+{
+  "key": "oak_door_top",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1516135629,
+    "images": [
+      "textures/materials/oak_door_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/oak_door_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/oak_door_top-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "obsidian",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 33856091,
+    "images": [
+      "textures/materials/obsidian-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/obsidian-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/obsidian-0-properties.png"
+    ]
+  }
+}

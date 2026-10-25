@@ -26,6 +26,17 @@ metadata name. Older authored and runtime-procedural tiles are fallback-only.
 
 ## Generate and validate
 
+The optional Natural Pixels visual package has independent palettes, pattern
+choices, material sequences and item definitions. It does not change the default
+generator style or outputs. Reproduce and review it with:
+
+```sh
+python3 tools/natural_pixels.py --review build-local/natural-pixels-review
+python3 tests/test_natural_pixels.py
+```
+
+See [Natural Pixels](docs/natural-pixels.md) for the package and coverage contract.
+
 From the repository root:
 
 ```bash

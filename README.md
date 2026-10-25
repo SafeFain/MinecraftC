@@ -9,6 +9,8 @@ Android and iOS (MoltenVK on Apple platforms).
   villagers, weather and persistent worlds.
 - LAN cooperative play for 2–8 players, configurable controls and ten UI languages.
 - Data and native plugins, including the default-enabled optional Heaven dimension.
+- Optional original 16×16 Natural Pixels block/item textures: enable **自然像素 /
+  Natural Pixels** on the Plugins page and restart; disable to restore the defaults.
 
 ## Quick start
 

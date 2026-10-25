@@ -1,0 +1,19 @@
+{
+  "key": "allium",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3187001078,
+    "images": [
+      "textures/materials/allium-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/allium-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/allium-0-properties.png"
+    ]
+  }
+}

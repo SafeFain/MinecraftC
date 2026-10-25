@@ -1,0 +1,19 @@
+{
+  "key": "jungle_sapling",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 923936371,
+    "images": [
+      "textures/materials/jungle_sapling-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/jungle_sapling-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/jungle_sapling-0-properties.png"
+    ]
+  }
+}

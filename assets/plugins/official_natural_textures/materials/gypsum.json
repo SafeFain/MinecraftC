@@ -1,0 +1,28 @@
+{
+  "key": "gypsum",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 713396523,
+    "images": [
+      "textures/materials/gypsum-0-images.png",
+      "textures/materials/gypsum-1-images.png",
+      "textures/materials/gypsum-2-images.png",
+      "textures/materials/gypsum-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/gypsum-0-normals.png",
+      "textures/materials/gypsum-1-normals.png",
+      "textures/materials/gypsum-2-normals.png",
+      "textures/materials/gypsum-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/gypsum-0-properties.png",
+      "textures/materials/gypsum-1-properties.png",
+      "textures/materials/gypsum-2-properties.png",
+      "textures/materials/gypsum-3-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "dry_grass_block",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1719812037,
+    "images": [
+      "textures/materials/dry_grass_block-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/dry_grass_block-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/dry_grass_block-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "nettle",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1723004620,
+    "images": [
+      "textures/materials/nettle-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/nettle-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/nettle-0-properties.png"
+    ]
+  }
+}

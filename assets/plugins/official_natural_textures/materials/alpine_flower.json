@@ -1,0 +1,19 @@
+{
+  "key": "alpine_flower",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1414421341,
+    "images": [
+      "textures/materials/alpine_flower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/alpine_flower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/alpine_flower-0-properties.png"
+    ]
+  }
+}

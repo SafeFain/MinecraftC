@@ -1,0 +1,19 @@
+{
+  "key": "crimson_planks",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 393383544,
+    "images": [
+      "textures/materials/crimson_planks-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/crimson_planks-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/crimson_planks-0-properties.png"
+    ]
+  }
+}

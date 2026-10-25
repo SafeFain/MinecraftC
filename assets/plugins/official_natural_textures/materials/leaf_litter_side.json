@@ -1,0 +1,19 @@
+{
+  "key": "leaf_litter_side",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2056770592,
+    "images": [
+      "textures/materials/leaf_litter_side-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/leaf_litter_side-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/leaf_litter_side-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "sandstone",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3540603920,
+    "images": [
+      "textures/materials/sandstone-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/sandstone-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sandstone-0-properties.png"
+    ]
+  }
+}

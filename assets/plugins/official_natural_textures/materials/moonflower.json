@@ -1,0 +1,19 @@
+{
+  "key": "moonflower",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1948111172,
+    "images": [
+      "textures/materials/moonflower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/moonflower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/moonflower-0-properties.png"
+    ]
+  }
+}

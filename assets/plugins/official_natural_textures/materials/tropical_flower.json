@@ -1,0 +1,19 @@
+{
+  "key": "tropical_flower",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3591699850,
+    "images": [
+      "textures/materials/tropical_flower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/tropical_flower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/tropical_flower-0-properties.png"
+    ]
+  }
+}

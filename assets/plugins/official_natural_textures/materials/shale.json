@@ -1,0 +1,28 @@
+{
+  "key": "shale",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2046599737,
+    "images": [
+      "textures/materials/shale-0-images.png",
+      "textures/materials/shale-1-images.png",
+      "textures/materials/shale-2-images.png",
+      "textures/materials/shale-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/shale-0-normals.png",
+      "textures/materials/shale-1-normals.png",
+      "textures/materials/shale-2-normals.png",
+      "textures/materials/shale-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/shale-0-properties.png",
+      "textures/materials/shale-1-properties.png",
+      "textures/materials/shale-2-properties.png",
+      "textures/materials/shale-3-properties.png"
+    ]
+  }
+}

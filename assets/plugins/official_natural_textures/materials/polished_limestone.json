@@ -1,0 +1,19 @@
+{
+  "key": "polished_limestone",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 882772511,
+    "images": [
+      "textures/materials/polished_limestone-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/polished_limestone-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/polished_limestone-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "key": "black_sand",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 373162073,
+    "images": [
+      "textures/materials/black_sand-0-images.png",
+      "textures/materials/black_sand-1-images.png",
+      "textures/materials/black_sand-2-images.png",
+      "textures/materials/black_sand-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/black_sand-0-normals.png",
+      "textures/materials/black_sand-1-normals.png",
+      "textures/materials/black_sand-2-normals.png",
+      "textures/materials/black_sand-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/black_sand-0-properties.png",
+      "textures/materials/black_sand-1-properties.png",
+      "textures/materials/black_sand-2-properties.png",
+      "textures/materials/black_sand-3-properties.png"
+    ]
+  }
+}

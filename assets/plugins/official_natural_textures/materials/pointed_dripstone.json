@@ -1,0 +1,19 @@
+{
+  "key": "pointed_dripstone",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 973156453,
+    "images": [
+      "textures/materials/pointed_dripstone-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/pointed_dripstone-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/pointed_dripstone-0-properties.png"
+    ]
+  }
+}

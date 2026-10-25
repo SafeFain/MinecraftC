@@ -33,6 +33,13 @@ ID, and remain visible in safe mode. This presentation catalog sits outside the
 gameplay package roots so editing official descriptions does not change save/LAN
 content fingerprints. The list wraps descriptions and shows at most three lines per entry.
 
+The builtin **自然像素 / Natural Pixels** (`official_natural_textures`) is
+disabled by default. Enable it on the Plugins page and restart to apply original
+16x16 natural pixel textures to all built-in blocks and items, including Nether
+and enabled Heaven content. Disable and restart to restore the default textures.
+It is visual-only: saves and LAN peers do not require matching texture choices.
+Heaven remains independently optional. Safe mode disables this pack as well.
+
 The builtin examples are disabled by default:
 
 - `official_content`: crystal block, crystal items, crafting and a use callback.
@@ -178,6 +185,21 @@ Normal/property data is linear; color textures are sRGB. The host expands the
 shared atlas, generates tile-safe mipmaps, and feeds material colors/emission to
 GI. Explicit `replace: true` can override an existing material key (builtin keys
 are the logical names from the texture definitions, without a namespace).
+
+A material can instead declare `sequence: {variants, frames, fps_milli, seed,
+images, normals, properties}`. Counts default to 1, rate/seed to 0; each supplied
+path array has `variants * frames` entries, variant-major then frame-major.
+`images` is required; normal/property arrays are optional. This uses the existing
+material-sequence SDK limits (1–4 variants, 1–16 frames, at most 60 fps).
+Do not combine `sequence` with top-level single-image fields.
+
+`item_icons` entries take `item` and package-relative `image` (16x16 PNG).
+Gameplay packages can supply their own items' icons. Visual-only packages can
+overlay existing items without altering gameplay definitions, using the same
+`MC_PresentationV2::register_item_icon` ABI. Known reserved Heaven item keys are
+skipped while Heaven is disabled; unknown targets are errors. Final overlays
+apply after provider icons, with canonical/command aliases sharing one slot.
+Multiple visual packages follow normal plugin order; the last override wins.
 
 Blocks take `key`, `name`, `materials` (one key or six keys ordered top, bottom,
 front, back, right, left), `solid`, `cross`, `layer` (0 opaque, 1 cutout, 2

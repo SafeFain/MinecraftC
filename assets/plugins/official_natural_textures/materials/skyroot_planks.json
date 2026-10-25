@@ -1,0 +1,28 @@
+{
+  "key": "skyroot_planks",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3513646978,
+    "images": [
+      "textures/materials/skyroot_planks-0-images.png",
+      "textures/materials/skyroot_planks-1-images.png",
+      "textures/materials/skyroot_planks-2-images.png",
+      "textures/materials/skyroot_planks-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_planks-0-normals.png",
+      "textures/materials/skyroot_planks-1-normals.png",
+      "textures/materials/skyroot_planks-2-normals.png",
+      "textures/materials/skyroot_planks-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_planks-0-properties.png",
+      "textures/materials/skyroot_planks-1-properties.png",
+      "textures/materials/skyroot_planks-2-properties.png",
+      "textures/materials/skyroot_planks-3-properties.png"
+    ]
+  }
+}

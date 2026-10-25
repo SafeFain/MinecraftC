@@ -1,0 +1,28 @@
+{
+  "key": "limestone",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3208038332,
+    "images": [
+      "textures/materials/limestone-0-images.png",
+      "textures/materials/limestone-1-images.png",
+      "textures/materials/limestone-2-images.png",
+      "textures/materials/limestone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/limestone-0-normals.png",
+      "textures/materials/limestone-1-normals.png",
+      "textures/materials/limestone-2-normals.png",
+      "textures/materials/limestone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/limestone-0-properties.png",
+      "textures/materials/limestone-1-properties.png",
+      "textures/materials/limestone-2-properties.png",
+      "textures/materials/limestone-3-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "skyroot_leaves",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2001054033,
+    "images": [
+      "textures/materials/skyroot_leaves-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_leaves-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_leaves-0-properties.png"
+    ]
+  }
+}

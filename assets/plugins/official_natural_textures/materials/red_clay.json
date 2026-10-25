@@ -1,0 +1,28 @@
+{
+  "key": "red_clay",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1848487219,
+    "images": [
+      "textures/materials/red_clay-0-images.png",
+      "textures/materials/red_clay-1-images.png",
+      "textures/materials/red_clay-2-images.png",
+      "textures/materials/red_clay-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/red_clay-0-normals.png",
+      "textures/materials/red_clay-1-normals.png",
+      "textures/materials/red_clay-2-normals.png",
+      "textures/materials/red_clay-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/red_clay-0-properties.png",
+      "textures/materials/red_clay-1-properties.png",
+      "textures/materials/red_clay-2-properties.png",
+      "textures/materials/red_clay-3-properties.png"
+    ]
+  }
+}

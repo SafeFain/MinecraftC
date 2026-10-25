@@ -1,0 +1,19 @@
+{
+  "key": "dawn_bell",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1096574754,
+    "images": [
+      "textures/materials/dawn_bell-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/dawn_bell-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/dawn_bell-0-properties.png"
+    ]
+  }
+}

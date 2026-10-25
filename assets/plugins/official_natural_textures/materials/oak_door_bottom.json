@@ -1,0 +1,19 @@
+{
+  "key": "oak_door_bottom",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1356128230,
+    "images": [
+      "textures/materials/oak_door_bottom-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/oak_door_bottom-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/oak_door_bottom-0-properties.png"
+    ]
+  }
+}

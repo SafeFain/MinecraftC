@@ -35,6 +35,7 @@
 #include <functional>
 #include <chrono>
 #include <set>
+#include "NaturalTextureVulkanSmoke.h"
 
 namespace {
 struct Access final : IContainerAccess,ITradeAccess {
@@ -60,6 +61,8 @@ int main(int argc,char** argv) {
     try {
         const bool heavenModel=argc==3&&std::string(argv[2])=="--heaven-model";
         const bool heavenOff=argc==3&&std::string(argv[2])=="--heaven-off";
+        const bool natural=argc==3&&std::string(argv[2])=="--natural-textures";
+        const bool defaultTextures=argc==3&&std::string(argv[2])=="--default-textures";
         const bool capabilities=heavenModel||(argc==3&&std::string(argv[2])=="--capabilities");
         const bool extensions=argc==4&&std::string(argv[2])=="--extensions";
         const bool contentPackage=argc==4&&std::string(argv[2])=="--content-package";
@@ -85,12 +88,16 @@ int main(int argc,char** argv) {
             std::ofstream manifest(package/"mod.json");manifest<<"{\"id\":\"render_demo\",\"version\":\"1.0.0\",\"api\":1,\"visual_only\":true,\"native\":{\"linux\":\""<<module.filename().string()<<"\",\"windows\":\""<<module.filename().string()<<"\",\"macos\":\""<<module.filename().string()<<"\"}}";
         }
         if(capabilities)std::filesystem::copy(assets.parent_path()/"examples/plugins/capability_demo",pluginRoot/"mods/capability_demo",std::filesystem::copy_options::recursive);
-        {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true,\"capability_demo\":true,\"official_heaven\":"<<(heavenOff?"false":"true")<<"}";}
+        {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true,\"capability_demo\":true,\"official_natural_textures\":"<<(natural?"true":"false")<<",\"official_heaven\":"<<(heavenOff?"false":"true")<<"}";}
         Plugins::PluginManager plugins({assets,pluginRoot});plugins.initialize();
         if(Plugins::validDimension(1)==heavenOff)throw std::runtime_error("Official provider enabled state mismatch");
         Window window(width,height,"MinecraftC UI smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,assets);
         renderer.setVisualQuality(VisualQuality::Low);renderer.setEnhancedVisuals(false);
+        if(natural||defaultTextures) {
+            if(natural&&Plugins::content().itemIconOverrides.empty())throw std::runtime_error("Natural pack failed to load");
+            return naturalTextureVulkanSmoke(window,renderer,assets,natural);
+        }
         plugins.renderDraw=[&](size_t owner,const MC_RenderDraw& draw){return renderer.pluginDraw(owner,draw);};
         plugins.renderScene=[&](size_t owner,uint64_t index,MC_RenderHandle pipeline){return renderer.pluginSceneDraw(owner,index,pipeline);};
         plugins.renderBuffer=[&](size_t owner,MC_RenderHandle handle,const void* data,uint32_t size){return renderer.pluginUpdateBuffer(owner,handle,data,size);};

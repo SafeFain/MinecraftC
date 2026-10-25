@@ -1,0 +1,19 @@
+{
+  "key": "white_bed_side",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1813319180,
+    "images": [
+      "textures/materials/white_bed_side-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/white_bed_side-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/white_bed_side-0-properties.png"
+    ]
+  }
+}

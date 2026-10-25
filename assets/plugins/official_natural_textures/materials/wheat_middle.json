@@ -1,0 +1,19 @@
+{
+  "key": "wheat_middle",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1545732401,
+    "images": [
+      "textures/materials/wheat_middle-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/wheat_middle-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/wheat_middle-0-properties.png"
+    ]
+  }
+}

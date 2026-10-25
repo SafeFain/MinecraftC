@@ -1,0 +1,19 @@
+{
+  "key": "stone_bricks",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4015978411,
+    "images": [
+      "textures/materials/stone_bricks-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/stone_bricks-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/stone_bricks-0-properties.png"
+    ]
+  }
+}

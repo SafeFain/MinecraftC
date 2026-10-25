@@ -1,0 +1,19 @@
+{
+  "key": "chest",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3538187176,
+    "images": [
+      "textures/materials/chest-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/chest-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/chest-0-properties.png"
+    ]
+  }
+}

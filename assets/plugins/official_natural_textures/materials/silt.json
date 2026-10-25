@@ -1,0 +1,28 @@
+{
+  "key": "silt",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2742666277,
+    "images": [
+      "textures/materials/silt-0-images.png",
+      "textures/materials/silt-1-images.png",
+      "textures/materials/silt-2-images.png",
+      "textures/materials/silt-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/silt-0-normals.png",
+      "textures/materials/silt-1-normals.png",
+      "textures/materials/silt-2-normals.png",
+      "textures/materials/silt-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/silt-0-properties.png",
+      "textures/materials/silt-1-properties.png",
+      "textures/materials/silt-2-properties.png",
+      "textures/materials/silt-3-properties.png"
+    ]
+  }
+}

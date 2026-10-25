@@ -1,0 +1,28 @@
+{
+  "key": "leaf_litter_soil",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1463347547,
+    "images": [
+      "textures/materials/leaf_litter_soil-0-images.png",
+      "textures/materials/leaf_litter_soil-1-images.png",
+      "textures/materials/leaf_litter_soil-2-images.png",
+      "textures/materials/leaf_litter_soil-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/leaf_litter_soil-0-normals.png",
+      "textures/materials/leaf_litter_soil-1-normals.png",
+      "textures/materials/leaf_litter_soil-2-normals.png",
+      "textures/materials/leaf_litter_soil-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/leaf_litter_soil-0-properties.png",
+      "textures/materials/leaf_litter_soil-1-properties.png",
+      "textures/materials/leaf_litter_soil-2-properties.png",
+      "textures/materials/leaf_litter_soil-3-properties.png"
+    ]
+  }
+}

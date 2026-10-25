@@ -1,0 +1,19 @@
+{
+  "key": "beach_grass",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1306602996,
+    "images": [
+      "textures/materials/beach_grass-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/beach_grass-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/beach_grass-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "birch_sapling",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2722131786,
+    "images": [
+      "textures/materials/birch_sapling-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/birch_sapling-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/birch_sapling-0-properties.png"
+    ]
+  }
+}

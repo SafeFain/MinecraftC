@@ -1,0 +1,19 @@
+{
+  "key": "blue_ice",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4197920107,
+    "images": [
+      "textures/materials/blue_ice-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/blue_ice-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/blue_ice-0-properties.png"
+    ]
+  }
+}

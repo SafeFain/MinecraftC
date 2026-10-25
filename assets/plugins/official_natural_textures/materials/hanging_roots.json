@@ -1,0 +1,19 @@
+{
+  "key": "hanging_roots",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 789385556,
+    "images": [
+      "textures/materials/hanging_roots-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/hanging_roots-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/hanging_roots-0-properties.png"
+    ]
+  }
+}

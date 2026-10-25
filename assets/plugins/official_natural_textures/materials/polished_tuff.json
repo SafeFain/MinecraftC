@@ -1,0 +1,19 @@
+{
+  "key": "polished_tuff",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1844215788,
+    "images": [
+      "textures/materials/polished_tuff-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/polished_tuff-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/polished_tuff-0-properties.png"
+    ]
+  }
+}

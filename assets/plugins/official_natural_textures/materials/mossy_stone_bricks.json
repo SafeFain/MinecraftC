@@ -1,0 +1,19 @@
+{
+  "key": "mossy_stone_bricks",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3786738598,
+    "images": [
+      "textures/materials/mossy_stone_bricks-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/mossy_stone_bricks-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/mossy_stone_bricks-0-properties.png"
+    ]
+  }
+}

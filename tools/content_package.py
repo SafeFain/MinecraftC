@@ -14,7 +14,7 @@ CATEGORIES = (
     "materials", "blocks", "block_families", "block_geometry", "items", "dimensions",
     "recipes", "entities", "generators", "block_behaviors", "item_behaviors",
     "loot_tables", "structures", "player_actions", "environments", "particles",
-    "held_models", "playlists", "render_resources", "render_passes",
+    "held_models", "playlists", "render_resources", "render_passes", "item_icons",
 )
 RESOURCES = ("textures", "models", "audio", "shaders", "lang")
 LICENSES = ("LICENSE", "LICENSE.md", "LICENSE.txt", "NOTICE", "NOTICE.md", "NOTICE.txt")

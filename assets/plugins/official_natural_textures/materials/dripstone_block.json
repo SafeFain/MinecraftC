@@ -1,0 +1,28 @@
+{
+  "key": "dripstone_block",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 28779744,
+    "images": [
+      "textures/materials/dripstone_block-0-images.png",
+      "textures/materials/dripstone_block-1-images.png",
+      "textures/materials/dripstone_block-2-images.png",
+      "textures/materials/dripstone_block-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/dripstone_block-0-normals.png",
+      "textures/materials/dripstone_block-1-normals.png",
+      "textures/materials/dripstone_block-2-normals.png",
+      "textures/materials/dripstone_block-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/dripstone_block-0-properties.png",
+      "textures/materials/dripstone_block-1-properties.png",
+      "textures/materials/dripstone_block-2-properties.png",
+      "textures/materials/dripstone_block-3-properties.png"
+    ]
+  }
+}

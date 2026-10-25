@@ -1,0 +1,28 @@
+{
+  "key": "sulfur_crust",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4239556536,
+    "images": [
+      "textures/materials/sulfur_crust-0-images.png",
+      "textures/materials/sulfur_crust-1-images.png",
+      "textures/materials/sulfur_crust-2-images.png",
+      "textures/materials/sulfur_crust-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/sulfur_crust-0-normals.png",
+      "textures/materials/sulfur_crust-1-normals.png",
+      "textures/materials/sulfur_crust-2-normals.png",
+      "textures/materials/sulfur_crust-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sulfur_crust-0-properties.png",
+      "textures/materials/sulfur_crust-1-properties.png",
+      "textures/materials/sulfur_crust-2-properties.png",
+      "textures/materials/sulfur_crust-3-properties.png"
+    ]
+  }
+}

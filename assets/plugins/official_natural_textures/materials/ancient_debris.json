@@ -1,0 +1,19 @@
+{
+  "key": "ancient_debris",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 961592128,
+    "images": [
+      "textures/materials/ancient_debris-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/ancient_debris-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/ancient_debris-0-properties.png"
+    ]
+  }
+}

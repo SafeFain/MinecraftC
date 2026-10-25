@@ -1,0 +1,19 @@
+{
+  "key": "spruce_log_top",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2389571439,
+    "images": [
+      "textures/materials/spruce_log_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/spruce_log_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/spruce_log_top-0-properties.png"
+    ]
+  }
+}

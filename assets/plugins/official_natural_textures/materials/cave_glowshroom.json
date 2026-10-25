@@ -1,0 +1,19 @@
+{
+  "key": "cave_glowshroom",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2726394907,
+    "images": [
+      "textures/materials/cave_glowshroom-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cave_glowshroom-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cave_glowshroom-0-properties.png"
+    ]
+  }
+}

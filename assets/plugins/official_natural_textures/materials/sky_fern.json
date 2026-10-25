@@ -1,0 +1,19 @@
+{
+  "key": "sky_fern",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 820453772,
+    "images": [
+      "textures/materials/sky_fern-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/sky_fern-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sky_fern-0-properties.png"
+    ]
+  }
+}

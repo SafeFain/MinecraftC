@@ -1,0 +1,19 @@
+{
+  "key": "bellflower",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4119203975,
+    "images": [
+      "textures/materials/bellflower-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/bellflower-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/bellflower-0-properties.png"
+    ]
+  }
+}

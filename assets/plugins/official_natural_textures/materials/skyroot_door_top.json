@@ -1,0 +1,19 @@
+{
+  "key": "skyroot_door_top",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2791915413,
+    "images": [
+      "textures/materials/skyroot_door_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_door_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_door_top-0-properties.png"
+    ]
+  }
+}

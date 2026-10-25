@@ -1,0 +1,19 @@
+{
+  "key": "polished_basalt",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 93808202,
+    "images": [
+      "textures/materials/polished_basalt-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/polished_basalt-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/polished_basalt-0-properties.png"
+    ]
+  }
+}

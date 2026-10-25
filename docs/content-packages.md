@@ -79,13 +79,15 @@ Each JSON file contains one object using the corresponding existing
 Supported definition directories are `materials`, `blocks`, `block_families`,
 `block_geometry`, `items`, `dimensions`, `recipes`, `entities`, `generators`,
 `block_behaviors`, `item_behaviors`, `loot_tables`, `structures`, `player_actions`,
-`environments`, `particles`, `held_models`, `playlists`, `render_resources` and
-`render_passes`. Subdirectories are supported; only `.json` files are definitions.
+`environments`, `particles`, `held_models`, `playlists`, `render_resources`,
+`render_passes` and `item_icons`. Subdirectories are supported; only `.json` files are definitions.
 Within each category files sort by normalized package-relative path. Render
 resources sort by explicit dependencies, retaining path order among independent nodes.
 
 Keys are explicit identities, independent of filenames. Geometry/block behavior
-files use `block`; item behavior/held model files use `item`, as before. All resource
+files use `block`; item behavior/held model files use `item`, as before.
+Icon override files also use `item`, paired with `image`; materials may include
+an optional `sequence` object (see [data content](plugins.md#data-content)). All resource
 paths are relative to the **package root**, not the definition file. Cross-package
 references require dependencies. Definition discovery allows at most 4096 files,
 128 MiB total JSON and 16 MiB per file, in addition to existing capability limits.

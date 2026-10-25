@@ -1,0 +1,19 @@
+{
+  "key": "cloud_bloom",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 988999743,
+    "images": [
+      "textures/materials/cloud_bloom-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cloud_bloom-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cloud_bloom-0-properties.png"
+    ]
+  }
+}

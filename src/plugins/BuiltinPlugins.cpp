@@ -120,7 +120,8 @@ const std::vector<BuiltinPluginDescriptor>& builtinPlugins(){
         std::vector<BuiltinPluginDescriptor> registered{
         {"official_content","Official Content Example","builtin-api1-content1","",false,false,builtinContent},
         {"official_atmosphere","Official Atmosphere Example","builtin-api1-content1","",true,false,builtinAtmosphere},
-        {"official_heaven","Heaven","heaven-v9-content2-p1","plugins/official_heaven",false,true,builtinHeaven}};
+        {"official_heaven","Heaven","heaven-v9-content2-p1","plugins/official_heaven",false,true,builtinHeaven},
+        {"official_natural_textures","自然像素 / Natural Pixels","natural-pixels-v1","plugins/official_natural_textures",true,false,nullptr,true}};
 #ifdef MINECRAFTC_CONTENT_PACKAGES_HEADER
         appendContentPackages(registered);
 #endif

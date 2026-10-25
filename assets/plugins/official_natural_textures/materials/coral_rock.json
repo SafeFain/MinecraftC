@@ -1,0 +1,28 @@
+{
+  "key": "coral_rock",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3862676610,
+    "images": [
+      "textures/materials/coral_rock-0-images.png",
+      "textures/materials/coral_rock-1-images.png",
+      "textures/materials/coral_rock-2-images.png",
+      "textures/materials/coral_rock-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/coral_rock-0-normals.png",
+      "textures/materials/coral_rock-1-normals.png",
+      "textures/materials/coral_rock-2-normals.png",
+      "textures/materials/coral_rock-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/coral_rock-0-properties.png",
+      "textures/materials/coral_rock-1-properties.png",
+      "textures/materials/coral_rock-2-properties.png",
+      "textures/materials/coral_rock-3-properties.png"
+    ]
+  }
+}

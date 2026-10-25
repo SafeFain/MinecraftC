@@ -1,0 +1,19 @@
+{
+  "key": "smithing_table_top",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3700065030,
+    "images": [
+      "textures/materials/smithing_table_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/smithing_table_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/smithing_table_top-0-properties.png"
+    ]
+  }
+}

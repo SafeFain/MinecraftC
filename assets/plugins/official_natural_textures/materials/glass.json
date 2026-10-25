@@ -1,0 +1,19 @@
+{
+  "key": "glass",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3716679307,
+    "images": [
+      "textures/materials/glass-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/glass-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/glass-0-properties.png"
+    ]
+  }
+}

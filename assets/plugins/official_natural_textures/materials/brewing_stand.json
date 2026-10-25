@@ -1,0 +1,19 @@
+{
+  "key": "brewing_stand",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3103030238,
+    "images": [
+      "textures/materials/brewing_stand-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/brewing_stand-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/brewing_stand-0-properties.png"
+    ]
+  }
+}

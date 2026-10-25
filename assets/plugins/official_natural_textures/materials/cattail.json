@@ -1,0 +1,19 @@
+{
+  "key": "cattail",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3411497503,
+    "images": [
+      "textures/materials/cattail-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cattail-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cattail-0-properties.png"
+    ]
+  }
+}

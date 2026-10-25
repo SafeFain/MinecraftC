@@ -1,0 +1,19 @@
+{
+  "key": "wet_farmland",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 467662361,
+    "images": [
+      "textures/materials/wet_farmland-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/wet_farmland-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/wet_farmland-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "key": "dirt",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1606449419,
+    "images": [
+      "textures/materials/dirt-0-images.png",
+      "textures/materials/dirt-1-images.png",
+      "textures/materials/dirt-2-images.png",
+      "textures/materials/dirt-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/dirt-0-normals.png",
+      "textures/materials/dirt-1-normals.png",
+      "textures/materials/dirt-2-normals.png",
+      "textures/materials/dirt-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/dirt-0-properties.png",
+      "textures/materials/dirt-1-properties.png",
+      "textures/materials/dirt-2-properties.png",
+      "textures/materials/dirt-3-properties.png"
+    ]
+  }
+}

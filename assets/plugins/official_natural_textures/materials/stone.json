@@ -1,0 +1,28 @@
+{
+  "key": "stone",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3118141492,
+    "images": [
+      "textures/materials/stone-0-images.png",
+      "textures/materials/stone-1-images.png",
+      "textures/materials/stone-2-images.png",
+      "textures/materials/stone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/stone-0-normals.png",
+      "textures/materials/stone-1-normals.png",
+      "textures/materials/stone-2-normals.png",
+      "textures/materials/stone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/stone-0-properties.png",
+      "textures/materials/stone-1-properties.png",
+      "textures/materials/stone-2-properties.png",
+      "textures/materials/stone-3-properties.png"
+    ]
+  }
+}

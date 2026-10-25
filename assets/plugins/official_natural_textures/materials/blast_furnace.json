@@ -1,0 +1,19 @@
+{
+  "key": "blast_furnace",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1925433355,
+    "images": [
+      "textures/materials/blast_furnace-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/blast_furnace-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/blast_furnace-0-properties.png"
+    ]
+  }
+}

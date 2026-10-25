@@ -1,0 +1,28 @@
+{
+  "key": "skyroot_log",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2784056283,
+    "images": [
+      "textures/materials/skyroot_log-0-images.png",
+      "textures/materials/skyroot_log-1-images.png",
+      "textures/materials/skyroot_log-2-images.png",
+      "textures/materials/skyroot_log-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/skyroot_log-0-normals.png",
+      "textures/materials/skyroot_log-1-normals.png",
+      "textures/materials/skyroot_log-2-normals.png",
+      "textures/materials/skyroot_log-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/skyroot_log-0-properties.png",
+      "textures/materials/skyroot_log-1-properties.png",
+      "textures/materials/skyroot_log-2-properties.png",
+      "textures/materials/skyroot_log-3-properties.png"
+    ]
+  }
+}

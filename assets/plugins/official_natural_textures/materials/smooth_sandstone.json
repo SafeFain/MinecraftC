@@ -1,0 +1,19 @@
+{
+  "key": "smooth_sandstone",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3461299376,
+    "images": [
+      "textures/materials/smooth_sandstone-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/smooth_sandstone-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/smooth_sandstone-0-properties.png"
+    ]
+  }
+}

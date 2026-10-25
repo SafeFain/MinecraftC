@@ -1,0 +1,19 @@
+{
+  "key": "loom_bottom",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 339124284,
+    "images": [
+      "textures/materials/loom_bottom-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/loom_bottom-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/loom_bottom-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "cloudberry_bush",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3254957625,
+    "images": [
+      "textures/materials/cloudberry_bush-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/cloudberry_bush-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/cloudberry_bush-0-properties.png"
+    ]
+  }
+}

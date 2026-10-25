@@ -1,0 +1,19 @@
+{
+  "key": "polished_granite",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 603116237,
+    "images": [
+      "textures/materials/polished_granite-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/polished_granite-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/polished_granite-0-properties.png"
+    ]
+  }
+}

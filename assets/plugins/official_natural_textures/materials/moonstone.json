@@ -1,0 +1,28 @@
+{
+  "key": "moonstone",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1758880168,
+    "images": [
+      "textures/materials/moonstone-0-images.png",
+      "textures/materials/moonstone-1-images.png",
+      "textures/materials/moonstone-2-images.png",
+      "textures/materials/moonstone-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/moonstone-0-normals.png",
+      "textures/materials/moonstone-1-normals.png",
+      "textures/materials/moonstone-2-normals.png",
+      "textures/materials/moonstone-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/moonstone-0-properties.png",
+      "textures/materials/moonstone-1-properties.png",
+      "textures/materials/moonstone-2-properties.png",
+      "textures/materials/moonstone-3-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "ice",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4014888173,
+    "images": [
+      "textures/materials/ice-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/ice-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/ice-0-properties.png"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "farmland",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1010714819,
+    "images": [
+      "textures/materials/farmland-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/farmland-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/farmland-0-properties.png"
+    ]
+  }
+}

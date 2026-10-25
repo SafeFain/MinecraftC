@@ -1,0 +1,19 @@
+{
+  "key": "crimson_stem",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3418704516,
+    "images": [
+      "textures/materials/crimson_stem-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/crimson_stem-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/crimson_stem-0-properties.png"
+    ]
+  }
+}

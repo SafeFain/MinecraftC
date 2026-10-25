@@ -1,0 +1,28 @@
+{
+  "key": "aether_soil",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1764122864,
+    "images": [
+      "textures/materials/aether_soil-0-images.png",
+      "textures/materials/aether_soil-1-images.png",
+      "textures/materials/aether_soil-2-images.png",
+      "textures/materials/aether_soil-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/aether_soil-0-normals.png",
+      "textures/materials/aether_soil-1-normals.png",
+      "textures/materials/aether_soil-2-normals.png",
+      "textures/materials/aether_soil-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/aether_soil-0-properties.png",
+      "textures/materials/aether_soil-1-properties.png",
+      "textures/materials/aether_soil-2-properties.png",
+      "textures/materials/aether_soil-3-properties.png"
+    ]
+  }
+}

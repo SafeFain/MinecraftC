@@ -1,0 +1,28 @@
+{
+  "key": "white_terracotta",
+  "replace": true,
+  "sequence": {
+    "variants": 4,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 331213670,
+    "images": [
+      "textures/materials/white_terracotta-0-images.png",
+      "textures/materials/white_terracotta-1-images.png",
+      "textures/materials/white_terracotta-2-images.png",
+      "textures/materials/white_terracotta-3-images.png"
+    ],
+    "normals": [
+      "textures/materials/white_terracotta-0-normals.png",
+      "textures/materials/white_terracotta-1-normals.png",
+      "textures/materials/white_terracotta-2-normals.png",
+      "textures/materials/white_terracotta-3-normals.png"
+    ],
+    "properties": [
+      "textures/materials/white_terracotta-0-properties.png",
+      "textures/materials/white_terracotta-1-properties.png",
+      "textures/materials/white_terracotta-2-properties.png",
+      "textures/materials/white_terracotta-3-properties.png"
+    ]
+  }
+}
