@@ -12,6 +12,28 @@ inline void run(const std::filesystem::path& assets) {
         advance(s,.4,60,true);
         check(s.player.survivalStats().health()==(resistant?20:15),"blaze fireball/fire resistance damage");
     }
+    for(bool pvp:{false,true})for(bool nearbyImpact:{false,true})for(bool reflected:{false,true}) {
+        Scene s(assets,PresentationMode::Null);
+        Player guest(s.world);guest.configureRules(GameMode::Survival,Difficulty::Normal);
+        guest.setPosition({nearbyImpact?1.4:.5,1,6.5});guest.setRoomPlayerId(7);
+        const std::string owner(32,'b');s.player.setPersistentIdentity(owner);
+        WorldMetadata::PersistedEntity fireball;fireball.type=static_cast<uint16_t>(EntityType::GhastFireball);
+        fireball.position={.5,2.4,2.5};fireball.velocity={0,0,-8};fireball.health=1;s.mobs.loadEntities({fireball});
+        if(reflected) {
+            MeleeAttackRequest attack;attack.damage=1;attack.reach=4;
+            check(s.mobs.attackRay(s.player.getEyePosition(),{0,0,1},attack,0,owner).foundTarget,"PvP fireball deflection fixture");
+        } else {
+            auto saved=s.mobs.saveEntities();saved[0].velocity={0,0,18};s.mobs.clear();s.mobs.loadEntities(saved);
+        }
+        if(nearbyImpact)s.add(EntityType::Zombie,{.5,1,6.5});
+        else s.block(0,2,8,BlockId::STONE);
+        const std::vector<EntityPlayerView> views{{0,&s.player,true,false,true},{7,&guest,true,false,true}};
+        s.mobs.setPvpPlayers(pvp,views);
+        for(int i=0;i<30;++i)s.mobs.update(views,1.f/60,false,false);
+        const bool shouldHurt=pvp||!reflected;
+        check((guest.survivalStats().health()<20)==shouldHurt,"reflected direct/explosion damage must obey PvP while hostile fireballs remain harmful");
+        check(std::none_of(s.mobs.entities().begin(),s.mobs.entities().end(),[](const auto& e){return nativeProjectile(e.type);}),"fireball fixture did not reach its impact");
+    }
     {
         Scene s(assets);s.add(EntityType::Ghast,{.5,1,8.5});
         auto saved=s.mobs.saveEntities();WorldMetadata::PersistedEntity fireball;

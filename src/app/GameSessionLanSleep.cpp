@@ -77,7 +77,10 @@ bool GameSession::travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, b
     if(!Plugins::validDimension(target))return false;
     bool anchorUsed=false;
     if(respawn&&guest.profile.netherAnchor&&(guest.profile.dimension==DimensionId::Overworld||guest.profile.dimension==DimensionId::Nether)) {
-        if(const auto landing=consumeAnchorRespawn(*guest.profile.netherAnchor)){destination=landing;target=DimensionId::Nether;anchorUsed=true;}
+        guest.pendingRespawn=true;
+        const auto landing=consumeAnchorRespawn(*guest.profile.netherAnchor);
+        if(landing.status==AnchorRespawnStatus::Pending)return false;
+        if(landing.status==AnchorRespawnStatus::Ready){destination=landing.position;target=DimensionId::Nether;anchorUsed=true;}
         else guest.profile.netherAnchor.reset();
     }
     const auto targetId=static_cast<uint32_t>(target),sourceId=static_cast<uint32_t>(guest.profile.dimension);
@@ -86,7 +89,7 @@ bool GameSession::travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, b
     else if(!respawn&&guest.profile.positioned[targetId])preferred=guest.profile.positions[targetId];
     std::optional<glm::ivec3> bed;
     if(respawn&&!anchorUsed){auto it=guest.profile.beds.find(targetId);if(it!=guest.profile.beds.end())bed=it->second;else if(target==DimensionId::Overworld)bed=guest.profile.bedSpawn;}
-    const auto landing=dimensionLanding(target,preferred,bed);if(!landing)return false;
+    const auto landing=anchorUsed?destination:dimensionLanding(target,preferred,bed);if(!landing)return false;
     if(respawn&&bed&&!ensureDimension(target).world.validBedFoot(*bed)) {
         guest.profile.beds.erase(targetId);
         if(target==DimensionId::Overworld)guest.profile.bedSpawn.reset();

@@ -138,6 +138,8 @@ public:
     void updatePlaying(float dt, IGameRenderer* renderer,
                        const Feedback& feedback, bool localControl = true);
     bool beginSleepAtBed(const glm::ivec3& bed);
+    enum class RestInteraction { Handled, SpawnSet, Sleeping, Blocked };
+    RestInteraction interactRestBlock(const glm::ivec3& position);
     void chooseSleepAction(SleepAction action, RuntimeClock::Tick loadingStarted,
                            const Feedback& feedback);
     void chooseBedTravel(const std::string&,RuntimeClock::Tick,const Feedback&);
@@ -150,7 +152,7 @@ public:
     bool handleVoidFall(RuntimeClock::Tick loadingStarted, const Feedback& feedback);
     bool switchDimension(DimensionId target, RuntimeClock::Tick loadingStarted);
     DimensionId activeDimension() const { return dimension; }
-    bool worldLoadingPending() const { return !terrainGenerated && (saveStore || lanJoining); }
+    bool worldLoadingPending() const { return pendingRespawn || (!terrainGenerated && (saveStore || lanJoining)); }
     void respawn(RuntimeClock::Tick loadingStarted = 0);
     CommandResult executeCommand(const ParsedCommand& command,
                                  const Localization& localization,
@@ -346,7 +348,13 @@ private:
     bool updateNetherPortals(float,const Feedback&);
     bool useRespawnAnchor(uint64_t,const glm::ivec3&);
     void explodeRestBlock(DimensionId,const glm::ivec3&);
-    std::optional<glm::dvec3> consumeAnchorRespawn(const glm::ivec3&);
+    enum class AnchorRespawnStatus { Pending, Invalid, Ready };
+    struct AnchorRespawnResult {
+        AnchorRespawnStatus status = AnchorRespawnStatus::Invalid;
+        glm::dvec3 position{0};
+    };
+    AnchorRespawnResult consumeAnchorRespawn(const glm::ivec3&);
+    bool pendingRespawn = false;
     struct PortalState {double inside=0;float cooldown=0,retry=0;};
     std::map<uint64_t,PortalState> portalStates;
     void simulateDimension(DimensionId id, const std::vector<EntityPlayerView>& views,

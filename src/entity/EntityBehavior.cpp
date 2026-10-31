@@ -35,7 +35,7 @@ void EntityManager::chooseEscape(Entity& entity,const glm::dvec3& danger) {
     if (glm::length(away)<.01) away=glm::dvec3(entity.facing)*-1.0;
     if (glm::length(away)<.01) away={1,0,0};
     away=glm::normalize(away);
-    const auto terrain=navigationTerrain(nullptr,entityTemplate(entity.type)==EntityType::Villager);
+    const auto terrain=navigationTerrain(nullptr,entityTemplate(entity.type)==EntityType::Villager,entity.type==EntityType::Strider);
     const double offsets[]={0,.785398163,-.785398163,1.570796327,-1.570796327};
     ai.hasDestination=false;
     for (int i=0;i<5;++i) {
@@ -272,7 +272,7 @@ void EntityManager::decideBehavior(Entity& entity,Player& player,bool isDay,
             ai.actionUntil=m_aiTime+3+(roll%300)*.01;
             const double angle=(roll%6283)*.001;
             const double radius=3+(roll%4);
-            if (auto destination=GroundNavigation::stand(navigationTerrain(nullptr,entityTemplate(entity.type)==EntityType::Villager),entitySize(entity),
+            if (auto destination=GroundNavigation::stand(navigationTerrain(nullptr,entityTemplate(entity.type)==EntityType::Villager,entity.type==EntityType::Strider),entitySize(entity),
                     std::floor(entity.position.x+std::cos(angle)*radius)+.5,
                     std::floor(entity.position.z+std::sin(angle)*radius)+.5,entity.position.y))
                 ai.destination={*destination,.35,.6};

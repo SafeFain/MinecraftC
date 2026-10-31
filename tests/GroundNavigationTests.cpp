@@ -35,6 +35,19 @@ GroundNavigation::Search solve(TerrainFixture& f,glm::dvec3 from,glm::dvec3 to,
 }
 int main() {
     {
+        TerrainFixture f;
+        for(int x=-4;x<=4;++x)for(int z=-4;z<=4;++z)f.edits[{x,0,z}]=BlockId::LAVA;
+        auto terrain=f.terrain();
+        require(!GroundNavigation::supported(terrain,human,{.5,1,.5}),"ordinary actors gained lava support");
+        require(!GroundNavigation::clear(terrain,human,{.5,.9,.5}),"ordinary actors lost lava avoidance");
+        terrain.canWalkOnLava=true;
+        require(GroundNavigation::supported(terrain,human,{.5,1,.5}),"strider terrain lost lava support");
+        require(GroundNavigation::traverse(terrain,human,{.5,1,.5},{2.5,1,.5}),"strider terrain cannot traverse exposed lava");
+        require(!GroundNavigation::clear(terrain,human,{.5,.9,.5},false),"strider gravity can cross its lava support plane");
+        f.edits[{1,1,0}]=BlockId::STONE;
+        require(!GroundNavigation::clear(terrain,human,{1.5,1,.5}),"strider terrain ignores solid obstacles");
+    }
+    {
         TerrainFixture f; f.wall(3,-3,3);
         auto search=solve(f,{.5,1,.5},{6.5,1,.5});
         require(search.status()==GroundNavigation::Status::Succeeded,"wall detour was not found");

@@ -49,27 +49,36 @@ bool GameSession::useRespawnAnchor(uint64_t id,const glm::ivec3& p) {
     return true;
 }
 
-std::optional<glm::dvec3> GameSession::consumeAnchorRespawn(const glm::ivec3& p) {
+GameSession::AnchorRespawnResult GameSession::consumeAnchorRespawn(const glm::ivec3& p) {
     auto& terrain=ensureDimension(DimensionId::Nether).world;
+    updateLanInterests();
     terrain.update(glm::dvec3(p));terrain.enqueueGeneration(true);
-    terrain.waitForInitialGeneration(1500);terrain.processCompletedGenerations(false);
-    const int charge=respawnAnchorCharge(terrain.getBlock(p.x,p.y,p.z));
+    terrain.processCompletedGenerations(false);
+    // A missing chunk is a loading state, never evidence that a saved anchor
+    // was destroyed. Callers retain their spawn and retry on later frames.
+    const auto block=terrain.getLoadedBlock(p.x,p.y,p.z);
+    if(!block)return {AnchorRespawnStatus::Pending,{}};
+    const int charge=respawnAnchorCharge(*block);
     if(charge<=0)return {};
     const auto safe=[](BlockId b) {
         return !isSolid(b)&&!isFluid(b)&&b!=BlockId::FIRE&&b!=BlockId::SOUL_FIRE&&!NetherPortal::isPortal(b);
     };
+    bool missing=false;
     for(int radius=1;radius<=2;++radius)for(int dy:{0,1,-1})
         for(int z=-radius;z<=radius;++z)for(int x=-radius;x<=radius;++x) {
             if(std::max(std::abs(x),std::abs(z))!=radius)continue;
             const glm::ivec3 q=p+glm::ivec3(x,dy,z);
-            if(q.y<1||q.y>256)continue;
+            if(q.y<1||q.y+1>=dimensionRules(DimensionId::Nether).maximumY)continue;
+            const auto landing=glm::dvec3(q)+glm::dvec3(.5,.01,.5);
+            if(std::abs(landing.x)>30000000||std::abs(landing.z)>30000000)continue;
             const auto ground=terrain.getLoadedBlock(q.x,q.y-1,q.z),feet=terrain.getLoadedBlock(q.x,q.y,q.z),head=terrain.getLoadedBlock(q.x,q.y+1,q.z);
-            if(!ground||!feet||!head||!isFullCollisionBlock(*ground)||*ground==BlockId::MAGMA_BLOCK||!safe(*feet)||!safe(*head))continue;
+            if(!ground||!feet||!head){missing=true;continue;}
+            if(!isFullCollisionBlock(*ground)||*ground==BlockId::MAGMA_BLOCK||!safe(*feet)||!safe(*head))continue;
             terrain.setBlock(p.x,p.y,p.z,respawnAnchorBlock(charge-1));
             terrain.persistChunkAt(p);
-            return glm::dvec3(q)+glm::dvec3(.5,.01,.5);
+            return {AnchorRespawnStatus::Ready,landing};
         }
-    return {};
+    return {missing?AnchorRespawnStatus::Pending:AnchorRespawnStatus::Invalid,{}};
 }
 
 std::optional<glm::dvec3> GameSession::netherPortalLanding(

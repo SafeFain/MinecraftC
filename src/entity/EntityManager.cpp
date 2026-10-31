@@ -711,6 +711,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         uint32_t seed;
         float power;
         bool mobExplosion = false;
+        std::optional<uint64_t> playerOwner{};
     };
     std::vector<PendingExplosion> pendingExplosions;
     if (m_naturalSpawningEnabled && m_world.gameRules().boolean(GameRuleId::SpawnMobs)) {
@@ -878,7 +879,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         queued.id=m_nextId++;m_entities.push_back(std::move(queued));
     }
     m_nativeSpawns.clear();
-    for(const auto& explosion:m_nativeExplosions)pendingExplosions.push_back({explosion.position,explosion.seed,explosion.power,true});
+    for(const auto& explosion:m_nativeExplosions)pendingExplosions.push_back({explosion.position,explosion.seed,explosion.power,true,explosion.playerOwner});
     m_nativeExplosions.clear();
     tickVillageLife(dt,worldTick);
     for (const auto& arrow : m_aiArrows)
@@ -894,7 +895,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
             pendingExplosions.push_back(
                 {entity.position, entity.behaviorSeed, 4.0f});
     for (const auto& explosion : pendingExplosions)
-        explode(explosion.position, explosion.power, explosion.seed, explosion.mobExplosion);
+        explode(explosion.position, explosion.power, explosion.seed, explosion.mobExplosion, explosion.playerOwner);
 
     std::vector<Entity> deadMobs;
     for (const auto& entity : m_entities)
@@ -1259,7 +1260,8 @@ void EntityManager::updateArrow(Entity& arrow, float dt) {
 }
 
 void EntityManager::explode(const glm::dvec3& center,
-                            float power, uint32_t eventSeed, bool mobExplosion) {
+                            float power, uint32_t eventSeed, bool mobExplosion,
+                            std::optional<uint64_t> playerOwner) {
     const float effectRadius = power * 2.0f;
     auto impactAt = [&](const glm::dvec3& target) {
         const glm::dvec3 delta = target - center;
@@ -1291,6 +1293,7 @@ void EntityManager::explode(const glm::dvec3& center,
     }
     for (const auto& view : m_framePlayers) {
         Player& player = *view.player;
+        if (playerOwner && view.id != *playerOwner && !m_pvpEnabled) continue;
         if (!view.damageable || !player.isSurvival() || player.survivalStats().dead()) continue;
         const float impact = impactAt(player.getPosition() + glm::dvec3(0.0, 1.0, 0.0));
         if (impact > 0.0f) {
@@ -1470,6 +1473,8 @@ void EntityManager::updateNativeProjectile(Entity& projectile,float dt) {
     }
     for(const auto& view:m_framePlayers) {
         if(!view.damageable||!view.player->isSurvival()||(projectile.playerOwned&&view.id==projectile.shooterId))continue;
+        if(projectile.playerOwned && !m_pvpEnabled &&
+            (projectile.type==EntityType::GhastFireball||projectile.type==EntityType::BlazeFireball))continue;
         const auto t=intersects(view.player->getPosition()+glm::dvec3(-.3,0,-.3),view.player->getPosition()+glm::dvec3(.3,view.player->currentHeight(),.3));
         if(t&&*t<contact){contact=*t;player=view.player;victim=nullptr;hit=true;}
     }
@@ -1525,7 +1530,8 @@ void EntityManager::updateNativeProjectile(Entity& projectile,float dt) {
         source.cause=DamageCause::Projectile;source.shieldBlockable=true;source.hasOrigin=true;source.origin=start;
         if(player->takeDamage(source).appliedDamage>0)player->ignite(5);
     }
-    if(projectile.type==EntityType::GhastFireball)m_nativeExplosions.push_back({projectile.position,projectile.behaviorSeed,1.f});
+    if(projectile.type==EntityType::GhastFireball)m_nativeExplosions.push_back({projectile.position,projectile.behaviorSeed,1.f,
+        projectile.playerOwned?std::optional<uint64_t>(projectile.shooterId):std::nullopt});
     else {
         const auto pos=glm::ivec3(glm::floor(projectile.position));
         if(m_world.getBlock(pos.x,pos.y,pos.z)==BlockId::AIR&&isSolid(m_world.getBlock(pos.x,pos.y-1,pos.z)))m_world.setBlock(pos.x,pos.y,pos.z,BlockId::FIRE);

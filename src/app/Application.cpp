@@ -337,15 +337,12 @@ private:
             m_flow.showCommandMessage(m_ui.localization.text("message.autosave_retry"));
         };
         m_session.setBedCallback([this](const glm::ivec3& bed) {
-            if (!m_session.isNight()) {
-                m_session.setDimensionBedSpawn(bed);
+            const auto result = m_session.interactRestBlock(bed);
+            if (result == GameSession::RestInteraction::SpawnSet) {
                 m_flow.showCommandMessage(m_ui.localization.text("message.respawn_set"));
-                return;
-            }
-            if (m_session.beginSleepAtBed(bed)) {
-                m_session.setDimensionBedSpawn(bed);
+            } else if (result == GameSession::RestInteraction::Sleeping) {
                 if (m_sessionFeedback.sleepStarted) m_sessionFeedback.sleepStarted();
-            } else if (m_sessionFeedback.sleepBlocked) {
+            } else if (result == GameSession::RestInteraction::Blocked && m_sessionFeedback.sleepBlocked) {
                 m_sessionFeedback.sleepBlocked();
             }
         });

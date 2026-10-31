@@ -254,14 +254,24 @@ void GameSession::updateLanInterests() {
     for (size_t index = 0; index < simulations.size(); ++index) {
         if (!simulations[index]) continue;
         std::vector<StreamingInterest> interests;
+        if (index == static_cast<size_t>(DimensionId::Nether) && pendingRespawn) {
+            const auto& anchor = worldMetadata.dimensions[static_cast<uint32_t>(DimensionId::Nether)].anchorSpawn;
+            if (anchor) interests.push_back({World::worldToChunkX(anchor->x), World::worldToChunkZ(anchor->z), 2});
+        }
         std::vector<EntityPlayerView> pvpPlayers;
         if (index == static_cast<size_t>(dimension)) pvpPlayers.push_back({0, &player, !playerDead, !playerDead, terrainGenerated});
         for (const auto& entry : guests) {
             const auto& guest = *entry.second;
+            const bool anchorPending = guest.pendingRespawn && guest.profile.netherAnchor.has_value();
+            if (index == static_cast<size_t>(DimensionId::Nether) && anchorPending) {
+                const auto p = *guest.profile.netherAnchor;
+                interests.push_back({World::worldToChunkX(p.x), World::worldToChunkZ(p.z), 2});
+            }
             if (static_cast<size_t>(guest.profile.dimension) != index) continue;
             pvpPlayers.push_back({entry.first, &entry.second->player, !guest.dead, !guest.dead, !guest.loading});
             const auto position = guest.player.getPosition();
-            interests.push_back({World::worldToChunkX(position.x), World::worldToChunkZ(position.z), guest.radius});
+            if (!anchorPending || index != static_cast<size_t>(DimensionId::Nether))
+                interests.push_back({World::worldToChunkX(position.x), World::worldToChunkZ(position.z), guest.radius});
         }
         simulations[index]->entities.setPvpPlayers(hostingLan() && lanPvp, std::move(pvpPlayers));
         simulations[index]->world.setLocalRenderEnabled(index == static_cast<size_t>(dimension));
@@ -274,6 +284,7 @@ void GameSession::updateLanPlayers(float dt) {
     static const std::array<InputBinding, INPUT_ACTION_COUNT> noPhysicalBindings{};
     for (auto& entry : guests) {
         auto& guest = *entry.second;
+        if (guest.pendingRespawn && travelLanPlayer(guest, deathDimension(guest.profile.dimension), true)) continue;
         const Plugins::ActorScope actor({entry.first,static_cast<uint32_t>(guest.profile.dimension),MC_HOST});
         auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
         const auto position = guest.player.getPosition();

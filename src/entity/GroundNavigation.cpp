@@ -9,6 +9,17 @@ constexpr double epsilon = 1e-5;
 bool hazard(BlockId block) {
     return isWater(block) || isLava(block) || block == BlockId::FIRE;
 }
+BlockCollisionBoxes terrainCollision(const Terrain& terrain, int x, int y, int z, BlockId block) {
+    // Striders stand on the exposed voxel surface; ordinary actors still see
+    // lava as a fluid hazard. All navigation and movement queries share this.
+    if (terrain.canWalkOnLava && isLava(block) && !isLava(terrain.block(x,y+1,z))) {
+        BlockCollisionBoxes boxes;
+        boxes.count = 1;
+        boxes.boxes[0] = {{0,0,0},{1,1,1}};
+        return boxes;
+    }
+    return blockCollisionBoxes(block);
+}
 bool overlapsXZ(const glm::dvec3& p, const glm::vec3& size,
                 int x, int z, const BlockCollisionBox& box) {
     return p.x-size.x*.5 < x+box.max.x-epsilon &&
@@ -30,13 +41,13 @@ bool clear(const Terrain& terrain, const glm::vec3& size,
         for (int y=static_cast<int>(std::floor(p.y+epsilon));
              y<=static_cast<int>(std::floor(p.y+size.y-epsilon));++y) {
             const BlockId block=terrain.block(x,y,z);
-            if (avoidHazards && hazard(block)) return false;
+            if (avoidHazards && hazard(block) && !(terrain.canWalkOnLava && isLava(block))) return false;
             DoorState door;
             BlockId collision=block;
             if(terrain.canOpenWoodDoors && decodeDoor(block,door) && doorVillagerOpen(door)) {
                 door.open=true;collision=doorBlock(door);
             }
-            const auto boxes=blockCollisionBoxes(collision);
+            const auto boxes=terrainCollision(terrain,x,y,z,collision);
             for (uint8_t i=0;i<boxes.count;++i) {
                 const auto& box=boxes.boxes[i];
                 if (overlapsXZ(p,size,x,z,box) && p.y < y+box.max.y-epsilon &&
@@ -55,7 +66,7 @@ bool supported(const Terrain& terrain, const glm::vec3& size,
         for (int x=static_cast<int>(std::floor(p.x-size.x*.5+epsilon));
              x<=static_cast<int>(std::floor(p.x+size.x*.5-epsilon));++x) {
             if (!terrain.loaded(x,z)) continue;
-            const auto boxes=blockCollisionBoxes(terrain.block(x,y,z));
+            const auto boxes=terrainCollision(terrain,x,y,z,terrain.block(x,y,z));
             for (uint8_t i=0;i<boxes.count;++i)
                 if (overlapsXZ(p,size,x,z,boxes.boxes[i]) &&
                     std::abs(y+boxes.boxes[i].max.y-p.y) < .025) return true;
@@ -77,7 +88,7 @@ std::optional<glm::dvec3> stand(const Terrain& terrain, const glm::vec3& size,
                                 static_cast<int>(std::floor(referenceY-down-1)));
                  by<=std::min(Config::WORLD_MAX_Y-1,
                               static_cast<int>(std::floor(referenceY+up)));++by) {
-                const auto boxes=blockCollisionBoxes(terrain.block(bx,by,bz));
+                const auto boxes=terrainCollision(terrain,bx,by,bz,terrain.block(bx,by,bz));
                 for (uint8_t i=0;i<boxes.count;++i) {
                     const double height=by+boxes.boxes[i].max.y;
                     if (height>=referenceY-down-epsilon && height<=referenceY+up+epsilon &&

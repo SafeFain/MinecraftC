@@ -33,6 +33,12 @@ GameSession::GameSession(const std::filesystem::path& savesDirectory)
 }
 
 GameSession::LoadingSnapshot GameSession::loadingSnapshot() const {
+    if (pendingRespawn && simulations.size() > 2 && simulations[2]) {
+        const auto progress = simulations[2]->world.generationProgress();
+        const float fraction = progress.total == 0 ? 0.f :
+            static_cast<float>(progress.completed) / static_cast<float>(progress.total);
+        return {progress, fraction * .75f, LoadingPhase::Chunks, fraction, false, LoadingReason::Dimension};
+    }
     const StreamingProgress progress = loadingGenerationComplete
         ? world().loadingProgress() : world().generationProgress();
     const float chunkFraction = progress.total == 0 ? 0.0f :
@@ -436,6 +442,7 @@ void GameSession::detachSaveStore() {
     closeLanRoom();
     closeReplica();
     portalStates.clear();
+    pendingRespawn = false;
     player.clearPluginCooldowns();
     // Drain pending generation/cache/entity I/O before destroying either store.
     for (auto& runtime : simulations) {
@@ -557,6 +564,10 @@ void GameSession::safeSpawn() {
 
 bool GameSession::advanceLoading(
     IGameRenderer* renderer, RuntimeClock::Tick now) {
+    if (pendingRespawn) {
+        respawn(now);
+        if (pendingRespawn) return false;
+    }
     if (lanJoining && !lanWorldReady()) return false;
     if (lanJoining) {
         for (const auto* chunk : world().getActiveChunks())
@@ -1013,9 +1024,29 @@ GameSession::CommandResult GameSession::executeCommandImpl(
     return result;
 }
 
+GameSession::RestInteraction GameSession::interactRestBlock(const glm::ivec3& position) {
+    if (lanJoining || playerDead || player.isSpectator()) return RestInteraction::Blocked;
+    const auto block = world().getBlock(position.x, position.y, position.z);
+    if (respawnAnchorCharge(block) >= 0) {
+        useRespawnAnchor(0, position);
+        return RestInteraction::Handled;
+    }
+    if (isBed(block) && dimensionRules(dimension).bedsExplode) {
+        explodeRestBlock(dimension, position);
+        return RestInteraction::Handled;
+    }
+    const auto foot = world().validBedFoot(position);
+    if (!foot) return RestInteraction::Blocked;
+    if (!isNight()) {
+        setDimensionBedSpawn(*foot);
+        return RestInteraction::SpawnSet;
+    }
+    if (!beginSleepAtBed(*foot)) return RestInteraction::Blocked;
+    setDimensionBedSpawn(*foot);
+    return RestInteraction::Sleeping;
+}
+
 bool GameSession::beginSleepAtBed(const glm::ivec3& bed) {
-    if(!lanJoining&&respawnAnchorCharge(world().getBlock(bed.x,bed.y,bed.z))>=0){useRespawnAnchor(0,bed);return false;}
-    if(!lanJoining&&!playerDead&&!player.isSpectator()&&dimensionRules(dimension).bedsExplode&&isBed(world().getBlock(bed.x,bed.y,bed.z))){explodeRestBlock(dimension,bed);return false;}
     if (lanJoining || sleepState != SleepVisualState::Awake || playerDead) return false;
     const auto foot = world().validBedFoot(bed);
     if (!foot || !dayNightCycle().isNight()) return false;
@@ -1170,13 +1201,19 @@ void GameSession::respawn(RuntimeClock::Tick loadingStarted) {
     const auto source=dimension;
     auto& anchor=worldMetadata.dimensions[static_cast<uint32_t>(DimensionId::Nether)].anchorSpawn;
     if(anchor&&(source==DimensionId::Overworld||source==DimensionId::Nether)) {
-        if(const auto landing=consumeAnchorRespawn(*anchor)) {
-            if(dimension!=DimensionId::Nether&&!enterDimension(DimensionId::Nether,loadingStarted,*landing))return;
-            player.setPosition(*landing);player.survivalStats().resetAfterRespawn();player.statusEffects().clear();player.extinguish();player.resetDamageImmunity();
-            resetTransientState(false,survivalTicks(),loadingStarted);world().update(*landing);world().enqueueGeneration();updateSaveMetadata();if(saveStore)saveStore->saveMetadata(worldMetadata);return;
+        pendingRespawn=true;
+        const auto landing=consumeAnchorRespawn(*anchor);
+        if(landing.status==AnchorRespawnStatus::Pending)return;
+        pendingRespawn=false;
+        if(landing.status==AnchorRespawnStatus::Ready) {
+            if(dimension!=DimensionId::Nether&&!enterDimension(DimensionId::Nether,loadingStarted,landing.position))return;
+            player.setPosition(landing.position);player.survivalStats().resetAfterRespawn();player.statusEffects().clear();player.extinguish();player.resetDamageImmunity();
+            resetTransientState(false,survivalTicks(),loadingStarted);updateLanInterests();world().update(landing.position);world().enqueueGeneration();updateSaveMetadata();if(saveStore)saveStore->saveMetadata(worldMetadata);return;
         }
         anchor.reset();
     }
+    pendingRespawn=false;
+    updateLanInterests();
     const auto target=deathDimension(source);
     if(target!=DimensionId::Overworld) {
         const auto bed=worldMetadata.dimensions[static_cast<uint32_t>(target)].bedSpawn;
@@ -1289,6 +1326,7 @@ void GameSession::resetTransientState(
     autosavePending = false;
     autosaveEntityTurn = true;
     playerDead = false;
+    pendingRespawn = false;
     survivalTicks() = worldTicks;
     if (newWorld) survivalWorldTickRemainder() = 0.0f;
     lightningEvents.clear();

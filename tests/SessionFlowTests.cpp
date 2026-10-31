@@ -72,6 +72,22 @@ struct GameSessionTestAccess {
     static void portalRule(GameSession& s,bool enabled){s.worldMetadata.gameRules.set(GameRuleId::AllowEnteringNetherUsingPortals,GameRuleValue::boolean(enabled));}
     static std::optional<glm::dvec3> portalLanding(GameSession& s,DimensionId d,glm::dvec3 p){return s.netherPortalLanding(d,p);}
     static bool anchorUse(GameSession& s,glm::ivec3 p){return s.useRespawnAnchor(0,p);}
+    static void restTime(GameSession& s,bool night){if(night)s.dayNightCycle().setNight();else s.dayNightCycle().setDay();}
+    static void anchorSpawn(GameSession& s,glm::ivec3 p){s.worldMetadata.dimensions[2].anchorSpawn=p;}
+    static bool invalidAnchor(GameSession& s,glm::ivec3 p) {
+        const auto previous=s.worldMetadata.dimensions[2].anchorSpawn;
+        s.pendingRespawn=true;s.worldMetadata.dimensions[2].anchorSpawn=p;
+        const auto result=s.consumeAnchorRespawn(p);
+        s.pendingRespawn=false;s.worldMetadata.dimensions[2].anchorSpawn=previous;s.updateLanInterests();
+        return result.status==GameSession::AnchorRespawnStatus::Invalid;
+    }
+    static LanPlayerRuntime& anchorGuest(GameSession& s,glm::ivec3 p) {
+        Lan::PlayerProfile profile;profile.dimension=DimensionId::Overworld;profile.netherAnchor=p;
+        auto guest=std::make_unique<LanPlayerRuntime>(s.world(),s.entities(),profile);
+        guest->player.setRoomPlayerId(7);guest->dead=true;
+        s.guests[7]=std::move(guest);return *s.guests.at(7);
+    }
+    static bool respawnGuest(GameSession& s,LanPlayerRuntime& guest){return s.travelLanPlayer(guest,DimensionId::Overworld,true);}
 
     static void prepareActionScene(GameSession& session,DimensionId dimension,uint64_t seed){
         session.worldMetadata.seed=seed;auto& runtime=session.ensureDimension(dimension);

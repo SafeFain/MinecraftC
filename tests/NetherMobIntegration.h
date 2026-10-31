@@ -59,6 +59,22 @@ inline int run(const std::filesystem::path& assets) {
         check(s.mobs.useNativeMob(s.player,0)&&s.player.inventory().slot(0).damage==1,"strider boost durability");
         s.mobs.dismount(0);check(!s.mobs.riding(0),"strider dismount");
     }
+    for(int fps:{30,60,120}) {
+        Scene s(assets,PresentationMode::Null);
+        for(int z=-8;z<=20;++z)for(int x=-3;x<=3;++x)s.block(x,1,z,BlockId::LAVA);
+        s.add(EntityType::Strider,{.5,2,2.5});s.player.setPosition({.5,2,.5});
+        s.player.inventory().slot(0)={ItemId::SADDLE,1,0};
+        check(s.mobs.useNativeMob(s.player,0)&&s.mobs.useNativeMob(s.player,0),"lava strider mounting");
+        s.player.inventory().slot(0)={ItemId::WARPED_FUNGUS_ON_A_STICK,1,0};
+        const auto start=s.mobs.entities().front().position;
+        advance(s,2,fps);
+        const auto position=s.mobs.entities().front().position;
+        check(position.z>start.z+8&&std::abs(position.y-2)<.01,"strider must keep moving and remain supported on lava at all frame rates");
+        // A solid wall and the standing rider's headroom still block travel.
+        for(int y=2;y<=5;++y)for(int x=-2;x<=2;++x)s.block(x,y,12,BlockId::STONE);
+        advance(s,1,fps);
+        check(s.mobs.entities().front().position.z<11.56,"lava riding bypassed solid collision");
+    }
     {
         std::cerr<<"Nether integration: splitting\n";
         Scene s(assets);s.add(EntityType::MagmaCube,{4.5,1,.5});auto saved=s.mobs.saveEntities();saved[0].health=0;

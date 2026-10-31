@@ -6,6 +6,8 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
+#include <chrono>
 
 namespace {
 
@@ -112,6 +114,28 @@ int main() {
         replaced >> content;
         require(content == "new" && !fs::exists(source),
                 "atomic replacement installs the new content");
+#if defined(_WIN32)
+        // MSVC's file streams do not share deletion. A reader may finish while
+        // an atomic publication is pending; the old destination must survive.
+        std::ofstream(source) << "after-reader";
+        std::thread releaseReader([&] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+            replaced.close();
+        });
+        const bool published = Platform::replaceFileAtomically(source, destination, error);
+        releaseReader.join();
+        require(published && !error, "atomic replacement tolerates a briefly held reader");
+        std::ifstream locked(destination);
+        locked >> content;
+        require(content == "after-reader", "reader retry did not publish the complete replacement");
+        std::ofstream(source) << "must-not-publish";
+        require(!Platform::replaceFileAtomically(source, destination, error) && error && fs::exists(source),
+                "a persistently held destination must fail without deleting either file");
+        locked.close();
+        std::ifstream preserved(destination);
+        preserved >> content;
+        require(content == "after-reader", "failed atomic publication damaged the original destination");
+#endif
     } catch (...) {
         fs::remove_all(root);
         throw;

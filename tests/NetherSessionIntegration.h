@@ -49,18 +49,34 @@ inline int run() {
         player.setPosition({.5,65.01,.5});player.configureRules(GameMode::Survival,Difficulty::Normal);
         const glm::ivec3 anchor{0,66,2};nether.setBlock(anchor.x,anchor.y,anchor.z,respawnAnchorBlock(0));
         player.inventory().slot(0)={ItemId::GLOWSTONE,5,0};player.setSelectedSlot(0);
-        for(int i=0;i<4;++i)check(GameSessionTestAccess::anchorUse(session,anchor),"anchor charges");
+        GameSessionTestAccess::restTime(session,false);
+        int restCallbacks=0;
+        session.setBedCallback([&](const glm::ivec3& p){++restCallbacks;session.interactRestBlock(p);});
+        player.setMouseLocked(true);
+        player.handleMouseButton(MouseButton::Right,ButtonAction::Press);
+        player.handleMouseButton(MouseButton::Right,ButtonAction::Release);
+        check(restCallbacks==1&&respawnAnchorCharge(nether.getBlock(0,66,2))==1,"daytime player use must reach native anchor charging");
+        for(int i=1;i<4;++i)check(session.interactRestBlock(anchor)==GameSession::RestInteraction::Handled,"anchor charges");
         check(respawnAnchorCharge(nether.getBlock(0,66,2))==4&&player.inventory().slot(0).count==1,"anchor charge capped and consumes exactly four");
-        player.inventory().slot(0).clear();check(GameSessionTestAccess::anchorUse(session,anchor),"anchor sets respawn");
+        player.inventory().slot(0).clear();session.interactRestBlock(anchor);
+        check(session.metadata().dimensions.at(2).anchorSpawn==anchor&&!session.metadata().dimensions.at(2).bedSpawn,"daytime anchor sets anchor, not bed spawn");
         GameSessionTestAccess::die(session);session.respawn(0);
         check(session.activeDimension()==DimensionId::Nether&&!session.isPlayerDead()&&respawnAnchorCharge(nether.getBlock(0,66,2))==3,"anchor respawn consumes one charge");
         nether.setBlock(0,66,2,BlockId::AIR);GameSessionTestAccess::die(session);session.respawn(0);
         check(session.activeDimension()==DimensionId::Overworld&&!session.isPlayerDead(),"missing anchor falls back to Overworld");
         GameSessionTestAccess::netherReady(session);player.configureRules(GameMode::Creative,Difficulty::Normal);player.setPosition({.5,65.01,.5});
-        ow.setBlock(0,66,2,respawnAnchorBlock(1));check(GameSessionTestAccess::anchorUse(session,{0,66,2})&&ow.getBlock(0,66,2)==BlockId::AIR,"Overworld anchor explodes");
-        GameSessionTestAccess::prepareActionScene(session,DimensionId::Nether,7);player.configureRules(GameMode::Creative,Difficulty::Normal);
-        nether.setBlock(0,65,2,bedBlock(BedPart::Foot,BedDirection::North));
-        check(!session.beginSleepAtBed({0,65,2})&&nether.getBlock(0,65,2)==BlockId::AIR,"Nether bed explodes");
+        const auto oldBed=session.metadata().bedSpawn;
+        for(bool night:{false,true}) {
+            GameSessionTestAccess::prepareActionScene(session,DimensionId::Overworld,7);player.configureRules(GameMode::Creative,Difficulty::Normal);
+            GameSessionTestAccess::restTime(session,night);GameSessionTestAccess::anchorSpawn(session,anchor);
+            ow.setBlock(0,66,2,respawnAnchorBlock(1));
+            check(session.interactRestBlock({0,66,2})==GameSession::RestInteraction::Handled&&ow.getBlock(0,66,2)==BlockId::AIR,"Overworld anchor explodes regardless of time");
+            check(session.metadata().dimensions.at(2).anchorSpawn==anchor&&session.metadata().bedSpawn==oldBed,"anchor use must not register a bed or clear another anchor");
+            GameSessionTestAccess::prepareActionScene(session,DimensionId::Nether,7);player.configureRules(GameMode::Creative,Difficulty::Normal);
+            GameSessionTestAccess::restTime(session,night);
+            nether.setBlock(0,65,2,bedBlock(BedPart::Foot,BedDirection::North));
+            check(session.interactRestBlock({0,65,2})==GameSession::RestInteraction::Handled&&nether.getBlock(0,65,2)==BlockId::AIR,"Nether bed explodes regardless of time");
+        }
         // Only the far edge is within radius16. The indexed origin is in a
         // cold chunk beyond the initial five-chunk landing window.
         std::vector<StreamingInterest> staging;
@@ -97,6 +113,56 @@ inline int run() {
         }
         check(wide&&*wide==glm::dvec3(-15.5,65.01,-29.5),"cold wide gate edge was missed by the persistent index");
         drainGeneration(session);session.leaveWorld();
+    }
+    {
+        GameSession session(root/"cold-saves");
+        const auto id=session.createWorld("Pending anchor",7,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
+        session.startWorld(id,true,0);drainGeneration(session);
+        GameSessionTestAccess::netherFlat(session,DimensionId::Overworld);
+        auto& nether=GameSessionTestAccess::netherFlat(session,DimensionId::Nether);
+        const glm::ivec3 anchor{15,66,2};
+        nether.setBlock(anchor.x,anchor.y,anchor.z,respawnAnchorBlock(4));
+        GameSessionTestAccess::anchorSpawn(session,anchor);
+        auto* chunk=nether.getChunk(0,0);chunk->generated=false;
+        GameSessionTestAccess::netherReady(session);GameSessionTestAccess::die(session);
+        session.respawn(0);
+        check(session.isPlayerDead()&&session.worldLoadingPending()&&session.metadata().dimensions.at(2).anchorSpawn==anchor,"cold anchor must remain pending without losing its record");
+        check(session.loadingSnapshot().reason==GameSession::LoadingReason::Dimension,"pending anchor must present destination loading");
+        check(respawnAnchorCharge(chunk->getBlock(15,66,2))==4,"pending respawn consumed a charge");
+        chunk->generated=true;
+        session.advanceLoading(nullptr,0);
+        check(!session.isPlayerDead()&&session.activeDimension()==DimensionId::Nether&&respawnAnchorCharge(nether.getBlock(15,66,2))==3,"loading must automatically finish anchor respawn exactly once");
+        GameSessionTestAccess::prepareActionScene(session,DimensionId::Overworld,7);
+        auto& guest=GameSessionTestAccess::anchorGuest(session,anchor);
+        // Every loaded candidate is obstructed. Only the cold neighboring chunk
+        // can supply a landing, so missing neighbors cannot mean invalid anchor.
+        for(int z=0;z<=4;++z)for(int x=13;x<=15;++x)for(int y=65;y<=68;++y)
+            if(glm::ivec3(x,y,z)!=anchor)nether.setBlock(x,y,z,BlockId::OBSIDIAN);
+        auto* neighbor=nether.getChunk(1,0);neighbor->generated=false;
+        check(!GameSessionTestAccess::respawnGuest(session,guest)&&guest.pendingRespawn&&guest.profile.netherAnchor==anchor&&guest.dead,"LAN respawn must retain an anchor while neighboring terrain is cold");
+        check(respawnAnchorCharge(nether.getBlock(15,66,2))==3,"pending LAN respawn consumed a charge");
+        neighbor->generated=true;
+        GameSessionTestAccess::tickLanPlayers(session,0);
+        check(!guest.dead&&!guest.pendingRespawn&&guest.profile.dimension==DimensionId::Nether&&respawnAnchorCharge(nether.getBlock(15,66,2))==2,"LAN anchor respawn did not retry automatically");
+        auto& overworld=GameSessionTestAccess::netherFlat(session,DimensionId::Overworld);
+        const glm::ivec3 bed{0,65,8},head=bed+bedDirectionOffset(BedDirection::North);
+        overworld.setBlock(bed.x,bed.y,bed.z,bedBlock(BedPart::Foot,BedDirection::North));
+        overworld.setBlock(head.x,head.y,head.z,bedBlock(BedPart::Head,BedDirection::North));
+        GameSessionTestAccess::restTime(session,false);
+        check(session.interactRestBlock(bed)==GameSession::RestInteraction::SpawnSet&&session.metadata().bedSpawn==bed&&!session.metadata().dimensions.at(2).anchorSpawn,"ordinary daytime bed must still set spawn and replace the anchor");
+        GameSessionTestAccess::restTime(session,true);
+        check(session.interactRestBlock(bed)==GameSession::RestInteraction::Sleeping&&session.isSleeping(),"ordinary nighttime bed must still begin sleep");
+        const glm::ivec3 highAnchor{5,255,5};
+        for(int z=3;z<=7;++z)for(int x=3;x<=7;++x)for(int y=253;y<=254;++y)nether.setBlock(x,y,z,BlockId::OBSIDIAN);
+        nether.setBlock(5,255,5,respawnAnchorBlock(4));
+        check(GameSessionTestAccess::invalidAnchor(session,highAnchor)&&respawnAnchorCharge(nether.getBlock(5,255,5))==4,"anchor landing must not put a player's head above the Nether build limit");
+        const glm::ivec3 borderAnchor{29999999,66,2};
+        auto* border=nether.getChunk(World::worldToChunkX(borderAnchor.x),0);
+        for(int z=0;z<16;++z)for(int x=0;x<16;++x)for(int y=64;y<=68;++y)
+            border->setBlock(x,y,z,BlockId::OBSIDIAN);
+        border->setBlock(15,66,2,respawnAnchorBlock(4));border->generated=true;border->lifecycle=Chunk::LifecycleState::Renderable;
+        check(GameSessionTestAccess::invalidAnchor(session,borderAnchor)&&respawnAnchorCharge(nether.getBlock(29999999,66,2))==4,"out-of-border landing cells must not be treated as safe or perpetually pending");
+        session.leaveWorld();
     }
     std::filesystem::remove_all(root);
     std::cout<<"Native Nether session portals and anchors passed\n";return 0;

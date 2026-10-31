@@ -319,7 +319,7 @@ void writeAtomic(const std::filesystem::path& path, const Bytes& body) {
     std::error_code error;
     if (!Platform::replaceFileAtomically(temporary, path, error)) {
         std::filesystem::remove(temporary);
-        throw std::runtime_error("Cannot atomically replace save file: " + error.message());
+        throw std::filesystem::filesystem_error("Cannot atomically replace save file", temporary, path, error);
     }
 }
 

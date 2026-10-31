@@ -5,7 +5,7 @@
 #include <cmath>
 
 GroundNavigation::Terrain EntityManager::navigationTerrain(
-    std::map<std::pair<int,int>,uint64_t>* revisions, bool canOpenWoodDoors) const {
+    std::map<std::pair<int,int>,uint64_t>* revisions, bool canOpenWoodDoors, bool canWalkOnLava) const {
     auto chunkAt=[this,revisions](int x,int z) -> const Chunk* {
         const auto key=std::make_pair(World::worldToChunkX(x),World::worldToChunkZ(z));
         const auto found=m_aiChunks.find(key);
@@ -22,7 +22,7 @@ GroundNavigation::Terrain EntityManager::navigationTerrain(
             return chunk ? chunk->getBlock(x-chunk->worldX(),y,z-chunk->worldZ()) : BlockId::AIR;
         },
         [chunkAt](int x,int z) { return chunkAt(x,z)!=nullptr; },
-        canOpenWoodDoors
+        canOpenWoodDoors, canWalkOnLava
     };
 }
 
@@ -149,7 +149,7 @@ void EntityManager::requestNavigation(Entity& entity,const GroundNavigation::Goa
     const auto delta=goal.position-entity.position;
     if(purpose==NavigationPurpose::Move && glm::length(delta)>40) {
         const auto intermediate=entity.position+delta*(32.0/glm::length(delta));
-        if(auto stand=GroundNavigation::stand(navigationTerrain(nullptr,entity.type==EntityType::Villager),entitySize(entity),
+        if(auto stand=GroundNavigation::stand(navigationTerrain(nullptr,entity.type==EntityType::Villager,entity.type==EntityType::Strider),entitySize(entity),
             std::floor(intermediate.x)+.5,std::floor(intermediate.z)+.5,intermediate.y,8,8))
             request.goal={*stand,.5,.6};
     }
@@ -179,7 +179,7 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
         auto& request=best->second;
         request.origin=entity->position;
         request.search=std::make_unique<GroundNavigation::Search>(
-            navigationTerrain(&request.revisions,entity->type==EntityType::Villager),entitySize(*entity),
+            navigationTerrain(&request.revisions,entity->type==EntityType::Villager,entity->type==EntityType::Strider),entitySize(*entity),
             request.origin,request.goal);
         ++active;
     }
@@ -196,7 +196,8 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
         m_searchCursor=selected->first;
         auto& request=selected->second;
         const size_t used=request.search->advance(navigationTerrain(&request.revisions,
-            aiEntity(selected->first) && aiEntity(selected->first)->type==EntityType::Villager),
+            aiEntity(selected->first) && aiEntity(selected->first)->type==EntityType::Villager,
+            aiEntity(selected->first) && aiEntity(selected->first)->type==EntityType::Strider),
                                                  std::min(Config::AI_SEARCH_SLICE_NODES,remaining));
         remaining-=used;
         m_aiStats.pathNodes+=used;
@@ -260,7 +261,7 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
 void EntityManager::followNavigation(Entity& entity,float dt) {
     auto& ai=entity.ai;
     if (!ai.hasDestination || ai.speed<=0) return;
-    const auto terrain=navigationTerrain(nullptr,entity.type==EntityType::Villager);
+    const auto terrain=navigationTerrain(nullptr,entity.type==EntityType::Villager,entity.type==EntityType::Strider);
     const glm::vec3 size=entitySize(entity);
     if (GroundNavigation::reached(entity.position,ai.destination)) {
         cancelNavigation(entity);
@@ -318,7 +319,7 @@ void EntityManager::followNavigation(Entity& entity,float dt) {
 }
 
 void EntityManager::moveWithTerrain(Entity& entity,const glm::vec3& horizontal,float dt) {
-    const auto terrain=navigationTerrain();
+    const auto terrain=navigationTerrain(nullptr,false,entity.type==EntityType::Strider);
     const auto size=entitySize(entity);
     const glm::dvec3 start=entity.position;
     const int steps=sweptCollisionSteps(glm::length(horizontal)*dt,Config::AI_COLLISION_STEP);
@@ -345,8 +346,11 @@ void EntityManager::integrateVelocity(Entity& entity,float dt) {
     // Small substeps keep the gravity/contact solution consistent at 30/60/120 Hz.
     const int frames=std::max(1,static_cast<int>(std::ceil(dt*120.0f)));
     const float h=dt/frames;
-    const auto terrain=navigationTerrain();
+    const auto terrain=navigationTerrain(nullptr,false,entity.type==EntityType::Strider);
     const auto size=entitySize(entity);
+    const auto clear=[&](const glm::dvec3& p) {
+        return entity.type==EntityType::Strider?GroundNavigation::clear(terrain,size,p,false):!collides(entity,p);
+    };
     entity.ai.grounded=entity.velocity.y<=0 && GroundNavigation::supported(terrain,size,entity.position);
     if (entity.ai.grounded) entity.velocity.y=0;
     for (int frame=0;frame<frames;++frame) {
@@ -361,7 +365,7 @@ void EntityManager::integrateVelocity(Entity& entity,float dt) {
             if (std::abs(step[axis])<1e-12) continue;
             glm::dvec3 next=entity.position;
             next[axis]+=step[axis];
-            if (!collides(entity,next)) {
+            if (clear(next)) {
                 entity.position=next;
                 if (axis!=1 && entity.ai.grounded)
                     entity.ai.grounded=GroundNavigation::supported(terrain,size,entity.position);
@@ -373,7 +377,7 @@ void EntityManager::integrateVelocity(Entity& entity,float dt) {
                 const double mid=(low+high)*.5;
                 next=entity.position;
                 next[axis]+=step[axis]*mid;
-                if (collides(entity,next)) high=mid; else low=mid;
+                if (!clear(next)) high=mid; else low=mid;
             }
             entity.position[axis]+=step[axis]*low;
             entity.velocity[axis]=0;

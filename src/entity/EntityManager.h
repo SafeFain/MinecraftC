@@ -219,7 +219,7 @@ private:
     std::vector<AiExplosion> m_aiExplosions;
     GroundNavigation::Terrain navigationTerrain(
         std::map<std::pair<int,int>,uint64_t>* revisions = nullptr,
-        bool canOpenWoodDoors = false) const;
+        bool canOpenWoodDoors = false, bool canWalkOnLava = false) const;
     void prepareAiFrame(float dt);
     void scheduleNavigation(const glm::dvec3& playerPosition);
     void requestNavigation(Entity& entity, const GroundNavigation::Goal& goal,
@@ -288,7 +288,7 @@ private:
     float m_villageRefreshSeconds = 0.0f;
 
     std::vector<Entity> m_nativeSpawns;
-    struct NativeExplosion {glm::dvec3 position;uint32_t seed;float power;};
+    struct NativeExplosion {glm::dvec3 position;uint32_t seed;float power;std::optional<uint64_t> playerOwner{};};
     std::vector<NativeExplosion> m_nativeExplosions;
     void tickNativeState(Entity&,float);
     bool nativeTargetsPlayer(Entity&,const Player&) const;
@@ -312,7 +312,8 @@ private:
                        uint64_t sourceId = 0);
     void updateArrow(Entity& entity, float dt);
     void explode(const glm::dvec3& center, float power,
-                 uint32_t eventSeed, bool mobExplosion = false);
+                 uint32_t eventSeed, bool mobExplosion = false,
+                 std::optional<uint64_t> playerOwner = {});
     void dropMobLoot(const Entity& entity);
     static bool hostile(EntityType type);
     static glm::vec3 renderSize(EntityType type);

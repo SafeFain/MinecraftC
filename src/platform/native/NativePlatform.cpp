@@ -2,9 +2,11 @@
 #include "platform/sdl/SdlPlatformPaths.h"
 
 #include <array>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 #if defined(__APPLE__)
@@ -201,13 +203,24 @@ bool replaceFileAtomically(const std::filesystem::path& source,
                            const std::filesystem::path& destination,
                            std::error_code& error) {
 #if defined(_WIN32)
-    if (MoveFileExW(source.c_str(), destination.c_str(),
-                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        error.clear();
-        return true;
+    // Readers can briefly deny deletion on Windows. Keep the replacement
+    // atomic and bound the wait; never delete the destination to make room.
+    constexpr int maximumRetries = 7;
+    for (int attempt = 0;; ++attempt) {
+        if (MoveFileExW(source.c_str(), destination.c_str(),
+                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+            error.clear();
+            return true;
+        }
+        const DWORD failure = GetLastError();
+        const bool transient = failure == ERROR_ACCESS_DENIED ||
+            failure == ERROR_SHARING_VIOLATION || failure == ERROR_LOCK_VIOLATION;
+        if (!transient || attempt == maximumRetries) {
+            error = std::error_code(static_cast<int>(failure), std::system_category());
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10 * (attempt + 1)));
     }
-    error = std::error_code(static_cast<int>(GetLastError()), std::system_category());
-    return false;
 #else
     std::filesystem::rename(source, destination, error);
     return !error;

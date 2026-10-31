@@ -47,6 +47,9 @@ Beds explode in the Nether. Charge a respawn anchor with up to four glowstone;
 interact with a charged anchor to choose it. Respawning spends one charge. A missing,
 empty or unsafe anchor falls back to the Overworld spawn. An anchor used in the
 Overworld explodes.
+Anchor and exploding-bed interactions work regardless of the time of day. If
+anchor terrain is still loading, respawning waits and retries without losing the
+selected anchor or spending a charge.
 
 ## Survival progression
 
@@ -57,6 +60,8 @@ Overworld zombification are simulated by the host. Gold armor keeps ordinary
 piglins neutral; gold ingots buy barter loot. Brutes remain hostile. Theft and
 attacks provoke nearby piglins. Saddle striders and guide/boost them with warped
 fungus on a stick; lava and land have different movement speeds.
+Disabling LAN PvP also protects other players from a player's deflected fireball
+and its explosion; fireballs still owned by monsters remain dangerous.
 
 Smelt ancient debris to scraps, combine scraps and gold into netherite ingots,
 and obtain/copy an upgrade template. A smithing table atomically consumes template,
