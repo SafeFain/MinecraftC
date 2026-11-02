@@ -65,7 +65,8 @@ inline int run() {
         const auto data=root/"rollback";write(data/"plugins.json",R"({"official_heaven":false,"official_natural_textures":true})");
         const auto source=assets/"plugins/official_natural_textures/textures/items/stone.png";
         auto fixture=[&](const std::string& id,const std::string& definition){
-            const auto p=data/"mods"/id;
+            // Package resources are canonicalized; exercise a lexical alias on every platform.
+            const auto p=data/"mods"/id/".";
             write(p/"mod.json",nlohmann::json{{"id",id},{"version","1.0.0"},{"api",1},{"package_format",1},{"visual_only",true},{"after",{"official_natural_textures"}}}.dump());
             std::filesystem::copy_file(source,p/"icon.png",std::filesystem::copy_options::overwrite_existing);
             write(p/"item_icons/a.json",definition);return p;
@@ -96,9 +97,10 @@ inline int run() {
         require(Plugins::content().materials.at("stone").images.size()>1,"failed package did not roll back material sequence");
         const auto stone=uint16_t(Plugins::resolveItem("minecraftc:stone")),dirt=uint16_t(Plugins::resolveItem("minecraftc:dirt"));
         require(Plugins::content().itemIconOverrides.at(stone).generic_string().find("official_natural_textures")!=std::string::npos,"failed icon overlay survived rollback");
-        require(Plugins::content().itemIconOverrides.at(dirt)==winner/"icon.png","later icon package did not win");
+        require(std::filesystem::equivalent(Plugins::content().itemIconOverrides.at(dirt),winner/"icon.png"),"later icon package did not win");
         const auto gem=Plugins::resolveItem("z_owner:gem");
-        require(Plugins::content().itemIconOverrides.at(uint16_t(gem))==winner/"icon.png"&&Plugins::pluginItem(gem)->icon==owner/"icon.png","foreign overlay changed provider icon");
+        require(std::filesystem::equivalent(Plugins::content().itemIconOverrides.at(uint16_t(gem)),winner/"icon.png"),"foreign icon overlay did not win");
+        require(std::filesystem::equivalent(Plugins::pluginItem(gem)->icon,owner/"icon.png"),"foreign overlay changed provider icon");
         TextureData customIcons;customIcons.width=128;customIcons.height=16;customIcons.pixels.resize(128*16*4);
         std::unordered_map<std::string,int> customIndices;int customRows=1;
         appendPluginItemIcons(customIcons,customIndices,8,customRows);
