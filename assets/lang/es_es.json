@@ -587,7 +587,7 @@
   "gamerule.description.freeze_damage": "Descripción detallada (en inglés): Allow powder-snow freezing damage; freezing is not implemented.",
   "gamerule.description.global_sound_events": "Descripción detallada (en inglés): Broadcast distant global events; no global sound event system exists.",
   "gamerule.description.immediate_respawn": "Descripción detallada (en inglés): Respawn automatically through the normal respawn flow without the death screen.",
-  "gamerule.description.keep_inventory": "Descripción detallada (en inglés): Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.",
+  "gamerule.description.keep_inventory": "Descripción detallada (en inglés): Keep inventory, armor, offhand and experience on death; otherwise drop inventory, reset experience and drop up to 100 experience points.",
   "gamerule.description.lava_source_conversion": "Descripción detallada (en inglés): Allow supported flowing lava between two source neighbors to become a source.",
   "gamerule.description.limited_crafting": "Descripción detallada (en inglés): Restrict crafting to unlocked recipes; recipe unlocking is not implemented.",
   "gamerule.description.locator_bar": "Descripción detallada (en inglés): Show multiplayer locator bar; multiplayer tracking is not implemented.",
@@ -875,5 +875,11 @@
   "item.431": "Huevo generador de Zoglin",
   "item.432": "Huevo generador de Lavagante",
   "item.433": "Huevo generador de Enderman",
-  "effect.wither": "Descomposición"
+  "effect.wither": "Descomposición",
+  "message.experience_changed": "{0}: nivel {1}, {2} puntos en este nivel.",
+  "message.experience_target": "Selecciona un jugador conectado; las consultas requieren uno solo.",
+  "message.experience_points": "Los puntos deben ser menores que los necesarios para el siguiente nivel.",
+  "message.experience_query": "{0} tiene {1} {2}.",
+  "experience.levels": "niveles",
+  "experience.points": "puntos"
 }

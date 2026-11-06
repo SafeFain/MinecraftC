@@ -40,6 +40,7 @@ struct InventoryOutcome {
     bool accepted=false;
     bool containerChanged=false;
     std::vector<ItemStack> drops;
+    std::map<std::string,uint64_t> furnaceExperience;
 };
 class InventoryTransaction {
 public:

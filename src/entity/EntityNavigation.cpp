@@ -71,7 +71,7 @@ void EntityManager::prepareAiFrame(float dt) {
             m_aiBuckets[{static_cast<int>(std::floor(entity.position.x/16)),
                 static_cast<int>(std::floor(entity.position.y/16)),static_cast<int>(std::floor(entity.position.z/16))}].push_back(entity.id);
         if (entity.type==EntityType::Item || entity.type==EntityType::Arrow ||
-            entity.type==EntityType::PrimedTnt || entity.health<=0) continue;
+            entity.type==EntityType::PrimedTnt || entity.type==EntityType::ExperienceOrb || entity.health<=0) continue;
         m_aiBuckets[{static_cast<int>(std::floor(entity.position.x/16)),
                      static_cast<int>(std::floor(entity.position.y/16)),
                      static_cast<int>(std::floor(entity.position.z/16))}].push_back(entity.id);

@@ -1,4 +1,5 @@
 #pragma once
+#include "game/Experience.h"
 
 #include <cstdint>
 #include <string>
@@ -31,4 +32,5 @@ struct EntityRecord {
     uint32_t pluginStateVersion=0;
     NetherMobState nether;
     std::vector<ActiveStatusEffect> effects;
+    ExperienceOrbState experienceOrb;
 };

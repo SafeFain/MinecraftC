@@ -13,6 +13,7 @@
 #include "game/GameRules.h"
 #include "game/InventoryModel.h"
 #include "game/SurvivalStats.h"
+#include "game/Experience.h"
 #include "core/Input.h"
 #include "player/PlayerPhysics.h"
 #include "player/PlayerVisual.h"
@@ -111,6 +112,16 @@ public:
     const InventoryModel& inventory() const { return m_inventory; }
     SurvivalStats& survivalStats() { return m_survivalStats; }
     const SurvivalStats& survivalStats() const { return m_survivalStats; }
+    Experience& experience() { return m_experience; }
+    const Experience& experience() const { return m_experience; }
+    void collectExperience(uint32_t points) {
+        const auto before = m_experience.level();
+        m_experience.addPoints(static_cast<int32_t>(std::min<uint32_t>(points, INT32_MAX)));
+        ++m_experiencePickups;
+        if (m_experience.level()/5 > before/5) ++m_experienceLevelSounds;
+    }
+    uint64_t experiencePickups() const { return m_experiencePickups; }
+    uint64_t experienceLevelSounds() const { return m_experienceLevelSounds; }
     DamageOutcome takeDamage(float amount, bool bypassArmor = false);
     DamageOutcome takeDamage(const DamageSourceInfo& source);
     void ignite(float seconds) { if(!m_effects.level(StatusEffectType::FireResistance))m_burningSeconds = std::max(m_burningSeconds, seconds); }
@@ -240,6 +251,8 @@ private:
     Difficulty m_difficulty = Difficulty::Normal;
     InventoryModel m_inventory;
     SurvivalStats m_survivalStats;
+    Experience m_experience;
+    uint64_t m_experiencePickups=0, m_experienceLevelSounds=0;
     EntityManager* m_entities = nullptr;
     std::function<void(const glm::ivec3&)> m_bedCallback;
     int m_selectedSlot = 0;

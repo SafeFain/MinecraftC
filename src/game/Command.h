@@ -35,12 +35,18 @@ enum class CommandType {
     LocateBiome,
     LocateStructure,
     Give,
-    Dimension
+    Dimension,
+    Experience
 };
 
 struct ParsedCommand {
     CommandType type = CommandType::Help;
     std::string dimensionKey;
+    enum class ExperienceOperation { Add, Set, Query };
+    ExperienceOperation experienceOperation=ExperienceOperation::Add;
+    std::string experienceTarget;
+    int32_t experienceAmount=0;
+    bool experienceLevels=false;
     GameMode gameMode = GameMode::Survival;
     TeleportTarget teleport;
     ItemId item = ItemId::EMPTY;
@@ -127,6 +133,29 @@ inline CommandParseResult parseCommand(const std::string& input) {
             if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
         }
         parsed.type = CommandType::Help;
+    } else if (name == "/experience" || name == "/xp") {
+        if(tokens.size()<2)return expected(input,tokens,1,"add|set|query");
+        const auto op=tokens[1].text;
+        if(op!="add"&&op!="set"&&op!="query")return expected(input,tokens,1,"add|set|query");
+        if(tokens.size()<3)return expected(input,tokens,2,"<targets>");
+        parsed.experienceTarget=tokens[2].text;
+        if(parsed.experienceTarget[0]=='@' && parsed.experienceTarget!="@s" && parsed.experienceTarget!="@a")return expected(input,tokens,2,"@s|@a|<player>");
+        parsed.experienceOperation=op=="add"?ParsedCommand::ExperienceOperation::Add:op=="set"?ParsedCommand::ExperienceOperation::Set:ParsedCommand::ExperienceOperation::Query;
+        const size_t unitIndex=op=="query"?3:4;
+        if(op!="query") {
+            if(tokens.size()<4)return expected(input,tokens,3,"<amount>");
+            const auto& amount=tokens[3].text;size_t digit=amount[0]=='-'?1:0;
+            if(digit==amount.size()||amount.find_first_not_of("0123456789",digit)!=std::string::npos)return expected(input,tokens,3,"<integer>");
+            errno=0;const auto value=std::strtoll(amount.c_str(),nullptr,10);
+            if(errno==ERANGE||value<INT32_MIN||value>INT32_MAX||(op=="set"&&value<0))return expected(input,tokens,3,op=="set"?"0..2147483647":"-2147483648..2147483647");
+            parsed.experienceAmount=static_cast<int32_t>(value);
+        }
+        if(tokens.size()>unitIndex){const auto& unit=tokens[unitIndex].text;
+            if(unit!="points"&&unit!="levels")return expected(input,tokens,unitIndex,"points|levels");
+            parsed.experienceLevels=unit=="levels";
+        }else if(op=="query")return expected(input,tokens,unitIndex,"points|levels");
+        if(tokens.size()>unitIndex+1)return expected(input,tokens,unitIndex+1,"<end>");
+        parsed.type=CommandType::Experience;
     } else if (name == "/dimension") {
         if(tokens.size()<2)return expected(input,tokens,1,"list|<dimension>");
         if(tokens.size()>2)return expected(input,tokens,2,"<end>");
@@ -260,12 +289,16 @@ inline std::vector<CommandSuggestion> commandSuggestions(
     };
 
     if (argument == 0) {
-        constexpr std::array<std::string_view, 8> commands{
-            "/gamerule", "/gamemode", "/give", "/help", "/locate", "/time", "/tp", "/weather"};
+        constexpr std::array<std::string_view, 10> commands{
+            "/experience", "/xp", "/gamerule", "/gamemode", "/give", "/help", "/locate", "/time", "/tp", "/weather"};
         for (const auto command : commands) add(command);
     } else {
         const std::string& command = before[0].text;
-        if (argument == 1 && command == "/give") {
+        if(command=="/experience"||command=="/xp") {
+            if(argument==1){add("add");add("set");add("query");}
+            else if(argument==2){add("@s");add("@a");}
+            else if((argument==3&&before[1].text=="query")||(argument==4&&before[1].text!="query")){add("points");add("levels");}
+        } else if (argument == 1 && command == "/give") {
             for (const ItemId registeredItem : creativeInventoryItems())
                 add(itemCommandName(registeredItem));
         } else if (argument == 1 && command == "/gamemode") {

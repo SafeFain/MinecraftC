@@ -25,6 +25,7 @@ uint64_t fingerprint(const BlockEntity& container) {
         }
     };
     hash ^= static_cast<uint8_t>(container.type);
+    for(const auto& xp:container.furnaceExperience) {for(unsigned char c:xp.first){hash^=c;hash*=1099511628211ULL;}hash^=xp.second;hash*=1099511628211ULL;}
     for (auto item : container.chest) stack(item);
     stack(container.input); stack(container.fuel); stack(container.output);
     return hash;
@@ -104,6 +105,7 @@ void GameSession::applyAuthorityInventory(Player& owner, DimensionSimulation& ru
     }
     action.revision = transaction.revision();
     const auto result = transaction.apply(owner.inventory(), action, context);
+    if(!result.furnaceExperience.empty())runtime.entities.settleFurnaceExperience(owner.getPosition(),result.furnaceExperience);
     drops(owner, runtime.entities, result.drops);
     if(&owner==&player)validateFishingRod();
     (void)authorityWindow(owner, runtime, transaction, view);

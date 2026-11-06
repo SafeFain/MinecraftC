@@ -47,7 +47,7 @@ and pause with Esc. Bindings are configurable; see [controls](docs/controls.md).
 
 ## World compatibility
 
-Opening a world requires save format **v22** and global generation **v21**
+Opening a world requires save format **v22 or v23** and global generation **v21**
 (native Nether **v1**, optional Heaven **v9**). Older/future versions remain listed as incompatible. Gameplay
 plugin changes require review and explicit local recovery; a full backup is
 retained by default, and entering without one permanently discards removed content.

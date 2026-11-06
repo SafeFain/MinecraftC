@@ -69,7 +69,7 @@ They remain listed and require explicit warning confirmation and recovery
 to open with the current plugin set. Ordinary refusal performs no writes. Worlds
 created with Heaven disabled contain only the dimensions currently registered.
 Enabling Heaven later also changes that world's required set. Terrain generation
-uses global v21 / native Nether v1 / Heaven v9; save v22 preserves existing numeric content IDs.
+uses global v21 / native Nether v1 / Heaven v9; save v23 preserves existing numeric content IDs.
 
 ## Registered localization, travel and presentation
 
@@ -273,7 +273,7 @@ corruption from native code cannot be recovered by this mechanism.
 
 ## Saves and limits
 
-Save v22 records namespaced block/item palettes (introduced in v16) and the exact gameplay plugin set,
+Save v23 records namespaced block/item palettes (introduced in v16) and the exact gameplay plugin set,
 versions and package/configuration fingerprints in each persisted file. Runtime
 IDs can move between launches without losing content. Missing, changed or extra gameplay plugins keep ordinary loading strict. The local
 world selector offers a warning listing all missing/extra plugins, saved/current
@@ -308,7 +308,7 @@ content. Recovery never bypasses checksums, malformed data, unsupported global
 generation versions or the save-format requirement.
 Visual-only plugins do not contribute a world requirement.
 
-Worlds now require save format v22. v2–v21 metadata remains inspectable, but opening
+Worlds accept save formats v22/v23; new writes use v23. v2–v21 metadata remains inspectable, but opening
 those worlds is refused without rewriting. Create new worlds with the desired
 plugin set; legacy format migration is not supplied. Generated caches are rebuildable when
 incompatible. Global generation is v21, native Nether is v1 and optional Heaven stays v9.
@@ -317,7 +317,7 @@ ABI 1 exposes independently versioned entity, world-generation, dimension and re
 Plugins can register/override mobs, select per-dimension generators and modifiers,
 and create Vulkan-owned shader resources and replaceable render stages.
 [Extension contracts and examples](plugin-extensions.md) document these APIs.
-Save v22 stores stable entity keys/state, generation choices and namespaced dimensions.
+Save v23 stores stable entity keys/state, generation choices and namespaced dimensions.
 No hot reload, raw Vulkan access, arbitrary plugin network
 messages, bytecode patching or custom block-entity schemas are provided.
 
@@ -440,7 +440,7 @@ Weather values are 0 normal, 1 clear, 2 rain, 3 thunder; spawn is 0 safe surface
 and `revision`. Numeric generator dimension 0/1 remains supported for older plugins.
 See [native dimension example](../examples/plugins/dimension_demo/README.md).
 
-Save v22 stores dimension keys, policy revisions, generation selections and player
+Save v23 stores dimension keys, policy revisions, generation selections and player
 states. The main world and Heaven retain existing directories; other dimension keys
 use segmented hex-encoded directories. Ordinary loads with missing dimensions/plugins/revisions refuse
 loading without writes. LAN v6 sends keys rather than local dimension handles and

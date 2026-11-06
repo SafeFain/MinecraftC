@@ -26,10 +26,12 @@ inline int run() {
         nether.setBlock(12,255,12,BlockId::SHROOMLIGHT);nether.setBlock(12,256,12,BlockId::GLOWSTONE);nether.setBlock(12,-1,12,BlockId::GLOWSTONE);
         check(nether.getBlock(12,255,12)==BlockId::SHROOMLIGHT&&nether.getBlock(12,256,12)==BlockId::AIR&&nether.getBlock(12,-1,12)==BlockId::AIR,"native construction height bounds");
         frame(ow,{-8,65,-8});frame(nether,{-1,65,-1},true);
+        player.experience().addPoints(1537);
         player.setPosition({-7.5,65.01,-7.5});
         GameSessionTestAccess::netherReady(session);
         check(!GameSessionTestAccess::tickPortals(session,3.95f)&&session.activeDimension()==DimensionId::Overworld,"survival gate waits 80 ticks");
         check(GameSessionTestAccess::tickPortals(session,.05f)&&session.activeDimension()==DimensionId::Nether,"survival gate transfer");
+        check(player.experience().level()==31&&player.experience().points()==30,"experience survives native dimension entry");
         check(glm::distance(player.getPosition(),glm::dvec3(-.5,65.01,-.5))<.01,"negative scale uses existing native gate");
         GameSessionTestAccess::netherReady(session);
         check(!GameSessionTestAccess::tickPortals(session,4)&&session.activeDimension()==DimensionId::Nether,"portal cooldown held while inside");
@@ -40,6 +42,7 @@ inline int run() {
         GameSessionTestAccess::portalRule(session,true);
         check(GameSessionTestAccess::tickPortals(session,.05f)&&session.activeDimension()==DimensionId::Overworld,"creative immediate return");
         GameSessionTestAccess::netherReady(session);
+        check(player.experience().level()==31&&player.experience().points()==30,"experience survives creative mode and portal return");player.experience().clear();
         // Both equal-distance candidates must resolve to the same stable origin.
         frame(nether,{-8,65,8});frame(nether,{7,65,8});
         const auto landing=GameSessionTestAccess::portalLanding(session,DimensionId::Nether,{.5,65.01,8.5});

@@ -1,3 +1,7 @@
+#include "game/Experience.h"
+#include <limits>
+#include <utility>
+#include <cmath>
 #include "game/SurvivalStats.h"
 
 #include <cstdlib>
@@ -70,6 +74,26 @@ int main() {
             fps30.hunger() == fps120.hunger() &&
             fps30.saturation() == fps120.saturation(),
             "survival outcomes depend on game ticks rather than frame rate");
+    Experience xp;
+    const std::pair<int,int64_t> boundaries[]={{0,0},{1,7},{2,16},{15,315},{16,352},{17,394},{30,1395},{31,1507},{32,1628},{40,2920}};
+    for(const auto& expected:boundaries) {
+        xp.clear();xp.addPoints(static_cast<int32_t>(expected.second));
+        require(xp.level()==expected.first && xp.points()==0,"Java experience thresholds");
+        xp.addPoints(-1);
+        require(expected.first==0 ? xp.level()==0 : xp.level()==expected.first-1,"threshold minus one");
+    }
+    xp.clear();for(int i=0;i<2920;++i)xp.addPoints(1);
+    require(xp.level()==40&&xp.points()==0,"incremental experience matches bulk rewards");
+    xp.addPoints(-2920);require(xp.level()==0&&xp.progress()==0,"point subtraction returns to zero");
+    xp.setLevel(16);require(xp.setPoints(21),"set in-level points");xp.addLevels(4);
+    require(xp.level()==20&&std::abs(xp.progress()-.5)<1e-9&&xp.points()==31,"level changes preserve bar fraction");
+    require(!xp.setPoints(62)&&xp.level()==20&&xp.points()==31,"set points cannot cross a level");
+    require(xp.deathDrop()==100,"death experience capped at 100");xp.setLevel(3);require(xp.deathDrop()==21,"death experience is seven per level");
+    xp.addLevels(INT32_MIN);require(xp.level()==0&&xp.progress()==0,"negative levels clamp without residual progress");
+    xp.addLevels(INT32_MAX);xp.addPoints(INT32_MAX);require(xp.level()==Experience::MAX_LEVEL&&xp.progress()==0,"experience overflow saturates");
+    for(double invalid:{-1.,1.,std::numeric_limits<double>::infinity(),std::numeric_limits<double>::quiet_NaN()})
+        require(!Experience::valid(1,invalid),"invalid saved progress rejected");
+
     std::cout << "Survival stats tests passed\n";
     return 0;
 }

@@ -587,7 +587,7 @@
   "gamerule.description.freeze_damage": "Ausführliche Erklärung (Englisch): Allow powder-snow freezing damage; freezing is not implemented.",
   "gamerule.description.global_sound_events": "Ausführliche Erklärung (Englisch): Broadcast distant global events; no global sound event system exists.",
   "gamerule.description.immediate_respawn": "Ausführliche Erklärung (Englisch): Respawn automatically through the normal respawn flow without the death screen.",
-  "gamerule.description.keep_inventory": "Ausführliche Erklärung (Englisch): Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.",
+  "gamerule.description.keep_inventory": "Ausführliche Erklärung (Englisch): Keep inventory, armor, offhand and experience on death; otherwise drop inventory, reset experience and drop up to 100 experience points.",
   "gamerule.description.lava_source_conversion": "Ausführliche Erklärung (Englisch): Allow supported flowing lava between two source neighbors to become a source.",
   "gamerule.description.limited_crafting": "Ausführliche Erklärung (Englisch): Restrict crafting to unlocked recipes; recipe unlocking is not implemented.",
   "gamerule.description.locator_bar": "Ausführliche Erklärung (Englisch): Show multiplayer locator bar; multiplayer tracking is not implemented.",
@@ -875,5 +875,11 @@
   "item.431": "Zoglin-Spawn-Ei",
   "item.432": "Schreiter-Spawn-Ei",
   "item.433": "Enderman-Spawn-Ei",
-  "effect.wither": "Wither"
+  "effect.wither": "Wither",
+  "message.experience_changed": "{0}: Stufe {1}, {2} Punkte in dieser Stufe.",
+  "message.experience_target": "Online-Spieler wählen; Abfragen benötigen genau einen Spieler.",
+  "message.experience_points": "Die Punkte müssen unter dem Bedarf der nächsten Stufe liegen.",
+  "message.experience_query": "{0} hat {1} {2}.",
+  "experience.levels": "Stufen",
+  "experience.points": "Punkte"
 }

@@ -1,5 +1,6 @@
 #include "plugins/Runtime.h"
 #include "app/GameUiController.h"
+#include "ui/ExperienceHud.h"
 
 #include "Config.h"
 #include "ui/UIStyle.h"
@@ -400,7 +401,8 @@ void GameUiController::renderSurvivalHud(const Player& player, int screenWidth) 
     const UiHotbarLayout bar(screenWidth);
     const float s=bar.scale;
     const float unitW=12*s,gap=2*s;
-    const float y=bar.y+bar.height+12*s;
+    renderExperienceHud(renderer,player.experience(),screenWidth);
+    const float y=bar.y+bar.height+29*s;
     const float groupW = 10.0f * unitW + 9.0f * gap;
     const float leftX = screenWidth * 0.5f - groupW - 10.0f*s;
     const float rightX = screenWidth * 0.5f + 10.0f*s;
@@ -484,7 +486,7 @@ void GameUiController::renderSelectedItemName(const Player& player, int screenWi
     const UiHotbarLayout bar(screenWidth);
     const float scale=UiTheme::fittedScale(renderer,name,1.0f,screenWidth-40.0f);
     const auto size=renderer.measureText(name,scale);
-    const float x=(screenWidth-size.x)*.5f,y=bar.y+bar.height+48*bar.scale;
+    const float x=(screenWidth-size.x)*.5f,y=bar.y+bar.height+(player.isSurvival()?70:48)*bar.scale;
     const float alpha=std::min(1.0f,itemNameSeconds/.25f);
     UiTheme::rounded(renderer,x-8,y-4,size.x+16,size.y+8,4,
                      UiTheme::withAlpha(UiTheme::PANEL_DEEP,.85f*alpha));

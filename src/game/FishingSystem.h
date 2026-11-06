@@ -13,6 +13,7 @@ struct FishingEvent {
     glm::dvec3 position{0.0};
     ItemStack catchItem{};
     uint16_t wear = 0;
+    uint8_t experience = 0;
 };
 struct FishingView {
     FishingPhase phase = FishingPhase::Idle;

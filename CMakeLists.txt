@@ -1529,6 +1529,8 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME lan_multiplayer_simulation COMMAND session_flow_tests --lan-simulation-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     add_test(NAME game_session_flow COMMAND session_flow_tests)
+    add_test(NAME experience_integration COMMAND session_flow_tests --experience-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    set_tests_properties(experience_integration PROPERTIES TIMEOUT 60)
     target_sources(session_flow_tests PRIVATE
         src/renderer/BlockAtlasData.cpp
         tests/reference/heaven_v9/FrozenParticleSystem.cpp
@@ -1565,6 +1567,11 @@ if(BUILD_TESTING)
         add_dependencies(vulkan_ui_smoke plugin_render_demo)
         if(MINECRAFTC_VULKAN_TESTS)
             set_property(TARGET vulkan_ui_smoke PROPERTY EXCLUDE_FROM_ALL FALSE)
+            add_test(NAME experience_vulkan_readback COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
+                ${CMAKE_SOURCE_DIR}/assets experience)
+            set_tests_properties(experience_vulkan_readback PROPERTIES
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 120 RESOURCE_LOCK vulkan_device)
             add_test(NAME natural_texture_vulkan_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                 ${CMAKE_SOURCE_DIR}/assets natural_textures)

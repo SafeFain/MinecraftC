@@ -56,6 +56,7 @@ void FishingSystem::use(const glm::dvec3& eye, const glm::vec3& forward,
             const float selection = random();
             event.catchItem = loot(openWater(m_surface,env), category, selection);
             event.wear = 1;
+            event.experience = static_cast<uint8_t>(1+std::min(5,int(random()*6)));
         } else if (m_view.phase == FishingPhase::Stuck) event.wear = 2;
         m_events.push_back(event);
         cancel();

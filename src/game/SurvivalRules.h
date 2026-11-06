@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "game/Item.h"
@@ -30,6 +31,7 @@ struct SmeltingRecipe {
     ItemId input = ItemId::EMPTY;
     ItemStack output;
     uint16_t cookTicks = 200;
+    uint16_t experienceMilli = 0;
 };
 
 const BlockSurvivalProperties& getBlockSurvivalProps(BlockId block);
@@ -49,6 +51,7 @@ std::vector<const CraftingRecipe*> availableCraftingRecipes(
     const InventoryModel& inventory, const std::array<ItemStack, 9>& grid,
     uint8_t gridWidth, uint8_t gridHeight);
 const SmeltingRecipe* findSmeltingRecipe(ItemId input);
+std::string smeltingRecipeKey(const SmeltingRecipe& recipe);
 uint16_t fuelTicks(ItemId fuel);
 
 int armorPointsForItem(ItemId item);

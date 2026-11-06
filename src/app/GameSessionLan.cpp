@@ -115,6 +115,7 @@ void GameSession::saveLanPlayer(LanPlayerRuntime& guest) {
     profile.saturation = stats.saturation(); profile.exhaustion = stats.exhaustion();
     profile.foodTickTimer = stats.foodTickTimer();
     profile.effects=guest.player.statusEffects().active();
+    profile.experience=guest.player.experience();
     if (guestProfiles) guestProfiles->save(profile);
 }
 
@@ -355,6 +356,7 @@ void GameSession::updateLanPlayers(float dt) {
                 Lan::GameEvent remote; remote.kind = Lan::EventKind::Fishing; remote.owner = entry.first; remote.dimension = guest.profile.dimension; remote.position = event.position; remote.flags = static_cast<uint8_t>(event.kind);
                 broadcastGameEvent(remote, false, true);
                 if (!event.catchItem.empty()) {
+                    runtime.entities.spawnExperience(guest.player.getPosition()+glm::dvec3(0,.5,0),event.experience);
                     const auto delta = guest.player.getPosition() + glm::dvec3(0, .7, 0) - event.position;
                     const float duration = std::clamp(static_cast<float>(glm::length(delta)) / 12, .2f, 1.2f);
                     runtime.entities.spawnItem(event.position, event.catchItem,
@@ -490,6 +492,8 @@ void GameSession::sendLanStates() {
         state.roster = roomRoster();
         state.window = authorityWindow(guest.player, *simulations[static_cast<size_t>(guest.profile.dimension)], guest.window, guest.windowView);
         state.inventory = guest.player.inventory();
+        state.experience=guest.player.experience();
+        state.experiencePickups=guest.player.experiencePickups();state.experienceLevelSounds=guest.player.experienceLevelSounds();
         const auto& stats = guest.player.survivalStats();
         state.health = stats.health(); state.hunger = stats.hunger(); state.saturation = stats.saturation();
         state.exhaustion = stats.exhaustion(); state.foodTimer = stats.foodTickTimer();state.effects=guest.player.statusEffects().active();
@@ -544,7 +548,7 @@ void GameSession::sendLanEntities() {
             snapshot.pluginState=entity->pluginState;snapshot.pluginStateVersion=entity->pluginStateVersion;
             snapshot.item = entity->item; snapshot.seed = entity->behaviorSeed; snapshot.inGround = entity->inGround;
             snapshot.playerOwned = entity->playerOwned; snapshot.sleeping = entity->sleeping; snapshot.attacking = entity->attackPending;
-            snapshot.nether=entity->nether;snapshot.effects=entity->effects.active();snapshot.riderId=entity->riderId;
+            snapshot.nether=entity->nether;snapshot.effects=entity->effects.active();snapshot.riderId=entity->riderId;snapshot.experienceOrb=entity->experienceOrb;
             snapshot.villager = entity->villager; batch.entities.push_back(std::move(snapshot));
         }
         for (const auto& dead : runtime.entities.deadEntityRenders()) if (inRange(dead.position) && batch.deaths.size() < Lan::MAX_VISIBLE_DEATHS)

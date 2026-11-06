@@ -62,6 +62,8 @@ void entity(Writer& writer, const EntitySnapshot& value) {
     MC_NETHER_STATE_FIELDS(NETHER_WRITE)
 #undef NETHER_WRITE
     writeStatusEffects(writer,value.effects);writer.u64(value.riderId);
+    if(!value.experienceOrb.valid(value.type==EntityType::ExperienceOrb))throw ProtocolError("Invalid experience orb");
+    writer.u32(value.experienceOrb.value);writer.u32(value.experienceOrb.count);
 }
 EntitySnapshot entity(Reader& reader) {
     EntitySnapshot result; result.id = reader.u64(); result.type = static_cast<EntityType>(entityType(reader.text())); result.position = position(reader);
@@ -77,6 +79,7 @@ EntitySnapshot entity(Reader& reader) {
 #undef NETHER_WIRE_uint16_t
 #undef NETHER_WIRE_uint32_t
     result.effects=readStatusEffects(reader);result.riderId=reader.u64();
+    result.experienceOrb={reader.u32(),reader.u32()};
     const auto* definition=Plugins::entityContent(static_cast<uint16_t>(result.type));
     if(definition&&definition->stateVersion!=result.pluginStateVersion)throw ProtocolError("Entity state revision mismatch");
     Writer check; entity(check, result); return result;

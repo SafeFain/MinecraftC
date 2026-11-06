@@ -120,7 +120,7 @@ void PluginManager::callbackFault(size_t i,const std::string& reason) {
 int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d,uint16_t& id) {
     require(d.size>=sizeof(d),"Entity descriptor size mismatch");
     EntityContent e;e.key=text(d.key);owned(ctx,e.key);e.name=text(d.name);
-    require(d.template_type<MC_BUILTIN_ENTITY_COUNT&&d.template_type!=0&&d.template_type!=9&&d.template_type!=10,"Invalid entity AI template");
+    require(d.template_type<MC_BUILTIN_ENTITY_COUNT&&d.template_type!=0&&d.template_type!=9&&d.template_type!=10&&d.template_type!=29,"Invalid entity AI template");
     require(d.hostile<=1&&d.natural_spawn<=1&&d.drop_count<=64,"Invalid entity flags/count");
     require(std::isfinite(d.health)&&d.health>0&&d.health<=10000&&std::isfinite(d.speed)&&d.speed>=0&&d.speed<=32&&
         std::isfinite(d.attack_damage)&&d.attack_damage>=0&&d.attack_damage<=1000,"Invalid entity attributes");
@@ -139,7 +139,7 @@ int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d
     auto& entries=mutableContentState().extensions.entities;
     for(const auto& it:entries)require(it.second.key!=e.key,"Duplicate entity key");
     if(d.target&&*d.target) {
-        id=resolveEntity(d.target);require(id<MC_BUILTIN_ENTITY_COUNT&&id!=0&&id!=9&&id!=10,"Only builtin mobs may be overridden");
+        id=resolveEntity(d.target);require(id<MC_BUILTIN_ENTITY_COUNT&&id!=0&&id!=9&&id!=10&&id!=29,"Only builtin mobs may be overridden");
         require(!entries.count(id),"Conflicting entity override");
     } else {
         uint32_t next=FIRST_CONTENT_ID;while(entries.count(static_cast<uint16_t>(next))&&next<INVALID_CONTENT_ID)++next;

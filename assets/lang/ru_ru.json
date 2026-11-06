@@ -587,7 +587,7 @@
   "gamerule.description.freeze_damage": "Подробное описание (на английском): Allow powder-snow freezing damage; freezing is not implemented.",
   "gamerule.description.global_sound_events": "Подробное описание (на английском): Broadcast distant global events; no global sound event system exists.",
   "gamerule.description.immediate_respawn": "Подробное описание (на английском): Respawn automatically through the normal respawn flow without the death screen.",
-  "gamerule.description.keep_inventory": "Подробное описание (на английском): Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.",
+  "gamerule.description.keep_inventory": "Подробное описание (на английском): Keep inventory, armor, offhand and experience on death; otherwise drop inventory, reset experience and drop up to 100 experience points.",
   "gamerule.description.lava_source_conversion": "Подробное описание (на английском): Allow supported flowing lava between two source neighbors to become a source.",
   "gamerule.description.limited_crafting": "Подробное описание (на английском): Restrict crafting to unlocked recipes; recipe unlocking is not implemented.",
   "gamerule.description.locator_bar": "Подробное описание (на английском): Show multiplayer locator bar; multiplayer tracking is not implemented.",
@@ -875,5 +875,11 @@
   "item.431": "Яйцо призыва: Зоглин",
   "item.432": "Яйцо призыва: Лавомерка",
   "item.433": "Яйцо призыва: Эндермен",
-  "effect.wither": "Иссушение"
+  "effect.wither": "Иссушение",
+  "message.experience_changed": "{0}: уровень {1}, {2} очков на этом уровне.",
+  "message.experience_target": "Выберите игрока в сети; запрос требует ровно одного игрока.",
+  "message.experience_points": "Очков должно быть меньше, чем нужно для следующего уровня.",
+  "message.experience_query": "У {0}: {1} {2}.",
+  "experience.levels": "уровни",
+  "experience.points": "очки опыта"
 }

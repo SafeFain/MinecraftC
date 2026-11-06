@@ -163,6 +163,8 @@ Bytes encodeAuthorityState(const AuthorityState& state) {
         writeStack(writer, container.input); writeStack(writer, container.fuel); writeStack(writer, container.output);
         writer.u16(container.burnRemaining); writer.u16(container.burnTotal); writer.u16(container.cookProgress); writer.u16(container.cookTotal);
     }
+    writer.u32(static_cast<uint32_t>(state.experience.level()));writer.f64(state.experience.progress());
+    writer.u64(state.experiencePickups);writer.u64(state.experienceLevelSounds);
     writer.u64(state.inventoryRevision); writeStack(writer, state.cursor); for (const auto& stack : state.crafting) writeStack(writer, stack);
     return std::move(writer.bytes);
 }
@@ -201,6 +203,9 @@ AuthorityState decodeAuthorityState(const Bytes& bytes) {
         container.input = readStack(reader); container.fuel = readStack(reader); container.output = readStack(reader);
         container.burnRemaining = reader.u16(); container.burnTotal = reader.u16(); container.cookProgress = reader.u16(); container.cookTotal = reader.u16();
     }
+    const auto level=reader.u32();const auto progress=reader.f64();
+    if(level>uint32_t(Experience::MAX_LEVEL)||!Experience::valid(static_cast<int32_t>(level),progress))throw ProtocolError("Invalid experience state");
+    state.experience.restore(static_cast<int32_t>(level),progress);state.experiencePickups=reader.u64();state.experienceLevelSounds=reader.u64();
     state.inventoryRevision = reader.u64(); state.cursor = readStack(reader); for (auto& stack : state.crafting) stack = readStack(reader);
     reader.finish(); stateValid(state); return state;
 }

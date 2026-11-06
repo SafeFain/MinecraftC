@@ -1027,6 +1027,13 @@ bool Player::breakBlockImpl() {
                 }
             }
             const ItemStack& tool = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
+            if(m_authority && m_entities && blockDrops) {
+                m_entities->awardMiningExperience(glm::dvec3(breakPos)+glm::dvec3(.5),block,tool);
+                if(auto* furnace=m_world->getBlockEntity(breakPos);furnace&&furnace->type==BlockEntityType::Furnace) {
+                    m_entities->settleFurnaceExperience(glm::dvec3(breakPos)+glm::dvec3(.5),furnace->furnaceExperience);
+                    furnace->furnaceExperience.clear();
+                }
+            }
             const auto drops = getBlockDrops(block, tool,
                 static_cast<uint32_t>(hit->blockPos.x) * 73428767u ^
                 static_cast<uint32_t>(hit->blockPos.y) * 912931u ^
@@ -1210,7 +1217,7 @@ bool Player::placeBlockImpl() {
         bool used = NetherPortal::ignite(*m_world,placePos);
         if(used) {}
         else if (targetedBlock == BlockId::TNT && m_entities) {
-            m_entities->primeTnt(hit->blockPos);
+            m_entities->primeTnt(hit->blockPos,4.f,true,true);
             used = true;
         } else if (m_world->getBlock(placePos.x, placePos.y, placePos.z) == BlockId::AIR &&
                    (isSolid(targetedBlock) || isFlammable(targetedBlock))) {

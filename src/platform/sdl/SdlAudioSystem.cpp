@@ -61,6 +61,8 @@ struct AudioSystem::Impl {
     std::atomic<unsigned> explosionTriggers{0};
     std::atomic<int> combatTrigger{-1};
     std::atomic<int> fishingTrigger{-1};
+    std::atomic<int> experienceTrigger{-1};
+    float experienceEnvelope=0,experiencePhase=0,experienceFrequency=0,experienceDecay=0;
     std::atomic<int> blockTrigger{-1};
     float blockEnvelope=0,blockPhase=0,blockFrequency=0,blockDecay=0,blockNoise=0;
     float fishingEnvelope = 0, fishingPhase = 0, fishingFrequency = 0;
@@ -191,6 +193,9 @@ struct AudioSystem::Impl {
             fishingFrequency = frequency[index]; fishingDecay = decay[index];
             fishingNoise = noiseMix[index];
         }
+        const int requestedExperience=experienceTrigger.exchange(-1);
+        if(requestedExperience>=0){experiencePhase=0;experienceFrequency=requestedExperience?660.f:1180.f;
+            experienceEnvelope=requestedExperience?.28f:.12f;experienceDecay=requestedExperience?.99978f:.9989f;}
         const int requestedCombat = combatTrigger.exchange(-1);
         if (requestedCombat >= 0) {
             static constexpr float frequencies[] = {
@@ -324,6 +329,10 @@ struct AudioSystem::Impl {
                 noise() * fishingNoise) * fishingEnvelope;
             fishingEnvelope *= fishingDecay;
             if (fishingEnvelope < .0001f) fishingEnvelope = 0;
+            experiencePhase+=6.283185307f*experienceFrequency/SAMPLE_RATE;
+            if(experiencePhase>6.283185307f)experiencePhase-=6.283185307f;
+            const float experienceSound=(std::sin(experiencePhase)+.30f*std::sin(experiencePhase*2.5f))*experienceEnvelope;
+            experienceEnvelope*=experienceDecay;if(experienceEnvelope<.0001f)experienceEnvelope=0;
             blockPhase+=6.283185307f*blockFrequency/SAMPLE_RATE;
             if(blockPhase>6.283185307f)blockPhase-=6.283185307f;
             const float blockSound=(std::sin(blockPhase)*(1-blockNoise)+noise()*blockNoise)*blockEnvelope;
@@ -331,12 +340,12 @@ struct AudioSystem::Impl {
             if(blockEnvelope<.0001f)blockEnvelope=0;
             samples[frame * 2] = std::clamp(masterGain * (
                 left + (rainLeft + thunder * leftPan) * weatherGain +
-                    (explosion * explosionLeft + (combat + fishing + blockSound) * .707f) * soundEffectsGain),
+                    (explosion * explosionLeft + (combat + fishing + blockSound + experienceSound) * .707f) * soundEffectsGain),
                 -1.0f, 1.0f);
             samples[frame * 2 + 1] =
                 std::clamp(masterGain * (right +
                                (rainRight + thunder * rightPan) * weatherGain +
-                               (explosion * explosionRight + (combat + fishing + blockSound) * .707f) *
+                               (explosion * explosionRight + (combat + fishing + blockSound + experienceSound) * .707f) *
                                    soundEffectsGain),
                            -1.0f, 1.0f);
         }
@@ -508,6 +517,10 @@ void AudioSystem::playExplosion(float pan, float volume) {
 void AudioSystem::playFishing(FishingSound sound) {
     if (!m_impl->initialized) return;
     m_impl->fishingTrigger = static_cast<int>(sound);
+}
+
+void AudioSystem::playExperience(bool levelUp) {
+    if(m_impl->initialized)m_impl->experienceTrigger=levelUp?1:0;
 }
 
 void AudioSystem::playCombat(CombatSound sound) {

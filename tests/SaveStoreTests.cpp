@@ -1,6 +1,7 @@
 #include "HeavenContentFixture.h"
 #include "plugins/ContentQueries.h"
 #include "game/SaveStore.h"
+#include "entity/EntityLogic.h"
 #include "game/EntityTransferJournal.h"
 #include "Config.h"
 #include "world/WorldGenContext.h"
@@ -38,9 +39,10 @@ std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
-// Construct the frozen v21 layout by removing exactly the appended v22
+// Construct the frozen v21 layout by removing the appended v23 and v22
 // native fields. Read lengths from the wire, never from C++ struct padding.
-void stripV22Metadata(std::vector<uint8_t>& bytes) {
+void stripV22Metadata(std::vector<uint8_t>& bytes, bool nativeFields=true) {
+    bytes.resize(bytes.size()-12); // v23 player experience tail
     size_t cursor=24;std::vector<std::pair<size_t,size_t>> removed;
     auto integer=[&](size_t width) {
         require(cursor+width<=bytes.size(),"v22 fixture cursor bounds");uint64_t result=0;
@@ -56,11 +58,11 @@ void stripV22Metadata(std::vector<uint8_t>& bytes) {
     count=integer(4);
     for(uint64_t i=0;i<count;++i) {
         cursor+=168;string();string();cursor+=4;
-        const auto start=cursor;cursor+=21;const auto effects=integer(1);cursor+=effects*6;
-        removed.emplace_back(start,cursor-start);
+        const auto start=cursor;cursor+=21;const auto effects=integer(1);cursor+=effects*6+8; // v23 orb payload follows the v22 native state
+        removed.emplace_back(nativeFields?start:cursor-8,nativeFields?cursor-start:8);
     }
     cursor+=59;
-    auto start=cursor;count=integer(1);cursor+=count*6;removed.emplace_back(start,cursor-start);
+    auto start=cursor;count=integer(1);cursor+=count*6;if(nativeFields)removed.emplace_back(start,cursor-start);
     cursor+=4;count=integer(4);for(uint64_t i=0;i<count;++i){string();cursor+=5;}
     for(int dimension=0;dimension<2;++dimension) {
         string();string();string();count=integer(2);for(uint64_t i=0;i<count;++i){string();string();}
@@ -70,7 +72,7 @@ void stripV22Metadata(std::vector<uint8_t>& bytes) {
         for(int field=0;field<5;++field)string();
         count=integer(2);for(uint64_t j=0;j<count;++j){string();string();}
         cursor+=80;if(integer(1))cursor+=12;
-        start=cursor;if(integer(1))cursor+=12;removed.emplace_back(start,cursor-start);
+        start=cursor;if(integer(1))cursor+=12;if(nativeFields)removed.emplace_back(start,cursor-start);
     }
     require(cursor<=bytes.size(),"v22 fixture tail bounds");
     for(auto it=removed.rbegin();it!=removed.rend();++it)bytes.erase(bytes.begin()+it->first,bytes.begin()+it->first+it->second);
@@ -214,6 +216,7 @@ int main() {
         source.saturation = 2.5f;
         source.exhaustion = 3.25f;
         source.foodTickTimer = 73;
+        source.experience.addPoints(1537);
         source.inventory.slot(0) = {ItemId::IRON_PICKAXE, 1, 42};
         source.inventory.slot(9) = {ItemId::COAL, 37, 0};
         source.inventory.slot(10) = {ItemId::LIMESTONE, 23, 0};
@@ -360,6 +363,38 @@ int main() {
         const auto v20=SaveStore(v20Directory).loadMetadata(true);require(v20.seed==source.seed&&!v20.pluginCompatibilityError.empty(),"v20 inspection retains metadata and reports refusal");
         bool refusedV20=false;try{SaveStore(v20Directory).loadMetadata();}catch(const std::exception&){refusedV20=true;}
         require(refusedV20&&readBytes(v20Directory/"level.bin")==v20Bytes,"v20 opening refuses without rewriting bytes");
+        require(store.loadMetadata().experience.level()==31&&store.loadMetadata().experience.points()==30,"experience metadata roundtrip");
+        {
+            const auto oldDirectory=root/"compatible-v22";std::filesystem::create_directories(oldDirectory);
+            auto bytes=readBytes(store.worldDirectory()/"level.bin");
+            stripV22Metadata(bytes,false);writeLittleEndian(bytes,8,22,4);
+            writeLittleEndian(bytes,12,bytes.size()-24,4);writeLittleEndian(bytes,16,payloadChecksum(bytes,24),8);
+            {std::ofstream out(oldDirectory/"level.bin",std::ios::binary);out.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());}
+            const auto before=readBytes(oldDirectory/"level.bin");
+            const auto old=SaveStore(oldDirectory).loadMetadata();
+            require(old.experience.level()==0&&old.experience.progress()==0&&old.inventory.count(ItemId::COAL)==source.inventory.count(ItemId::COAL),"v22 keeps inventory and defaults to zero XP");
+            require(readBytes(oldDirectory/"level.bin")==before,"loading v22 never rewrites it");
+            SaveStore(oldDirectory).saveMetadata(old);
+            require(readBytes(oldDirectory/"level.bin")[8]==23,"normal save upgrades v22 metadata");
+            BlockEntity furnace;furnace.type=BlockEntityType::Furnace;furnace.furnaceExperience={{"minecraftc:smelting_7",2800}};
+            SaveStore(oldDirectory).saveBlockEntities(-1,2,{{1,furnace}});
+            require(SaveStore(oldDirectory).loadBlockEntities(-1,2).front().value.furnaceExperience==furnace.furnaceExperience,"pending furnace XP persists");
+            WorldMetadata::PersistedEntity orb;orb.type=static_cast<uint16_t>(EntityType::ExperienceOrb);orb.position={-1,70,33};orb.health=5;orb.experienceOrb={7,9};
+            SaveStore(oldDirectory).saveChunkEntities(-1,2,{orb});
+            require(SaveStore(oldDirectory).loadChunkEntities(-1,2).front().experienceOrb.count==9,"orb count persists at negative chunk coordinates");
+            BlockEntity oldFurnace;oldFurnace.type=BlockEntityType::Furnace;oldFurnace.output={ItemId::IRON_INGOT,2,0};
+            SaveStore(oldDirectory).saveBlockEntities(-2,3,{{7,oldFurnace}});
+            const auto oldBlockPath=oldDirectory/"block_entities/b.-2.3.bin";
+            auto oldBlock=readBytes(oldBlockPath);oldBlock.resize(oldBlock.size()-2); // v22 has no empty XP-bank count.
+            writeLittleEndian(oldBlock,8,22,4);writeLittleEndian(oldBlock,12,oldBlock.size()-24,4);writeLittleEndian(oldBlock,16,payloadChecksum(oldBlock,24),8);
+            {std::ofstream out(oldBlockPath,std::ios::binary);out.write(reinterpret_cast<const char*>(oldBlock.data()),oldBlock.size());}
+            const auto mixed=SaveStore(oldDirectory).loadBlockEntities(-2,3);
+            require(mixed.front().value.output.count==2&&mixed.front().value.furnaceExperience.empty(),"v23 world reads v22 furnace partitions with zero pending XP");
+            const auto recovery=root/"mixed-partition-recovery";
+            SaveStore(oldDirectory,SaveReadPolicy::RecoverPlugins).recoverFileTo("block_entities/b.-2.3.bin",recovery);
+            require(SaveStore(recovery).loadBlockEntities(-2,3).front().value.output.count==2&&readBytes(oldBlockPath)==oldBlock,"plugin recovery upgrades a mixed old partition without mutating its source");
+
+        }
         const auto v18Directory=root/"legacy-v18";
         SaveStore(v18Directory).saveMetadata(source);
         {

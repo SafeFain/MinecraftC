@@ -1,4 +1,5 @@
 #pragma once
+#include "game/Experience.h"
 
 #include "entity/EntityLogic.h"
 #include "game/VillagerTrade.h"
@@ -21,6 +22,7 @@ struct EntitySnapshot {
     NetherMobState nether;
     std::vector<ActiveStatusEffect> effects;
     uint64_t riderId=UINT64_MAX;
+    ExperienceOrbState experienceOrb;
 };
 struct EntityDeathSnapshot {
     uint64_t id = 0;

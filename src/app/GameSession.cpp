@@ -211,6 +211,7 @@ void GameSession::validateFishingRod() {
 void GameSession::collectFishingEvents() {
     for (const auto& event : fishing.takeEvents()) {
         if (!event.catchItem.empty()) {
+            entities().spawnExperience(player.getPosition()+glm::dvec3(0,.5,0),event.experience);
             const glm::dvec3 delta = player.getPosition() + glm::dvec3(0,.7,0) - event.position;
             const float distance = static_cast<float>(glm::length(delta));
             const float duration = std::clamp(distance / 12.0f, .2f, 1.2f);
@@ -513,6 +514,8 @@ GameMode GameSession::startWorld(
         worldMetadata.health, worldMetadata.hunger,
         worldMetadata.saturation, worldMetadata.exhaustion,
         worldMetadata.foodTickTimer);
+    player.experience()=worldMetadata.experience;
+    observedExperiencePickups=player.experiencePickups();observedExperienceLevelSounds=player.experienceLevelSounds();
     player.statusEffects().restore(worldMetadata.effects);
     LOG_INFO("Loading world with seed " << worldMetadata.seed);
     loadActiveDimensionState();
@@ -770,6 +773,10 @@ void GameSession::updatePlaying(
             guest.fishing.cancel();
             auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
             closeAuthorityWindow(guest.player, runtime, guest.window, guest.windowView);
+            if (!worldMetadata.gameRules.boolean(GameRuleId::KeepInventory)) {
+                runtime.entities.spawnExperience(guest.player.getPosition(),guest.player.experience().deathDrop());
+                guest.player.experience().clear();
+            }
             if (!worldMetadata.gameRules.boolean(GameRuleId::KeepInventory))
                 for (const auto& stack : takeDeathDrops(guest.player.inventory()))
                     runtime.entities.spawnItem(guest.player.getPosition() + glm::dvec3(0, .5, 0), stack);
@@ -792,6 +799,9 @@ void GameSession::updatePlaying(
         }
     }
     presentLanEvents(feedback); lanEventsSent = 0;
+    if(feedback.playExperience && player.experiencePickups()!=observedExperiencePickups)
+        feedback.playExperience(player.experienceLevelSounds()!=observedExperienceLevelSounds);
+    observedExperiencePickups=player.experiencePickups();observedExperienceLevelSounds=player.experienceLevelSounds();
     if (player.isSurvival() && !playerDead && player.survivalStats().dead()) {
         beginPlayerDeath();
         if (worldMetadata.gameRules.boolean(GameRuleId::ShowDeathMessages) && feedback.playerDeathMessage)
@@ -830,15 +840,16 @@ GameSession::CommandResult GameSession::executeCommand(
     RuntimeClock::Tick now) {
     const bool feedbackEnabled = worldMetadata.gameRules.boolean(GameRuleId::SendCommandFeedback);
     CommandResult result = executeCommandImpl(command, localization, now);
-    const bool query = command.type == CommandType::GameRule && !command.gameRuleValue;
+    const bool query = (command.type == CommandType::GameRule && !command.gameRuleValue) ||
+        (command.type==CommandType::Experience && command.experienceOperation==ParsedCommand::ExperienceOperation::Query);
     const bool feedbackToggle = command.type == CommandType::GameRule &&
         command.gameRule.id == GameRuleId::SendCommandFeedback;
     const bool supportWarning = command.type == CommandType::GameRule &&
         gameRuleDefinition(command.gameRule.id).support != GameRuleSupport::Implemented;
     if (worldMetadata.cheatsEnabled && command.type != CommandType::Help && !query &&
         worldMetadata.gameRules.boolean(GameRuleId::LogAdminCommands))
-        LOG_INFO("Executed local command " << (std::array<const char*, 10>{
-            "/help", "/gamemode", "/tp", "/time", "/gamerule", "/weather", "/locate biome", "/locate structure", "/give", "/dimension"
+        LOG_INFO("Executed local command " << (std::array<const char*, 11>{
+            "/help", "/gamemode", "/tp", "/time", "/gamerule", "/weather", "/locate biome", "/locate structure", "/give", "/dimension", "/experience"
         }.at(static_cast<size_t>(command.type))));
     if (worldMetadata.cheatsEnabled && !feedbackEnabled && !query &&
         command.type != CommandType::Help && !feedbackToggle) {
@@ -877,6 +888,8 @@ GameSession::CommandResult GameSession::executeCommandImpl(
         message("/help");
         message("/gamemode 0|1|3");
         message("/give <item> [1..64]");
+        message("/experience|xp add|set <targets> <amount> [points|levels]");
+        message("/experience|xp query <player> points|levels");
         message("/tp <x> <y> <z>");
         message("/time set day|night");
         message("/gamerule <rule> [<value>]");
@@ -891,6 +904,25 @@ GameSession::CommandResult GameSession::executeCommandImpl(
     }
     if (!worldMetadata.cheatsEnabled) {
         message(localization.text("message.cheats_disabled"));
+        return result;
+    }
+    if(command.type==CommandType::Experience) {
+        using Op=ParsedCommand::ExperienceOperation;
+        std::vector<std::pair<std::string,Player*>> targets;
+        const std::string hostName=hostIdentity.nickname.empty()?"Player":hostIdentity.nickname;
+        const auto& name=command.experienceTarget;
+        if(name=="@s"||name=="@a"||name==hostName)targets.emplace_back(hostName,&player);
+        if(name!="@s")for(auto& entry:guests)if(name=="@a"||name==entry.second->profile.identity.nickname)targets.emplace_back(entry.second->profile.identity.nickname,&entry.second->player);
+        if(targets.empty()||(name!="@a"&&targets.size()>1)||(command.experienceOperation==Op::Query&&targets.size()!=1)){message(localization.text("message.experience_target"));return result;}
+        if(command.experienceOperation==Op::Set&&!command.experienceLevels) {
+            for(const auto& target:targets){auto trial=target.second->experience();if(!trial.setPoints(command.experienceAmount)){message(localization.text("message.experience_points"));return result;}}
+        }
+        for(auto& target:targets){auto& xp=target.second->experience();
+            if(command.experienceOperation==Op::Add){if(command.experienceLevels)xp.addLevels(command.experienceAmount);else xp.addPoints(command.experienceAmount);}
+            else if(command.experienceOperation==Op::Set){if(command.experienceLevels)xp.setLevel(command.experienceAmount);else (void)xp.setPoints(command.experienceAmount);}
+            if(command.experienceOperation==Op::Query)message(localization.format("message.experience_query",{target.first,std::to_string(command.experienceLevels?xp.level():xp.points()),localization.text(command.experienceLevels?"experience.levels":"experience.points")}));
+            else message(localization.format("message.experience_changed",{target.first,std::to_string(xp.level()),std::to_string(xp.points())}));
+        }
         return result;
     }
     if(command.type==CommandType::Dimension) {
@@ -1191,6 +1223,10 @@ void GameSession::beginPlayerDeath() {
     playerDead = true;
     const glm::vec3 deathPosition = glm::vec3(
         player.getPosition() + glm::dvec3(0.0, 0.5, 0.0));
+    if (!worldMetadata.gameRules.boolean(GameRuleId::KeepInventory)) {
+        entities().spawnExperience(player.getPosition(),player.experience().deathDrop());
+        player.experience().clear();
+    }
     if (!worldMetadata.gameRules.boolean(GameRuleId::KeepInventory))
         for (const auto& stack : takeDeathDrops(player.inventory()))
             entities().spawnItem(deathPosition, stack);
@@ -1445,6 +1481,7 @@ void GameSession::updateSaveMetadata() {
     worldMetadata.exhaustion = player.survivalStats().exhaustion();
     worldMetadata.foodTickTimer = player.survivalStats().foodTickTimer();
     worldMetadata.effects=player.statusEffects().active();
+    worldMetadata.experience=player.experience();
     if (simulations[0]->initialized) {
         worldMetadata.worldTicks = simulations[0]->ticks;
         worldMetadata.overworldDayPhase = simulations[0]->daylight.phase();

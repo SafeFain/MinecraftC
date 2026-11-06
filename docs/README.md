@@ -8,6 +8,7 @@ independently; source-code links require the matching checkout.
 
 - [Build and run](building.md): desktop prerequisites, install/test commands and mobile entry points.
 - [Controls](controls.md), [gameplay features](project-features.md), [saves and commands](saves-and-commands.md).
+- [Experience](experience.md): rewards, orbs, death, commands and save compatibility.
 - [Game rules](game-rules.md): supported rules and implementation limits.
 - [LAN multiplayer](lan-multiplayer.md): setup, authority, compatibility and dated platform evidence.
 - [Android](../android/README.md), [iOS](../ios/README.md), [portable packages](../packaging/README-release.md).

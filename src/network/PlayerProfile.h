@@ -1,4 +1,5 @@
 #pragma once
+#include "game/Experience.h"
 
 #include "network/Session.h"
 #include "plugins/ContentQueries.h"
@@ -29,12 +30,13 @@ struct PlayerProfile {
     uint32_t foodTickTimer=0;
     std::vector<ActiveStatusEffect> effects;
     InventoryModel inventory;
+    Experience experience;
     ItemStack cursor;
     std::array<ItemStack, 9> crafting{};
 };
 Bytes encodeProfile(const PlayerProfile& profile);
 PlayerProfile decodeProfile(const Bytes& bytes);
-// Sidecars are independent of the v18 world format and generation output.
+// Sidecars have independent versions; v6 writes and v5 reads preserve identity and generation output.
 class ProfileStore {
 public:
     explicit ProfileStore(std::filesystem::path directory) : m_directory(std::move(directory)) {}

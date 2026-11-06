@@ -17,6 +17,7 @@ void check(bool passed,const char* message) { if(!passed) { std::cerr<<message<<
 template<class F> void rejects(F function) { bool rejected=false; try { function(); } catch(const Lan::ProtocolError&) { rejected=true; } check(rejected,"Invalid message accepted"); }
 }
 int main() {
+    try {
     installHeavenFixture();
     using namespace Lan;
     Writer writer; writer.u8(255);writer.u16(0x1234);writer.u32(0x12345678);writer.u64(UINT64_MAX);writer.f32(-1.25f);writer.f64(-4096.5);writer.text("局域网");
@@ -149,6 +150,7 @@ int main() {
     PlayerProfile profile;profile.identity=ProfileStore::localIdentity(profileDirectory/"client");
     profile.positions[0]={-2048.5,65.25,4096.5};profile.positioned[0]=true;profile.dimension=DimensionId::Heaven;
     profile.bedSpawn=glm::ivec3(-4,70,-8);profile.inventory.slot(0)={ItemId::DIAMOND,12,0};
+    profile.experience.addPoints(1507);
     auto profileBytes=encodeProfile(profile);auto restored=decodeProfile(profileBytes);
     check(restored.positions[0]==profile.positions[0] && restored.inventory.count(ItemId::DIAMOND)==12 && restored.bedSpawn==profile.bedSpawn,"Player profile roundtrip failed");
     for(uint16_t version:{uint16_t(1),uint16_t(2),uint16_t(3)}) {
@@ -159,6 +161,16 @@ int main() {
         try{decodeProfile(legacy);}catch(const ProtocolError& error){refused=std::string(error.what())=="Unsupported player profile format";}
         check(refused,"Legacy profile version must be explicitly refused");
     }
+    check(restored.experience.level()==31,"v6 profile experience roundtrip");
+    {
+        Bytes legacy(profileBytes.begin(),profileBytes.end()-20);legacy[4]=5;legacy[5]=0;
+        uint64_t hash=14695981039346656037ULL;for(auto byte:legacy){hash^=byte;hash*=1099511628211ULL;}
+        Writer trailer;trailer.u64(hash);legacy.insert(legacy.end(),trailer.bytes.begin(),trailer.bytes.end());
+        const auto old=decodeProfile(legacy);check(old.experience.level()==0&&old.identity.id==profile.identity.id&&old.inventory.count(ItemId::DIAMOND)==12,"v5 profile preserves identity/items and defaults XP");
+        const auto file=profileDirectory/"old-identity"/"lan-identity";std::filesystem::create_directories(file.parent_path());
+        {std::ofstream out(file,std::ios::binary);out.write(reinterpret_cast<const char*>(legacy.data()),legacy.size());}
+        check(ProfileStore::localIdentity(file.parent_path()).id==profile.identity.id,"v5 local identity is never regenerated");
+    }
     profileBytes[20]^=1;rejects([&]{decodeProfile(profileBytes);});
     profiles.save(profile);auto reloaded=profiles.load(profile.identity);check(reloaded && reloaded->inventory.count(ItemId::DIAMOND)==12,"Persistent player data missing");
     check(ProfileStore::localIdentity(profileDirectory/"client").id==profile.identity.id,"Local identity changed on restart");
@@ -167,4 +179,5 @@ int main() {
     forged.id="../../escape";check(!profiles.accepts(forged),"Unsafe profile filename accepted");
     std::filesystem::remove_all(profileDirectory);
     std::cout<<"LAN protocol, TCP, sessions and profile tests passed\n";
+    } catch(const std::exception& error) {std::cerr<<"Network test exception: "<<error.what()<<'\n';return 1;}
 }

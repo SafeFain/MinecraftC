@@ -18,6 +18,10 @@ bool tickFurnace(BlockEntity& entity){
         if(burn){entity.burnRemaining=entity.burnTotal=burn;if(!--entity.fuel.count)entity.fuel.clear();changed=true;}}
     if(entity.burnRemaining>0){--entity.burnRemaining;changed=true;}
     if(entity.burnRemaining>0&&fits){entity.cookTotal=recipe->cookTicks;if(++entity.cookProgress>=entity.cookTotal){entity.cookProgress=0;
+        if(recipe->experienceMilli) {
+            auto& pending=entity.furnaceExperience[smeltingRecipeKey(*recipe)];
+            pending=std::min<uint64_t>(uint64_t(INT32_MAX)*1000,pending+recipe->experienceMilli);
+        }
         if(!--entity.input.count)entity.input.clear();
         if(entity.output.empty())entity.output=recipe->output;else entity.output.count+=recipe->output.count;}changed=true;}
     else if(entity.cookProgress){entity.cookProgress=0;changed=true;}

@@ -16,7 +16,7 @@ enum class EntityType : uint16_t {
 #define NETHER_ENTITY_ENUM(type,egg,key,label,h,x,y,z,s,d,monster,fire) type,
     MC_NETHER_MOBS(NETHER_ENTITY_ENUM)
 #undef NETHER_ENTITY_ENUM
-    GhastFireball, BlazeFireball, ThrownPotion, EnderPearl
+    GhastFireball, BlazeFireball, ThrownPotion, EnderPearl, ExperienceOrb
 };
 static_assert(static_cast<uint16_t>(EntityType::IronGolem)==13 && static_cast<uint16_t>(EntityType::Ghast)==14 && static_cast<uint16_t>(EntityType::EnderPearl)==28,"Append-only entity identities");
 inline bool nativeNetherMob(EntityType type) {return type>=EntityType::Ghast && type<=EntityType::Enderman;}
@@ -63,7 +63,7 @@ inline EntityType entityTemplate(EntityType type) {
     return type;
 }
 inline bool registeredMob(EntityType type) {
-    return !nativeProjectile(type)&&type!=EntityType::Item&&type!=EntityType::Arrow&&type!=EntityType::PrimedTnt&&Plugins::validEntity(static_cast<uint16_t>(type));
+    return !nativeProjectile(type)&&type!=EntityType::ExperienceOrb&&type!=EntityType::Item&&type!=EntityType::Arrow&&type!=EntityType::PrimedTnt&&Plugins::validEntity(static_cast<uint16_t>(type));
 }
 
 enum class EntityPlayback { Idle, Walk, Hurt, Death, Attack };

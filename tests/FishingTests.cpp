@@ -79,7 +79,7 @@ int main() {
         auto events=fishing.takeEvents();
         require(std::count_if(events.begin(),events.end(),[](const auto& e){return !e.catchItem.empty();})==1,
             "exactly one catch");
-        require(events.back().wear==1 && events.back().catchItem.id==ItemId::RAW_COD,"catch durability");
+        require(events.back().wear==1 && events.back().experience==1 && events.back().catchItem.id==ItemId::RAW_COD,"catch durability");
         fishing.use(eye,{0,0,-1},{0,0,0},pond.environment());
         require(fishing.takeEvents().empty(),"repeated input cannot duplicate catch");
     }

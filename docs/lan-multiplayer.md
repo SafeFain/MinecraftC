@@ -26,18 +26,18 @@ the room; sending a client to the background leaves its session.
 
 The local user-data `lan-identity` file supplies a persistent identity/credential.
 The host keeps guest profiles under each world's `players` directory. Rejoining
-restores that guest's inventory, health, bed spawn and dimension positions.
+restores that guest's inventory, experience, health, bed spawn and dimension positions.
 Protocol/game/generation incompatibilities and mismatching gameplay plugins reject
-admission. Matching gameplay plugins are supported; visual plugins may differ. The host uses save v22 with generation
-v21, native Nether v1 and Heaven v9; LAN v7 carries dimension keys, action cooldowns/time policies and scoped particles.
-Guest sidecars use profile v5 palettes and keyed dimension state; older profiles are refused without writes.
+admission. Matching gameplay plugins are supported; visual plugins may differ. The host reads save v22/v23 and writes v23 with generation
+v21, native Nether v1 and Heaven v9; LAN v8 carries experience state/orbs as well as dimension keys, action cooldowns/time policies and scoped particles.
+Guest sidecars write profile v6 with experience, palettes and keyed dimension state; v5 reads start at zero experience and preserve credentials. Older profiles are refused without writes.
 
 ## Implemented foundation
 
 - `Platform::NetworkSocket` owns nonblocking native TCP handles. IPv4/IPv6 numeric
   connections, a dual-stack listener, bounded reads/writes and closure/error
   handling are isolated inside the native adapter. Windows links Winsock.
-- `Lan::Decoder` parses fragmented/coalesced TCP frames. Protocol v6 uses a
+- `Lan::Decoder` parses fragmented/coalesced TCP frames. Protocol v8 uses a
   little-endian, 20-byte header (magic, protocol, type, length, sequence), a 1 MiB
   payload limit, a 4 MiB connection queue limit and 128 ready-frame limit.
   Scalars reject non-finite values; strings reject NUL and invalid UTF-8.
@@ -51,12 +51,12 @@ Guest sidecars use profile v5 palettes and keyed dimension state; older profiles
   increasing counters per channel. Network polling has a per-connection 256 KiB
   I/O allowance per direction. These APIs perform no game or GPU mutation.
 - `Lan::ProfileStore` stores local identity and credential plus checked,
-  atomically replaced per-world player sidecars. Profile v4 stores namespaced item
-  palettes, held cursor/crafting contents and keyed per-dimension state; v1–v3 are
-  refused without writes. It contains independent
-  dimension positions, bed spawn, game mode, survival values and inventory. It
+  atomically replaced per-world player sidecars. Profile v6 adds experience to v5;
+  v1–v4 are refused without writes. It contains namespaced item palettes, held
+  cursor/crafting contents, independent dimension positions, beds, anchors, effects,
+  game mode, survival values and inventory. It
   does not alter block IDs or generation output; profile storage is independent of
-  save v22. Admission validation
+  save v22/v23. Admission validation
   only reads existing profiles; callers save a new profile after actual admission.
 - `InventoryTransaction` applies logical slot commands to authoritative storage,
   cursor, crafting and optional container data. Sequence/revision checks reject

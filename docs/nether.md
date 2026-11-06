@@ -4,9 +4,10 @@ The Nether is compiled into MinecraftC and remains available with all plugins of
 Its key is `minecraftc:nether` (ID 2), saved separately under `dimensions/nether/`.
 Optional Heaven retains ID 1 and has its own travel rules.
 
-New worlds require save v22, generation v21, Nether generation v1, LAN protocol v7,
-player profile v5 and survival rules 2603. Older worlds stay visible but cannot be
-opened or migrated by this release. Refused loads do not rewrite their files.
+New worlds write save v23, with generation v21, Nether generation v1, LAN protocol v8,
+player profile v6 and survival rules 2603. Save v22 and profile v5 remain readable
+with zero initial experience; normal saves write the new formats. V2–v21 worlds
+remain inspection-only. Refused loads do not rewrite their files.
 Heaven generation remains v9. The application version still comes only from VERSION.
 
 ## Exploration

@@ -314,7 +314,13 @@ std::string Localization::format(
 #include "HeavenParticleMigration.h"
 #include "HeavenP1Integration.h"
 
+#include "ExperienceIntegration.h"
+
 int main(int argc, char** argv) {
+    if(argc==3&&std::string(argv[1])=="--experience-tests") {
+        try{return ExperienceIntegration::run(argv[2]);}
+        catch(const std::exception& error){std::cerr<<"Experience test exception: "<<error.what()<<'\n';return 1;}
+    }
     if(argc==3 && (std::string(argv[1])=="--nether-mob-tests"||std::string(argv[1])=="--nether-mob-tests-no-plugins")) {
         try {if(std::string(argv[1])=="--nether-mob-tests")installHeavenFixture();return NetherMobIntegration::run(argv[2]);}
         catch(const std::exception& error){std::cerr<<"Nether integration exception: "<<error.what()<<'\n';return 1;}
@@ -408,9 +414,10 @@ int main(int argc, char** argv) {
         require(!fishingSession.fishingState().active() && fishingSession.inventory().slot(0).empty(),
             "successful catch breaks worn survival rod");
         const auto& drops=fishingSession.entityState().entities();
-        require(drops.size()==1 && drops.front().item.id==ItemId::RAW_COD &&
+        require(std::count_if(drops.begin(),drops.end(),[](const Entity& e){return e.type==EntityType::Item&&e.item.id==ItemId::RAW_COD;})==1 &&
             fishingSession.inventory().count(ItemId::RAW_COD)==0,
             "full inventory keeps catch as normal world drop");
+        require(ExperienceIntegration::orbPoints(fishingSession.entityState())==1,"successful fishing produces XP without needing inventory space");
         for(int i=0;i<150;++i)GameSessionTestAccess::tickFishingDrops(fishingSession,.01f);
         require(fishingSession.inventory().count(ItemId::RAW_COD)==1,
             "reeled catch follows ordinary entity physics and inventory pickup");
@@ -619,6 +626,7 @@ int main(int argc, char** argv) {
             [&autosaveError] { autosaveError = true; });
         require(!autosaveError, "autosave processes without error");
 
+        GameSessionTestAccess::player(session).experience().addPoints(1537);
         // Explicit save persists session metadata.
         bool saveError = false;
         GameSessionTestAccess::markTerrainReady(session);
@@ -675,6 +683,7 @@ int main(int argc, char** argv) {
             reopened.startWorld(worlds[0].id, false, clock.now());
         require(mode == GameMode::Survival,
                 "existing world restores its saved mode");
+        require(reopened.playerState().experience().level()==31&&reopened.playerState().experience().points()==30,"session save/reopen restores host experience");
         require(reopened.metadata().dayNightDurationSeconds == 180,
                 "world duration survives save and reopen");
         require(!GameSessionTestAccess::newWorldLoading(reopened),

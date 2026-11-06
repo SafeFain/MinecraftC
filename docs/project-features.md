@@ -2,7 +2,7 @@
 
 Current gameplay reference. Version numbers in section titles identify when content
 was introduced; they do not expand the set of loadable saves. Current requirements
-are save **v22**, global generation **v21**, native Nether **v1**, optional Heaven **v9**. See
+are save **v22/v23**, global generation **v21**, native Nether **v1**, optional Heaven **v9**. See
 [save compatibility](saves-and-commands.md), [controls](controls.md) and [documentation index](README.md).
 
 - Infinite chunk loading around the player with a runtime-selectable render distance.
@@ -257,7 +257,7 @@ below uses provider generation v9. Save compatibility is documented centrally in
 - Existing Heaven loot gains shards, berries and bricks while the origin shrine
   retains its guaranteed Starstep Scepter. No new mobs, tool tiers or growth timers.
 - Day/night duration is world-wide (default 1200 seconds), changed with
-  `/gamerule DayNightDuration <seconds>` when cheats are enabled. Current save v22
+  `/gamerule DayNightDuration <seconds>` when cheats are enabled. Current save v23
   uses 16-bit block IDs; packed light remains derived byte-sized runtime data.
 
 ## Overworld structures (generation v18)
@@ -361,14 +361,14 @@ stay consumed across unload and reload. Commands also accept `minecraftc:` names
 - Pausing freezes fishing. Opening inventory follows normal world ticking.
   Switching slots, dropping/losing the rod, sleeping, death, Spectator mode,
   dimension changes, world exit, unloaded water and excess distance cancel it.
-  Rods and fish persist in save v22; bobbers and timers are transient. No enchantments, experience, bait or entity hooking.
+  Rods and fish persist in save v22; bobbers and timers are transient. Successful catches also award 1–6 experience points. No enchantments, bait or entity hooking.
 
 ### GameRule commands
 
 Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
 query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
 are world-wide and persisted in save v22 (introduced in v15); legacy metadata remains
-inspectable, but opening worlds requires v22. Missing/partial mechanics are explicit in feedback.
+inspectable, but opening worlds requires v22/v23. Missing/partial mechanics are explicit in feedback.
 See [game-rules.md](game-rules.md) for the full table and limits.
 
 ### Plugin loader
@@ -441,3 +441,9 @@ and incompatible.
 
 The native five-biome Nether, structures, portals and core survival progression work
 with every plugin disabled. See [Nether gameplay and persistence](nether.md).
+
+## Experience (save v23)
+
+Java-style levels, a green HUD bar, durable physical orbs, mining/mob/smelting/fishing/trading rewards,
+keep-inventory death semantics and host-owned LAN pickup. Existing v22 worlds and v5 guest profiles
+start at zero experience and remain playable. See [rules, commands and limits](experience.md).

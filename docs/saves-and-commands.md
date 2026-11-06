@@ -17,7 +17,7 @@ Assets are read-only and resolved separately from the executable/package.
 
 ## Compatibility and recovery
 
-Worlds require **save v22**, **global generation v21**, and matching gameplay
+Worlds require **save v22 or v23**, **global generation v21**, and matching gameplay
 plugin requirements. The optional official Heaven provider uses generation **v9**.
 Save-format and generation versions are independent of the application version.
 Older save metadata (v2–v21) remains inspectable in the world list, but opening
@@ -39,7 +39,10 @@ profiles keep their own compatibility rules. Recovery cannot bypass corrupt data
 or unsupported save/generation versions. See [full recovery rules](plugins.md#saves-and-limits).
 
 LAN requires matching gameplay plugins; visual-only packages may differ.
-The wire protocol is v6 and guest profiles are v4. Older profiles are refused.
+The wire protocol is v8; guest profiles v5/v6 are readable and writes use v6.
+V22 worlds start with zero experience and upgrade partitions during normal saving;
+v23 persists player/orb experience and pending furnace rewards. Older programs
+refuse the new formats. V2–v21 worlds remain inspection-only.
 See [LAN play](lan-multiplayer.md).
 
 ## Commands
@@ -54,6 +57,7 @@ host-only. `/help` lists commands and `/help gamerule [<rule>]` describes rules.
 | `/tp` | Teleport |
 | `/time`, `/weather` | Change time or weather |
 | `/give <item_name> [1..64]` | Give an item |
+| `/experience`, `/xp` | Add, set or query player points/levels; see [experience](experience.md) |
 | `/gamerule <rule> [<value>]` | Query or set a world rule |
 | `/locate biome <biome>` | Find a biome |
 | `/locate structure <structure>` | Find a structure in the active dimension |

@@ -587,7 +587,7 @@
   "gamerule.description.freeze_damage": "자세한 설명 (영어): Allow powder-snow freezing damage; freezing is not implemented.",
   "gamerule.description.global_sound_events": "자세한 설명 (영어): Broadcast distant global events; no global sound event system exists.",
   "gamerule.description.immediate_respawn": "자세한 설명 (영어): Respawn automatically through the normal respawn flow without the death screen.",
-  "gamerule.description.keep_inventory": "자세한 설명 (영어): Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.",
+  "gamerule.description.keep_inventory": "자세한 설명 (영어): Keep inventory, armor, offhand and experience on death; otherwise drop inventory, reset experience and drop up to 100 experience points.",
   "gamerule.description.lava_source_conversion": "자세한 설명 (영어): Allow supported flowing lava between two source neighbors to become a source.",
   "gamerule.description.limited_crafting": "자세한 설명 (영어): Restrict crafting to unlocked recipes; recipe unlocking is not implemented.",
   "gamerule.description.locator_bar": "자세한 설명 (영어): Show multiplayer locator bar; multiplayer tracking is not implemented.",
@@ -875,5 +875,11 @@
   "item.431": "조글린 생성 알",
   "item.432": "스트라이더 생성 알",
   "item.433": "엔더맨 생성 알",
-  "effect.wither": "시듦"
+  "effect.wither": "시듦",
+  "message.experience_changed": "{0}: 레벨 {1}, 현재 레벨의 경험치 {2}.",
+  "message.experience_target": "온라인 플레이어를 선택하세요. 조회 대상은 한 명이어야 합니다.",
+  "message.experience_points": "경험치는 다음 레벨에 필요한 값보다 작아야 합니다.",
+  "message.experience_query": "{0}: {1} {2}.",
+  "experience.levels": "레벨",
+  "experience.points": "경험치"
 }

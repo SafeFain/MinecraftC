@@ -1,4 +1,5 @@
 #pragma once
+#include "game/Experience.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -87,6 +88,7 @@ struct WorldMetadata {
     uint32_t foodTickTimer = 0;
     std::vector<ActiveStatusEffect> effects;
     InventoryModel inventory;
+    Experience experience;
     // Durable entity partition shared with chunk persistence and transfers.
     // The record contract lives in entity/EntityRecord.h; this alias preserves
     // every existing WorldMetadata::PersistedEntity spelling and the save format.

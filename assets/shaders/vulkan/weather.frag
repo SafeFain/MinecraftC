@@ -24,7 +24,17 @@ vec4 atlasFragment(){
 
 void main(){
     vec4 color;
-    if(kind>15.5){color=atlasFragment()*tint;color.a*=1.0-clamp(phase,0.0,1.0);}
+    if(kind>17.5){
+        // Original eight-pixel orb silhouette, independent of weather/ambience settings.
+        vec2 p=(floor(uv*8.0)+0.5)/8.0-0.5;
+        float r=length(p);if(r>0.48)discard;
+        float pulse=0.5+0.5*sin(phase*3.0);
+        vec3 body=mix(vec3(0.22,0.78,0.04),vec3(0.82,1.0,0.12),pulse);
+        body*=r>0.36?0.42:1.0;
+        if(p.x<0.0&&p.y>0.05&&r<0.28)body=mix(body,vec3(0.95,1.0,0.60),0.75);
+        color=vec4(body,1.0);
+    }
+    else if(kind>15.5){color=atlasFragment()*tint;color.a*=1.0-clamp(phase,0.0,1.0);}
     else if(kind<0.5){
         color=atlasFragment();
         color.rgb=mix(color.rgb,vec3(0.58,0.72,0.90),0.32);

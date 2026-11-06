@@ -192,10 +192,14 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
         next.returnStack(next.cursor);for(auto& stack:next.crafting) next.returnStack(stack);accepted=true;break;
     }
     if(!accepted) return {};
-    const bool changed=context.container && !sameContainer(*context.container,*next.container);
+    std::map<std::string,uint64_t> experience;
+    if(context.container && context.container->type==BlockEntityType::Furnace &&
+       next.container->output.count < context.container->output.count)
+        experience.swap(next.container->furnaceExperience);
+    const bool changed=context.container && (!sameContainer(*context.container,*next.container) || !experience.empty());
     inventory=next.inventory;m_cursor=next.cursor;m_crafting=next.crafting;++m_revision;
     if(context.container) *context.container=*next.container;
-    return {true,changed,std::move(next.drops)};
+    return {true,changed,std::move(next.drops),std::move(experience)};
 }
 
 std::vector<ItemStack> InventoryTransaction::close(InventoryModel& inventory) {

@@ -1,4 +1,5 @@
 #pragma once
+#include "game/Experience.h"
 
 #include <tuple>
 
@@ -43,6 +44,7 @@ struct EntityAiStats {
 
 struct Entity {
     uint64_t id = 0;
+    ExperienceOrbState experienceOrb;
     EntityType type = EntityType::Item;
     glm::dvec3 position{0.0};
     glm::vec3 velocity{0.0f};
@@ -72,6 +74,7 @@ struct Entity {
     bool sleeping = false;
     EntityAiState ai;
     uint64_t shooterId = 0;
+    float playerHitRemaining = 0; // Transient kill attribution, never serialized.
     std::string pluginState="{}";
     std::string nativeOwner; // derived cache of the persisted shared envelope
     uint32_t pluginStateVersion=0;
@@ -117,6 +120,9 @@ public:
     void spawnItem(const glm::dvec3& position, ItemStack stack,
                    const glm::vec3& velocity = glm::vec3(0.0f),
                    float pickupDelaySeconds = 0.0f);
+    void spawnExperience(const glm::dvec3& position, uint32_t points);
+    void awardMiningExperience(const glm::dvec3&,BlockId,const ItemStack&);
+    void settleFurnaceExperience(const glm::dvec3&, const std::map<std::string,uint64_t>&);
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
                     float damage, bool playerOwned, uint64_t shooterId = 0);
     bool spawnMob(EntityType type, const glm::dvec3& position);
@@ -134,7 +140,7 @@ public:
     bool pluginIntent(uint64_t,const MC_EntityIntent&);
     void explodeAt(const glm::dvec3&,float,const std::vector<EntityPlayerView>&);
     void primeTnt(const glm::ivec3& position, float fuseSeconds = 4.0f,
-                  bool removeBlock = true);
+                  bool removeBlock = true, bool playerIgnited = false);
     std::vector<glm::dvec3> takeExplosionEvents();
     void update(Player& player, float dt, bool isDay, bool peaceful,
                 bool playerTargetable, bool playerCanPickup,
@@ -196,6 +202,11 @@ public:
     }
 
 private:
+    void updateExperienceOrb(Entity&, float);
+    uint32_t experienceRandom();
+    uint32_t m_experienceRandom=0x639ba17d;
+    std::map<uint64_t,float> m_experiencePickupCooldown;
+    float m_experienceMergeTimer=0;
     EntityAiStats m_aiStats;
     double m_aiTime = 0;
     std::map<std::tuple<int,int,int>,double> m_openedVillageDoors;
@@ -313,7 +324,7 @@ private:
     void updateArrow(Entity& entity, float dt);
     void explode(const glm::dvec3& center, float power,
                  uint32_t eventSeed, bool mobExplosion = false,
-                 std::optional<uint64_t> playerOwner = {});
+                 std::optional<uint64_t> playerOwner = {}, bool experienceCredit = false);
     void dropMobLoot(const Entity& entity);
     static bool hostile(EntityType type);
     static glm::vec3 renderSize(EntityType type);

@@ -286,6 +286,7 @@ private:
         m_sessionFeedback.playBlockInteraction=[this](bool metal,bool opening,bool button) {
             m_audio.playBlockInteraction(metal,opening,button);
         };
+        m_sessionFeedback.playExperience = [this](bool levelUp){m_audio.playExperience(levelUp);};
         m_sessionFeedback.playFishing = [this](FishingEventKind kind) {
             switch (kind) {
                 case FishingEventKind::Cast: m_audio.playFishing(FishingSound::Cast); break;

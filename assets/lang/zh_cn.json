@@ -587,7 +587,7 @@
   "gamerule.description.freeze_damage": "允许细雪冰冻伤害；当前尚未实现冰冻系统。",
   "gamerule.description.global_sound_events": "广播远处的全局音效事件；当前尚无全局音效系统。",
   "gamerule.description.immediate_respawn": "死亡后通过正常重生流程自动重生，不显示死亡界面。",
-  "gamerule.description.keep_inventory": "死亡后保留全部背包、护甲和副手物品，否则正常掉落；当前无经验系统。",
+  "gamerule.description.keep_inventory": "死亡后保留背包、护甲、副手和全部经验；否则掉落物品、清空经验，并掉落最多100点经验。",
   "gamerule.description.lava_source_conversion": "允许两个源邻居之间有支撑的流动熔岩形成源。",
   "gamerule.description.limited_crafting": "限制为已解锁配方的合成；当前尚无配方解锁系统。",
   "gamerule.description.locator_bar": "显示多人定位条；当前尚无多人追踪系统。",
@@ -875,5 +875,11 @@
   "item.431": "僵尸疣猪兽刷怪蛋",
   "item.432": "炽足兽刷怪蛋",
   "item.433": "末影人刷怪蛋",
-  "effect.wither": "凋零"
+  "effect.wither": "凋零",
+  "message.experience_changed": "{0}：{1} 级，当前等级内 {2} 点经验。",
+  "message.experience_target": "请选择在线玩家；查询必须指定一名玩家。",
+  "message.experience_points": "经验点必须小于升到下一级所需的点数。",
+  "message.experience_query": "{0} 拥有 {1} {2}。",
+  "experience.levels": "经验等级",
+  "experience.points": "经验点"
 }

@@ -418,6 +418,8 @@ void appendEntity(Bytes& payload, const WorldMetadata::PersistedEntity& entity) 
 #undef NETHER_SAVE_FIELD
     append(payload,static_cast<uint8_t>(entity.effects.size()));
     for(const auto& effect:entity.effects) {append(payload,static_cast<uint8_t>(effect.type));append(payload,effect.amplifier);append(payload,effect.remaining);}
+    if(!entity.experienceOrb.valid(entity.type==static_cast<uint16_t>(EntityType::ExperienceOrb)))throw std::runtime_error("Invalid experience orb");
+    append(payload,entity.experienceOrb.value);append(payload,entity.experienceOrb.count);
 }
 
 WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
@@ -500,6 +502,9 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
         for(uint8_t i=0;i<count;++i)entity.effects.push_back({static_cast<StatusEffectType>(reader.read<uint8_t>()),reader.read<uint8_t>(),reader.read<uint32_t>()});
         if(!validNetherMobState(entity.nether)||!validStatusEffects(entity.effects))throw std::runtime_error("Invalid native entity state");
     }
+    if(version>=23) {entity.experienceOrb.value=reader.read<uint32_t>();entity.experienceOrb.count=reader.read<uint32_t>();}
+    if(!entity.experienceOrb.valid(entity.type==static_cast<uint16_t>(EntityType::ExperienceOrb)) ||
+       (version<23&&entity.type==static_cast<uint16_t>(EntityType::ExperienceOrb)))throw std::runtime_error("Invalid experience orb");
     // Appended entity types are legal only in the versions that introduced them.
     if ((version<19 && entity.type > static_cast<uint8_t>(version>=17 ? EntityType::IronGolem : EntityType::ZombieVillager)) ||
         (version>=19&&!reader.inspectOnly&&!reader.recoverPlugins&&!Plugins::validEntity(entity.type)))
@@ -533,6 +538,12 @@ void appendBlockEntity(Bytes& payload, const PersistedBlockEntity& entity) {
         append(payload, entity.value.burnTotal);
         append(payload, entity.value.cookProgress);
         append(payload, entity.value.cookTotal);
+        if(entity.value.furnaceExperience.size()>1024)throw std::runtime_error("Too many furnace experience recipes");
+        append(payload,static_cast<uint16_t>(entity.value.furnaceExperience.size()));
+        for(const auto& xp:entity.value.furnaceExperience) {
+            if(!Plugins::validKey(xp.first)||xp.second>uint64_t(INT32_MAX)*1000)throw std::runtime_error("Invalid furnace experience");
+            appendString(payload,xp.first);append(payload,xp.second);
+        }
     }
 }
 
@@ -571,6 +582,9 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
         entity.value.cookProgress = reader.read<uint16_t>();
         entity.value.cookTotal = reader.read<uint16_t>();
         if (entity.value.cookTotal == 0) entity.value.cookTotal = 200;
+        if(version>=23) {const auto count=reader.read<uint16_t>();if(count>1024)throw std::runtime_error("Too many furnace experience recipes");
+            for(uint16_t i=0;i<count;++i){auto key=reader.readString();const auto value=reader.read<uint64_t>();
+                if(!Plugins::validKey(key)||value>uint64_t(INT32_MAX)*1000||!entity.value.furnaceExperience.emplace(key,value).second)throw std::runtime_error("Invalid furnace experience");}}
     }
     return entity;
 }
@@ -691,18 +705,19 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     }
     append(payload,static_cast<uint32_t>(metadata.timePolicies.size()));
     for(const auto& entry:metadata.timePolicies){appendString(payload,Plugins::dimensionContent(entry.first).key);append(payload,entry.second.first);append(payload,entry.second.second);}
+    append(payload,static_cast<uint32_t>(metadata.experience.level()));append(payload,metadata.experience.progress());
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
 WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     CheckedBytes checked = readChecked(m_worldDirectory / "level.bin");
-    if(!inspection&&checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("World requires save format v22; legacy worlds are incompatible");
+    if(!inspection&&(checked.version!=22&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("World requires save format v22 or v23; legacy worlds are incompatible");
     const bool recovery=m_policy==SaveReadPolicy::RecoverPlugins;
     Reader reader(std::move(checked.payload), checked.version, inspection, recovery, m_issues);
     WorldMetadata metadata;
     metadata.pluginRequirements = reader.requirements;
     metadata.pluginCompatibilityError = reader.compatibilityError;
-    if(checked.version!=SAVE_FORMAT_VERSION)metadata.pluginCompatibilityError="World requires save format v22; legacy worlds are incompatible";
+    if((checked.version!=22&&checked.version!=SAVE_FORMAT_VERSION))metadata.pluginCompatibilityError="World requires save format v22 or v23; legacy worlds are incompatible";
     if (checked.version < 16 && !Plugins::content().requirements.empty()) {
         metadata.pluginCompatibilityError = "Legacy world has no content/behavior plugins";
         if (!inspection) throw std::runtime_error(metadata.pluginCompatibilityError);
@@ -902,6 +917,9 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     // Pre-v10 migration fixtures may carry fields appended by a newer writer
     // while retaining their legacy version marker.  Older fields are already
     // fully decoded above, so safely ignore that tail; v10 remains strict.
+    if(checked.version>=23) {const auto level=reader.read<uint32_t>();const auto progress=reader.read<double>();
+        if(level>uint32_t(Experience::MAX_LEVEL))throw std::runtime_error("Invalid experience level");
+        metadata.experience.restore(static_cast<int32_t>(level),progress);}
     if (checked.version >= 10 && !reader.finished())
         throw std::runtime_error("Unexpected trailing save data");
     return metadata;
@@ -1252,7 +1270,7 @@ void SaveStore::recoverFileTo(const std::filesystem::path& relative,const std::f
     SaveStore source(m_worldDirectory/file.root,m_policy,m_issues),target(destination/file.root);
     if(file.kind) {
         const auto checked=readChecked(m_worldDirectory/relative);
-        if(checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Durable world partitions require save format v22");
+        if((checked.version!=22&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("Durable world partitions require save format v22 or v23");
     }
     switch(file.kind) {
         case 'l': {auto metadata=source.loadMetadata();if(!WorldGenContext::canLoadGeneration(metadata.generationVersion))throw std::runtime_error("World generation version is incompatible");if(!destination.empty()) {
@@ -1438,7 +1456,7 @@ std::vector<glm::ivec3> SaveStore::netherPortalsNear(const glm::dvec3& center,in
     for(int z=firstZ;z<=lastZ;++z)for(int x=firstX;x<=lastX;++x) {
         const auto file=m_worldDirectory/"portals"/("p."+std::to_string(x)+"."+std::to_string(z)+".bin");
         if(!std::filesystem::exists(file))continue;
-        const auto checked=readChecked(file);if(checked.version!=SAVE_FORMAT_VERSION)throw std::runtime_error("Incompatible portal index");
+        const auto checked=readChecked(file);if((checked.version!=22&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("Incompatible portal index");
         Reader reader(checked.payload,checked.version);
         if(reader.read<int32_t>()!=x||reader.read<int32_t>()!=z)throw std::runtime_error("Invalid portal index coordinates");
         const auto count=reader.read<uint32_t>();if(count>16384)throw std::runtime_error("Portal index exceeds chunk capacity");

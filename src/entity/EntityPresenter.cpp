@@ -73,7 +73,7 @@ void EntityPresenter::render(IGameRenderer& renderer,
     for (const auto& entity : entities.entities()) {
         // Item geometry/materials are drawn by the scene presenter's shared
         // item cache.
-        if (entity.type == EntityType::Item) continue;
+        if (entity.type == EntityType::Item || entity.type==EntityType::ExperienceOrb) continue;
         glm::vec3 color = renderColor(entity.type);
         glm::vec3 visualTint(1.0f);
         if (entity.type == EntityType::PrimedTnt) {

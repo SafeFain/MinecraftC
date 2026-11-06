@@ -14,7 +14,17 @@ void require(bool condition, const char* message) {
 }
 }
 
+// Experience uses the Java command argument order and integer bounds.
+void experienceCommandTests() {
+    for(const auto& command:{"/xp add @s 7","/experience add @a -20 levels","/xp set Player 3 points","/xp query @s levels"})
+        require(parseCommand(command).command.has_value(),"experience command accepted");
+    for(const auto& command:{"/xp","/xp add @e 1","/xp set @s -1","/xp add @s 1.5","/xp add @s 2147483648","/xp query @s","/xp query @s points extra"})
+        require(!parseCommand(command).command,"invalid experience command rejected");
+    require(!commandSuggestions("/xp q",5).empty(),"experience operation completion");
+}
+
 int main(int argc, char** argv) {
+    experienceCommandTests();
     if (argc > 1) verifyGameRuleBaseline(argv[1]);
     const auto give = parseCommand("/give stone_bricks 64");
     require(give.command && give.command->type == CommandType::Give &&

@@ -38,7 +38,7 @@ void GameSession::closeReplica() {
     for (auto& runtime : simulations) if (runtime) runtime->world.clearReplicaLod();
     replicaEpoch = 0; replicaInput = {}; replicaLastInputSent = -1;
     replicaChunks.clear(); replicaChunkBytes = 0; replicaRevisions.clear(); replicaRecovery.clear();
-    lanEvents.clear();
+    lanEvents.clear();replicaExperiencePickup=replicaExperienceLevel=false;
     replicaRoster.clear(); replicaOthers.clear(); replicaFishing = {}; lanChat.clear(); hostChatTokens = 5; hostChatLast = lanNow;
     replicaDeathNotified = replicaSleepStarted = replicaSleepEnded = false; replicaWindow = {}; replicaActions.clear(); replicaActionInFlight = replicaActionSequence = 0;
 }
@@ -88,6 +88,9 @@ void GameSession::applyReplicaState(const Lan::AuthorityState& state) {
     player.setReplicaMining(state.miningProgress, state.miningTarget);
     player.survivalStats().set(state.health, state.hunger, state.saturation, state.exhaustion, state.foodTimer);
     player.statusEffects().restore(state.effects);
+    player.experience()=state.experience;
+    if(!initial){replicaExperiencePickup|=state.experiencePickups>observedExperiencePickups;replicaExperienceLevel|=state.experienceLevelSounds>observedExperienceLevelSounds;}
+    observedExperiencePickups=state.experiencePickups;observedExperienceLevelSounds=state.experienceLevelSounds;
     playerDead = state.dead;
     if (sleepState == SleepVisualState::Awake && state.sleepState != 0) replicaSleepStarted = true;
     if (sleepState != SleepVisualState::Awake && state.sleepState == 0) replicaSleepEnded = true;
@@ -216,6 +219,8 @@ void GameSession::pollReplica(double now) {
 void GameSession::updateReplica(float dt, IGameRenderer* renderer, const Feedback& feedback) {
     if (!lanWorldReady() || lanConnectionFailed()) return;
     presentLanEvents(feedback);
+    if(replicaExperiencePickup && feedback.playExperience)feedback.playExperience(replicaExperienceLevel);
+    replicaExperiencePickup=replicaExperienceLevel=false;
     for (auto& event : lightningEvents) event.seconds -= dt;
     lightningEvents.erase(std::remove_if(lightningEvents.begin(), lightningEvents.end(), [](const LightningEvent& event) { return event.seconds <= 0; }), lightningEvents.end());
     if (feedback.setRainVolume) feedback.setRainVolume(weather().rainGradient() * .72f);

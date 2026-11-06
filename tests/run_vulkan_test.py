@@ -20,6 +20,8 @@ elif scene == "content_package":
     command += ["--content-package", extra[0]]
 elif scene in ("heaven_model", "heaven_off"):
     command += ["--heaven-model" if scene == "heaven_model" else "--heaven-off"]
+elif scene == "experience":
+    command += ["--experience"]
 elif scene == "natural_textures":
     command += ["--natural-textures"]
 elif extra:
@@ -54,6 +56,7 @@ with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
 print(stdout, end="")
 print(stderr, end="", file=sys.stderr)
 marker = {
+    "experience": "Experience HUD and orb Vulkan readback passed",
     "content_package": "Content package Vulkan material/icon and native interaction readback passed",
     "gi": "Voxel GI Vulkan smoke passed", "model_fog": "PASS Vulkan model fog:",
     "plugins": "Plugin Vulkan shader/post pass, rebuild and resume passed",

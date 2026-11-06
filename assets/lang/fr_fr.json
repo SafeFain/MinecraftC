@@ -587,7 +587,7 @@
   "gamerule.description.freeze_damage": "Description détaillée (en anglais) : Allow powder-snow freezing damage; freezing is not implemented.",
   "gamerule.description.global_sound_events": "Description détaillée (en anglais) : Broadcast distant global events; no global sound event system exists.",
   "gamerule.description.immediate_respawn": "Description détaillée (en anglais) : Respawn automatically through the normal respawn flow without the death screen.",
-  "gamerule.description.keep_inventory": "Description détaillée (en anglais) : Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.",
+  "gamerule.description.keep_inventory": "Description détaillée (en anglais) : Keep inventory, armor, offhand and experience on death; otherwise drop inventory, reset experience and drop up to 100 experience points.",
   "gamerule.description.lava_source_conversion": "Description détaillée (en anglais) : Allow supported flowing lava between two source neighbors to become a source.",
   "gamerule.description.limited_crafting": "Description détaillée (en anglais) : Restrict crafting to unlocked recipes; recipe unlocking is not implemented.",
   "gamerule.description.locator_bar": "Description détaillée (en anglais) : Show multiplayer locator bar; multiplayer tracking is not implemented.",
@@ -875,5 +875,11 @@
   "item.431": "Œuf d’apparition de Zoglin",
   "item.432": "Œuf d’apparition de Arpenteur",
   "item.433": "Œuf d’apparition de Enderman",
-  "effect.wither": "Wither"
+  "effect.wither": "Wither",
+  "message.experience_changed": "{0} : niveau {1}, {2} points dans ce niveau.",
+  "message.experience_target": "Choisissez un joueur connecté ; une requête exige un seul joueur.",
+  "message.experience_points": "Les points doivent être inférieurs au seuil du niveau suivant.",
+  "message.experience_query": "{0} possède {1} {2}.",
+  "experience.levels": "niveaux",
+  "experience.points": "points"
 }

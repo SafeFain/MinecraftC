@@ -12,7 +12,8 @@
 namespace Lan {
 namespace {
 constexpr uint32_t PROFILE_MAGIC=0x504e414c;
-constexpr uint16_t PROFILE_VERSION=5;
+constexpr uint16_t PROFILE_VERSION=6;
+bool supportedProfileVersion(uint16_t version) {return version==5||version==PROFILE_VERSION;}
 constexpr size_t MAX_PROFILE_BYTES=1024*1024;
 uint64_t checksum(const Bytes& bytes) {
     uint64_t value=14695981039346656037ull;
@@ -102,6 +103,7 @@ Bytes encodeProfile(const PlayerProfile& profile) {
     for(const auto& stack:profile.inventory.armor()) writeStack(writer,stack);
     writeStack(writer,profile.inventory.offhand());
     writeStack(writer,profile.cursor); for (auto item : profile.crafting) writeStack(writer,item);
+    writer.u32(static_cast<uint32_t>(profile.experience.level()));writer.f64(profile.experience.progress());
     const auto hash=checksum(writer.bytes);writer.u64(hash);return std::move(writer.bytes);
 }
 PlayerProfile decodeProfile(const Bytes& bytes) {
@@ -111,7 +113,7 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
     Reader reader(payload);
     if(reader.u32()!=PROFILE_MAGIC) throw ProtocolError("Unsupported player profile format");
     const auto version=reader.u16();
-    if(version!=PROFILE_VERSION) throw ProtocolError("Unsupported player profile format");
+    if(!supportedProfileVersion(version)) throw ProtocolError("Unsupported player profile format");
     std::map<uint16_t,ItemId> palette;
     if(version>=3) {
         const auto count=reader.u16();if(!count||count>51)throw ProtocolError("Invalid profile palette size");
@@ -143,6 +145,9 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
     for(auto& stack:profile.inventory.armor()) stack=readStack(reader,palette);
     profile.inventory.offhand()=readStack(reader,palette);
     if (version >= 2) { profile.cursor=readStack(reader,palette); for (auto& item : profile.crafting) item=readStack(reader,palette); }
+    if(version>=6) { const auto level=reader.u32();const auto progress=reader.f64();
+        if(level>uint32_t(Experience::MAX_LEVEL)||!Experience::valid(static_cast<int32_t>(level),progress))throw ProtocolError("Invalid player experience");
+        profile.experience.restore(static_cast<int32_t>(level),progress); }
     reader.finish();validateStats(profile);return profile;
 }
 std::filesystem::path ProfileStore::path(const std::string& id) const {
@@ -157,7 +162,7 @@ Identity ProfileStore::localIdentity(const std::filesystem::path& directory) {
         const auto bytes=readFile(file);if(bytes.size()<14)throw ProtocolError("Invalid identity file");
         Bytes payload(bytes.begin(),bytes.end()-8),trailer(bytes.end()-8,bytes.end());Reader check(trailer);
         if(check.u64()!=checksum(payload))throw ProtocolError("Identity checksum mismatch");
-        Reader reader(payload);if(reader.u32()!=PROFILE_MAGIC||reader.u16()!=PROFILE_VERSION)throw ProtocolError("Unsupported identity format");
+        Reader reader(payload);if(reader.u32()!=PROFILE_MAGIC||!supportedProfileVersion(reader.u16()))throw ProtocolError("Unsupported identity format");
         const auto count=reader.u16();if(!count||count>51)throw ProtocolError("Invalid identity palette");
         for(uint16_t i=0;i<count;++i){reader.u16();reader.text(256);}
         Identity identity;identity.id=reader.text(32);identity.credential=reader.text(32);identity.nickname=reader.text(64);

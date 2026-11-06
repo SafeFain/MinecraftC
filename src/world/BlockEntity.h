@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 
 #include <array>
 #include <cstdint>
@@ -21,6 +22,7 @@ struct BlockEntity {
     uint16_t burnTotal = 0;
     uint16_t cookProgress = 0;
     uint16_t cookTotal = 200;
+    std::map<std::string,uint64_t> furnaceExperience;
     uint16_t buttonRemaining = 0;
     std::string lootKey, lootRevision, structureKey, structureRevision;
     uint64_t lootSeed=0;

@@ -1,5 +1,6 @@
 #include "game/StatusEffects.h"
 #pragma once
+#include "game/Experience.h"
 
 #include "network/Protocol.h"
 #include "plugins/ContentQueries.h"
@@ -55,6 +56,8 @@ struct AuthorityState {
     std::vector<PlayerView> others;
     std::vector<RoomPlayer> roster;
     InventoryModel inventory;
+    Experience experience;
+    uint64_t experiencePickups=0, experienceLevelSounds=0;
     float health = 20, saturation = 5, exhaustion = 0;
     uint8_t hunger = 20;
     uint32_t foodTimer = 0;

@@ -39,6 +39,7 @@ inline int run() {
     const auto afterOneTick = guest.player.getPosition();
     for (int i = 0; i < 10; ++i) { client.send({Lan::MessageType::Input, 0, Lan::encodePlayerInput(input)}); pump(); }
     require(guest.player.getPosition() == afterOneTick, "TCP packet count cannot advance player time");
+    guest.player.experience().addPoints(1628);
     guest.player.inventory().slot(0) = {ItemId::DIAMOND, 3, 0};
     InventoryAction cursor;
     cursor.sequence = 1;
@@ -50,7 +51,7 @@ inline int run() {
     const auto loadingProfile = loadingProfiles.load(identity);
     SaveStore loadingStore(root / "saves" / worldId);
     const auto loadingEdits = loadingStore.loadChunkOverrides(0,0);
-    require(!saveError && loadingProfile && loadingProfile->cursor.count == 3 &&
+    require(!saveError && loadingProfile && loadingProfile->experience.level()==32 && loadingProfile->cursor.count == 3 &&
             std::any_of(loadingEdits.begin(), loadingEdits.end(), [](const BlockOverride& edit) {
                 return edit.localIndex == static_cast<uint32_t>((100 - Config::WORLD_MIN_Y) * 256 + 17) && edit.block == BlockId::DIAMOND_ORE;
             }), "active host saves guest cursor and terrain even while its own dimension is loading");
@@ -65,7 +66,8 @@ inline int run() {
     require(client.join("::1", session.lanPort(), GameSession::lanCompatibility(), identity, now), "guest reconnects with persistent identity");
     for (int i = 0; i < 500 && session.lanGuestCount() == 0; ++i) pump();
     require(session.lanGuestCount() == 1 &&
-            GameSessionTestAccess::guest(session, client.peerId()).player.inventory().slot(0).count == 3,
+            GameSessionTestAccess::guest(session, client.peerId()).player.inventory().slot(0).count == 3 &&
+            GameSessionTestAccess::guest(session, client.peerId()).player.experience().level()==32,
             "reconnection restores guest inventory rather than host inventory");
     Lan::Bytes malformed = Lan::encodePlayerInput(input); malformed[2] = 0xff; malformed[3] = 0xff;
     malformed[4] = 0xff; malformed[5] = 0x7f;

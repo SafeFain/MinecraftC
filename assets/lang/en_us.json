@@ -444,7 +444,7 @@
   "gamerule.description.freeze_damage": "Allow powder-snow freezing damage; freezing is not implemented.",
   "gamerule.description.global_sound_events": "Broadcast distant global events; no global sound event system exists.",
   "gamerule.description.immediate_respawn": "Respawn automatically through the normal respawn flow without the death screen.",
-  "gamerule.description.keep_inventory": "Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.",
+  "gamerule.description.keep_inventory": "Keep inventory, armor, offhand and experience on death; otherwise drop inventory, reset experience and drop up to 100 experience points.",
   "gamerule.description.lava_source_conversion": "Allow supported flowing lava between two source neighbors to become a source.",
   "gamerule.description.limited_crafting": "Restrict crafting to unlocked recipes; recipe unlocking is not implemented.",
   "gamerule.description.locator_bar": "Show multiplayer locator bar; multiplayer tracking is not implemented.",
@@ -732,5 +732,11 @@
   "item.431": "Zoglin Spawn Egg",
   "item.432": "Strider Spawn Egg",
   "item.433": "Enderman Spawn Egg",
-  "effect.wither": "Wither"
+  "effect.wither": "Wither",
+  "message.experience_changed": "{0}: level {1}, {2} points in this level.",
+  "message.experience_target": "Select an online player; queries require exactly one player.",
+  "message.experience_points": "Points must be below the amount needed for the next level.",
+  "message.experience_query": "{0} has {1} {2}.",
+  "experience.levels": "levels",
+  "experience.points": "points"
 }

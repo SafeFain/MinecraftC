@@ -22,6 +22,7 @@ struct LanPlayerRuntime {
         player.survivalStats().set(profile.health, profile.hunger, profile.saturation,
                                   profile.exhaustion, profile.foodTickTimer);
         player.statusEffects().restore(profile.effects);
+        player.experience()=profile.experience;
         player.setPosition(profile.positions[static_cast<size_t>(profile.dimension)]);
     }
     Lan::PlayerProfile profile;

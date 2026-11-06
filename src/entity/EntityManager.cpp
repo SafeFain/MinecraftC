@@ -7,6 +7,7 @@
 #include "world/World.h"
 #include "game/SurvivalSession.h"
 #include "game/SurvivalRules.h"
+#include "game/ExperienceRewards.h"
 #include "game/SaveStore.h"
 #include "game/NetherProgression.h"
 #include "world/NetherGenerator.h"
@@ -44,6 +45,7 @@ IEntityPresentation& EntityManager::presentation() {
 }
 
 void EntityManager::clear() {
+    m_experiencePickupCooldown.clear();m_experienceMergeTimer=0;
     m_entities.clear(); m_replicaTargets.clear(); m_pvpPlayers.clear(); m_pvpEnabled = false;
     m_navigation.clear();
     m_openedVillageDoors.clear();
@@ -81,7 +83,7 @@ std::vector<EntityRecord> EntityManager::saveEntities() const {
             entity.health, entity.ageSeconds, entity.item, entity.behaviorSeed,
             static_cast<uint8_t>((entity.inGround ? 1 : 0) |
                                  (entity.playerOwned ? 2 : 0)), entity.projectileDamage
-            , entity.villager, entity.pluginState,entity.pluginStateVersion,entity.nether,entity.effects.active()
+            , entity.villager, entity.pluginState,entity.pluginStateVersion,entity.nether,entity.effects.active(),entity.experienceOrb
         });
     }
     return saved;
@@ -103,6 +105,7 @@ void EntityManager::loadEntities(
         entity.playerOwned = (source.flags & 2) != 0;
         entity.projectileDamage = source.projectileDamage;
         entity.villager = source.villager;
+        entity.experienceOrb=source.experienceOrb;
         entity.nether=source.nether;entity.effects.restore(source.effects);
         entity.pluginState=source.pluginState;entity.pluginStateVersion=source.pluginStateVersion;
         m_entities.push_back(entity);
@@ -132,7 +135,7 @@ void EntityManager::syncChunks() {
                 saved.push_back({static_cast<uint16_t>(entity.type),entity.position,entity.velocity,
                     entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
                     static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                    entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion,entity.nether,entity.effects.active()});
+                    entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion,entity.nether,entity.effects.active(),entity.experienceOrb});
             }
             m_saveStore->saveChunkEntities(key.first,key.second,saved);
         }
@@ -197,7 +200,7 @@ void EntityManager::syncChunks() {
                         entity.ageSeconds,entity.item,entity.behaviorSeed,
                         static_cast<uint8_t>((entity.inGround?1:0) |
                                              (entity.playerOwned?2:0)),
-                        entity.projectileDamage,entity.villager,entity.pluginState,entity.pluginStateVersion,entity.nether,entity.effects.active()});
+                        entity.projectileDamage,entity.villager,entity.pluginState,entity.pluginStateVersion,entity.nether,entity.effects.active(),entity.experienceOrb});
                 }
                 // Persist the merged entities first. If a crash interrupts this
                 // sequence, the absent revision marker safely retries and merges
@@ -242,7 +245,7 @@ bool EntityManager::flushChunkEntities(size_t maxFiles, bool includeAllLoaded) {
             saved.push_back({static_cast<uint16_t>(entity.type),entity.position,entity.velocity,
                 entity.health,entity.ageSeconds,entity.item,entity.behaviorSeed,
                 static_cast<uint8_t>((entity.inGround?1:0)|(entity.playerOwned?2:0)),
-                entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion,entity.nether,entity.effects.active()});
+                entity.projectileDamage, entity.villager, entity.pluginState, entity.pluginStateVersion,entity.nether,entity.effects.active(),entity.experienceOrb});
         m_saveStore->saveChunkEntities(key.first,key.second,saved);
         m_pendingEntitySaves.erase(key);
         ++savedFiles;
@@ -284,7 +287,7 @@ void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velo
 }
 
 void EntityManager::primeTnt(const glm::ivec3& position, float fuseSeconds,
-                             bool removeBlock) {
+                             bool removeBlock, bool playerIgnited) {
     if (removeBlock) {
         if (m_world.getBlock(position.x, position.y, position.z) != BlockId::TNT)
             return;
@@ -293,6 +296,7 @@ void EntityManager::primeTnt(const glm::ivec3& position, float fuseSeconds,
     Entity entity;
     entity.id = m_nextId++;
     entity.type = EntityType::PrimedTnt;
+    entity.playerOwned=playerIgnited;
     entity.position = glm::dvec3(position) + glm::dvec3(0.5, 0.0, 0.5);
     entity.velocity = {0.0f, 0.2f, 0.0f};
     entity.health = 1.0f;
@@ -333,6 +337,7 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
         case EntityType::IronGolem: entity.health = 100.0f; break;
         case EntityType::Arrow: return false;
         case EntityType::PrimedTnt: return false;
+        case EntityType::ExperienceOrb: return false;
         case EntityType::Item: return false;
     }
     if(const auto* definition=Plugins::entityContent(static_cast<uint16_t>(type))) {
@@ -415,10 +420,15 @@ TradeResult EntityManager::tradeWith(
     if (found == m_entities.end() || found->type != EntityType::Villager ||
         found->health <= 0.0f)
         return TradeResult::InvalidOffer;
+    const auto beforeLevel=found->villager.level;
     const TradeResult result = executeVillagerTrade(
         found->villager, offerIndex, inventory);
-    if (result == TradeResult::Success)
-        m_dirtyEntityChunks.insert(entityChunk(found->position));
+    if (result == TradeResult::Success) {
+        const auto position=found->position;
+        const bool leveled=found->villager.level>beforeLevel;
+        m_dirtyEntityChunks.insert(entityChunk(position));
+        spawnExperience(position,(leveled?8:3)+experienceRandom()%4);
+    }
     return result;
 }
 
@@ -617,6 +627,7 @@ float EntityManager::damageEntity(Entity& entity, float damage,
     // a lethal hit removes it and before the periodic village refresh.
     if(playerAttack && entity.type==EntityType::Villager)rebuildLogicalVillages();
     entity.health -= accepted;
+    if(playerAttack && registeredMob(entity.type))entity.playerHitRemaining=5.f;
     if(nativeNetherMob(entity.type)&&playerAttack) {entity.nether.angerTicks=600;if(entity.type==EntityType::Piglin||entity.type==EntityType::ZombifiedPiglin)angerPiglins(entity.position,entity.type==EntityType::ZombifiedPiglin);}
     if(entity.type==EntityType::Enderman)teleportEnderman(entity);
     if(entity.health<=0 && entity.type==EntityType::IronGolem)
@@ -692,6 +703,20 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
     struct ClearPlayers { std::vector<EntityPlayerView>& players; ~ClearPlayers() { players.clear(); } } clear{m_framePlayers};
     dt = std::max(0.0f, dt);
     m_aiStats = {};
+    for(auto& entry:m_experiencePickupCooldown)entry.second-=dt;
+    m_experienceMergeTimer+=dt;
+    if(m_experienceMergeTimer>=1.f) {
+        m_experienceMergeTimer=0;
+        std::map<std::tuple<int,int,int,uint32_t>,size_t> buckets;
+        for(size_t i=0;i<m_entities.size();++i) {auto& orb=m_entities[i];
+            if(orb.type!=EntityType::ExperienceOrb||orb.health<=0)continue;
+            const auto key=std::make_tuple(int(std::floor(orb.position.x)),int(std::floor(orb.position.y)),int(std::floor(orb.position.z)),orb.experienceOrb.value);
+            const auto previous=buckets.emplace(key,i);if(previous.second)continue;
+            auto& into=m_entities[previous.first->second];
+            if(uint64_t(into.experienceOrb.count)+orb.experienceOrb.count>INT32_MAX)continue;
+            into.experienceOrb.count+=orb.experienceOrb.count;into.ageSeconds=std::min(into.ageSeconds,orb.ageSeconds);orb.health=0;
+        }
+    }
     for (const auto& entity : m_entities)
         m_dirtyEntityChunks.insert(entityChunk(entity.position));
     for (auto& dead : m_deadEntityRenders) {
@@ -712,6 +737,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         float power;
         bool mobExplosion = false;
         std::optional<uint64_t> playerOwner{};
+        bool experienceCredit=false;
     };
     std::vector<PendingExplosion> pendingExplosions;
     if (m_naturalSpawningEnabled && m_world.gameRules().boolean(GameRuleId::SpawnMobs)) {
@@ -748,6 +774,8 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         if (peaceful && hostile(entity.type)) { entity.health=0.0f;entity.despawning=true; continue; }
         entity.ageSeconds += dt;
         entity.actionCooldown = std::max(0.0f, entity.actionCooldown - dt);
+        entity.playerHitRemaining=std::max(0.f,entity.playerHitRemaining-dt);
+        if(entity.type==EntityType::ExperienceOrb){updateExperienceOrb(entity,dt);continue;}
         entity.hurtFlashSeconds = std::max(0.0f, entity.hurtFlashSeconds - dt);
         if(nativeProjectile(entity.type)){updateNativeProjectile(entity,dt);continue;}
         if (entity.type == EntityType::Arrow) {
@@ -881,6 +909,8 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
     m_nativeSpawns.clear();
     for(const auto& explosion:m_nativeExplosions)pendingExplosions.push_back({explosion.position,explosion.seed,explosion.power,true,explosion.playerOwner});
     m_nativeExplosions.clear();
+    // Preserve elapsed-time overshoot when collecting, without banking idle pickup credits.
+    for(auto& entry:m_experiencePickupCooldown)entry.second=std::max(0.f,entry.second);
     tickVillageLife(dt,worldTick);
     for (const auto& arrow : m_aiArrows)
         spawnArrow(arrow.position, arrow.velocity, arrow.damage, false, arrow.shooterId);
@@ -893,14 +923,14 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         if (entity.type == EntityType::PrimedTnt && entity.health <= 0.0f &&
             m_world.gameRules().boolean(GameRuleId::TntExplodes))
             pendingExplosions.push_back(
-                {entity.position, entity.behaviorSeed, 4.0f});
+                {entity.position, entity.behaviorSeed, 4.0f, false, {}, entity.playerOwned});
     for (const auto& explosion : pendingExplosions)
-        explode(explosion.position, explosion.power, explosion.seed, explosion.mobExplosion, explosion.playerOwner);
+        explode(explosion.position, explosion.power, explosion.seed, explosion.mobExplosion, explosion.playerOwner, explosion.experienceCredit);
 
     std::vector<Entity> deadMobs;
     for (const auto& entity : m_entities)
         if (entity.health <= 0.0f && entity.type != EntityType::Item &&
-            entity.type != EntityType::PrimedTnt) {
+            entity.type != EntityType::PrimedTnt && entity.type != EntityType::ExperienceOrb) {
             m_navigation.erase(entity.id);
             deadMobs.push_back(entity);
         }
@@ -916,12 +946,16 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
     m_entities.erase(std::remove_if(m_entities.begin(), m_entities.end(),
         [](const Entity& entity) {
             return entity.health <= 0.0f ||
-                   (entity.type == EntityType::Item && entity.ageSeconds >= 300.0f) ||
+                   ((entity.type == EntityType::Item || entity.type == EntityType::ExperienceOrb) && entity.ageSeconds >= 300.0f) ||
                    (entity.type == EntityType::Arrow && entity.ageSeconds >= 60.0f) ||
                    (nativeProjectile(entity.type) && entity.ageSeconds>=30.f);
         }), m_entities.end());
     for (const auto& entity : deadMobs) {
         if(entity.despawning)continue;
+        if(m_world.gameRules().boolean(GameRuleId::MobDrops) &&
+           (entity.playerHitRemaining>0 || (entity.type==EntityType::ZombifiedPiglin&&entity.nether.angerTicks>0)))
+            spawnExperience(entity.position,mobExperience(entity.type,entity.nether.magmaSize,
+                (entity.type==EntityType::ZombieVillager)&&!entity.villager.adult(),experienceRandom()));
         if(entity.type==EntityType::MagmaCube && entity.nether.magmaSize>0 && !peaceful) {
             for(int child=0;child<4;++child) {
                 const auto position=entity.position+glm::dvec3((child%2-.5)*.9,0,(child/2-.5)*.9);
@@ -943,7 +977,7 @@ void EntityManager::strikeLightning(Player& player, const glm::ivec3& position) 
 void EntityManager::strikeLightning(const std::vector<EntityPlayerView>& players, const glm::ivec3& position) {
     const glm::dvec3 center = glm::dvec3(position) + glm::dvec3(0.5, 0.0, 0.5);
     for (auto& entity : m_entities) {
-        if (entity.type == EntityType::Item || entity.type == EntityType::Arrow ||
+        if (entity.type == EntityType::Item || entity.type == EntityType::Arrow || entity.type==EntityType::ExperienceOrb ||
             entity.health <= 0.0f) continue;
         if (glm::distance(entity.position, center) <= 3.0) {
             damageEntity(entity, 5.0f, glm::vec3(0.0f, 0.25f, 0.0f), false, center);
@@ -1261,7 +1295,7 @@ void EntityManager::updateArrow(Entity& arrow, float dt) {
 
 void EntityManager::explode(const glm::dvec3& center,
                             float power, uint32_t eventSeed, bool mobExplosion,
-                            std::optional<uint64_t> playerOwner) {
+                            std::optional<uint64_t> playerOwner, bool experienceCredit) {
     const float effectRadius = power * 2.0f;
     auto impactAt = [&](const glm::dvec3& target) {
         const glm::dvec3 delta = target - center;
@@ -1288,7 +1322,8 @@ void EntityManager::explode(const glm::dvec3& center,
             entity.velocity += direction * impact * 4.0f;
         } else {
             const float damage = std::floor((impact * impact + impact) * 7.0f + 1.0f);
-            damageEntity(entity, damage, direction * impact * 3.5f, false, center);
+            const auto applied=damageEntity(entity, damage, direction * impact * 3.5f, playerOwner.has_value(), center, playerOwner.value_or(0));
+            if(experienceCredit && applied>0 && registeredMob(entity.type))entity.playerHitRemaining=5.f;
         }
     }
     for (const auto& view : m_framePlayers) {
@@ -1351,6 +1386,8 @@ void EntityManager::explode(const glm::dvec3& center,
                         ++spawnedDrops;
                     }
                 }
+                if(block==BlockId::FURNACE && m_world.gameRules().boolean(GameRuleId::BlockDrops))
+                    if(auto* furnace=m_world.getBlockEntity(p)) {settleFurnaceExperience(glm::dvec3(p)+glm::dvec3(.5),furnace->furnaceExperience);furnace->furnaceExperience.clear();}
                 m_world.setBlock(p.x, p.y, p.z, BlockId::AIR);
             }
         }
@@ -1361,7 +1398,7 @@ void EntityManager::explode(const glm::dvec3& center,
         // silently vanishing.
         const uint32_t random = hash32(eventSeed ^ static_cast<uint32_t>(p.x) ^
                                        (static_cast<uint32_t>(p.z) << 16));
-        primeTnt(p, .5f + static_cast<float>(random % 1001) / 1000.0f, false);
+        primeTnt(p, .5f + static_cast<float>(random % 1001) / 1000.0f, false, experienceCredit||playerOwner.has_value());
     }
     m_explosionEvents.push_back(center);
 }
@@ -1376,6 +1413,7 @@ glm::vec3 EntityManager::renderSize(EntityType type) {
     if(nativeProjectile(type))return {.3f,.3f,.3f};
     if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(type)))return {e->size[0],e->size[1],e->size[2]};
     switch (type) {
+        case EntityType::ExperienceOrb: return {0.5f,0.5f,0.5f};
         case EntityType::Item: return {0.25f, 0.25f, 0.25f};
         case EntityType::Arrow: return {0.08f,0.08f,0.75f};
         case EntityType::PrimedTnt: return {0.98f,0.98f,0.98f};
@@ -1608,7 +1646,7 @@ void EntityManager::tickSpawners(bool peaceful) {
 std::vector<uint64_t> EntityManager::portalCandidates(float dt) {
     std::vector<uint64_t> ready;
     for(auto& entity:m_entities) {
-        if(entity.health<=0||(entity.type!=EntityType::Item&&!registeredMob(entity.type))||entity.riderId!=UINT64_MAX)continue;
+        if(entity.health<=0||(entity.type!=EntityType::Item&&entity.type!=EntityType::ExperienceOrb&&!registeredMob(entity.type))||entity.riderId!=UINT64_MAX)continue;
         const bool cooling=entity.portalCooldown>0;
         entity.portalCooldown=std::max(0.f,entity.portalCooldown-dt);entity.portalRetry=std::max(0.f,entity.portalRetry-dt);
         const auto p=glm::ivec3(glm::floor(entity.position));
@@ -1627,7 +1665,7 @@ bool EntityManager::transferTo(uint64_t id,EntityManager& target,const glm::dvec
     if(&target==this||!m_saveStore||!target.m_saveStore)return false;
     const auto found=std::find_if(m_entities.begin(),m_entities.end(),[&](const auto& e){return e.id==id;});
     if(found==m_entities.end()||found->health<=0||found->riderId!=UINT64_MAX||
-        (found->type!=EntityType::Item&&!registeredMob(found->type)))return false;
+        (found->type!=EntityType::Item&&found->type!=EntityType::ExperienceOrb&&!registeredMob(found->type)))return false;
     Entity moved=*found;std::optional<glm::dvec3> landing;
     const auto size=entitySize(moved);
     for(const auto offset:{glm::dvec3(0),glm::dvec3(0,0,3),glm::dvec3(0,0,-3),glm::dvec3(3,0,0),glm::dvec3(-3,0,0)}) {
@@ -1691,4 +1729,87 @@ bool EntityManager::tryDismount(Player& player,uint64_t playerId) {
             dismount(playerId);player.teleport(point);return true;
         }
     return false;
+}
+
+uint32_t EntityManager::experienceRandom() {
+    m_experienceRandom ^= m_experienceRandom<<13;
+    m_experienceRandom ^= m_experienceRandom>>17;
+    m_experienceRandom ^= m_experienceRandom<<5;
+    return m_experienceRandom;
+}
+void EntityManager::spawnExperience(const glm::dvec3& position, uint32_t points) {
+    for(const auto value:EXPERIENCE_ORB_VALUES) {
+        const uint32_t count=points/value;points%=value;if(!count)continue;
+        auto found=std::find_if(m_entities.begin(),m_entities.end(),[&](const Entity& e) {
+            return e.type==EntityType::ExperienceOrb && e.health>0 && e.experienceOrb.value==value &&
+                uint64_t(e.experienceOrb.count)+count<=INT32_MAX && glm::distance(e.position,position)<.5;
+        });
+        if(found!=m_entities.end()) {found->experienceOrb.count+=count;found->ageSeconds=0;continue;}
+        Entity orb;orb.id=m_nextId++;orb.type=EntityType::ExperienceOrb;orb.position=position;
+        orb.health=5;orb.experienceOrb={value,count};orb.behaviorSeed=experienceRandom();
+        orb.velocity={float(int(experienceRandom()%401)-200)*.01f,float(experienceRandom()%400)*.01f,
+            float(int(experienceRandom()%401)-200)*.01f};
+        m_entities.push_back(orb);m_dirtyEntityChunks.insert(entityChunk(position));
+    }
+}
+void EntityManager::awardMiningExperience(const glm::dvec3& position,BlockId block,const ItemStack& tool) {
+    spawnExperience(position,miningExperience(block,tool,experienceRandom()));
+}
+void EntityManager::settleFurnaceExperience(const glm::dvec3& position,const std::map<std::string,uint64_t>& pending) {
+    uint64_t points=0;
+    for(const auto& recipe:pending)points+=recipe.second/1000+(experienceRandom()%1000<recipe.second%1000?1:0);
+    spawnExperience(position,static_cast<uint32_t>(std::min<uint64_t>(points,INT32_MAX)));
+}
+void EntityManager::updateExperienceOrb(Entity& orb,float dt) {
+    if(orb.ageSeconds>=300 || orb.position.y<Config::WORLD_MIN_Y-16) {orb.health=0;return;}
+    const EntityPlayerView* target=nullptr;double nearest=64;
+    for(const auto& view:m_framePlayers) {
+        if(!view.canPickup || view.player->isSpectator() || view.player->survivalStats().dead())continue;
+        const double distance=glm::dot(orb.position-view.player->getPosition(),orb.position-view.player->getPosition());
+        if(distance<nearest){nearest=distance;target=&view;}
+    }
+    const int steps=std::max(1,int(std::ceil(std::min(dt,.25f)/.025f)));
+    const float step=std::min(dt,.25f)/steps;
+    for(int i=0;i<steps;++i) {
+        const auto cell=glm::ivec3(glm::floor(orb.position));
+        const auto block=m_world.getLoadedBlock(cell.x,cell.y,cell.z);
+        if(!block)return; // Never integrate through an unloaded boundary.
+        if(isLava(*block)||*block==BlockId::FIRE||*block==BlockId::SOUL_FIRE) {orb.health=0;return;}
+        orb.velocity.y-=.03f*20*20*step;
+        if(isWater(*block)) {
+            orb.velocity.y=std::min(1.2f,orb.velocity.y+.0005f*20*20*step);
+            glm::vec3 flow(0);
+            for(const glm::ivec3 direction:{glm::ivec3(-1,0,0),glm::ivec3(1,0,0),glm::ivec3(0,0,-1),glm::ivec3(0,0,1)}) {
+                const auto neighbor=m_world.getLoadedBlock(cell.x+direction.x,cell.y,cell.z+direction.z);
+                if(!neighbor)continue;
+                if(isWater(*neighbor))flow+=glm::vec3(direction)*float(int(fluidLevel(*neighbor))-int(fluidLevel(*block)));
+                else if(!isSolid(*neighbor))flow+=glm::vec3(direction)*8.f;
+            }
+            if(glm::length(flow)>.001f)orb.velocity+=glm::normalize(flow)*step*.28f;
+        }
+        if(target) {
+            const auto delta=target->player->getPosition()+glm::dvec3(0,target->player->currentHeight()*.5,0)-orb.position;
+            const double distance=glm::length(delta);
+            if(distance>.001 && distance<8)orb.velocity+=glm::vec3(delta/distance)*float((1-distance/8)*(1-distance/8))*40.f*step;
+        }
+        bool grounded=false;
+        for(int axis=0;axis<3;++axis) {
+            auto next=orb.position;next[axis]+=orb.velocity[axis]*step;
+            const auto nextCell=glm::ivec3(glm::floor(next));
+            if(!m_world.getLoadedBlock(nextCell.x,nextCell.y,nextCell.z)) {orb.velocity[axis]=0;continue;}
+            if(!collides(orb,next))orb.position=next;
+            else {if(axis==1){grounded=orb.velocity.y<0;orb.velocity.y=-orb.velocity.y*.6f;}else orb.velocity[axis]=0;}
+        }
+        orb.velocity*=std::pow(grounded?.6f:.98f,step*20);
+    }
+    if(target && m_experiencePickupCooldown[target->id]<=1e-6f) {
+        const auto delta=orb.position-target->player->getPosition();
+        // Java's expanded player AABB includes the upper body. A feet-centered
+        // sphere misses orbiting XP and makes collection depend on frame rate.
+        if(std::abs(delta.x)>1.55 || std::abs(delta.z)>1.55 ||
+           delta.y>target->player->currentHeight()+.5 || delta.y+.5<-.5)return;
+        target->player->collectExperience(orb.experienceOrb.value);
+        m_experiencePickupCooldown[target->id]+=.1f;
+        if(--orb.experienceOrb.count==0)orb.health=0;
+    }
 }

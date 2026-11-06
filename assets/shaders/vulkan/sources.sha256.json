@@ -21,7 +21,7 @@
     "ui.vert.spv": "154afac4733ccf457acbfe3e368b1697a2a0f464c3943a1ea3791a1e789cbbf5",
     "voxel_gi_inject.comp.spv": "68dbe1f0a2f210414548192cc566b3065f9d19b73fa4182fc7e00b40b7861c85",
     "voxel_gi_probe.comp.spv": "62e6d484b2cb6b56b6475675f18a33311ee4b7e543f79a88203b30d51b63d8a8",
-    "weather.frag.spv": "f982e9ed18f3a86cdab86013d7e1cbc919130a0ff84f8d7348af62805cb06d9d",
+    "weather.frag.spv": "ad2edfd44f090e8caacd218fa30c8fe95139b64ad788acdeef27f77aa107ce08",
     "weather.vert.spv": "1a7ec4739cafe47124c9f702f82bfd116484a3bc39197d8b280ff48168c0e03a",
     "wireframe.frag.spv": "d2fa2220ea907ac798d6c1bd9a1bcd6b39f97f31fd7de0fb92f7992018047daf",
     "wireframe.vert.spv": "b81b3316e84f506ff1a9174464f11dfb81428e68bacfa57ec60d82158e7c7de7"
@@ -53,7 +53,7 @@
     "voxel_gi_inject.comp": "f37425bd6785a3440ba5fc177f2435b4441669eddf334b6d21b1f99e7cfd6b72",
     "voxel_gi_probe.comp": "504e1be85ec2192d21ff5a991387119f278b94595757a58352baf0519f2aeb05",
     "voxel_gi_trace.glsl": "7031195cba5b6225d1a72de1263d1f326f806193bc1be625fcc7dd2bb829957d",
-    "weather.frag": "35101258855ac2e6d46f35d064a314679e426309638cb965f26a1a0f9f190c01",
+    "weather.frag": "fc33d306d486964512b5bc5c32780400a0402be53031d025b4d9d3017980c103",
     "weather.vert": "8b8417712707c509dfa4b64bbabced7cc573d2a6c68ec3facbf7960dfaef2212",
     "wireframe.frag": "36d617b55cf5c5be2d1b87c82895577067bef5bcbd7874545337fc921cacf32d",
     "wireframe.vert": "89d32b8ce6efb4ec447a292c17c8f4d69b0e7371ae673999ea0e12331338877a"

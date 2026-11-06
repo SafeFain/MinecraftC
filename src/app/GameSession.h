@@ -71,6 +71,7 @@ public:
         std::function<void(float, float)> playThunder;
         std::function<void(float, uint32_t)> rumble;
         std::function<void(FishingEventKind)> playFishing;
+        std::function<void(bool)> playExperience;
         std::function<void(bool,bool,bool)> playBlockInteraction;
         std::function<void()> playerDied;
         std::function<void()> playerDeathMessage;
@@ -303,6 +304,8 @@ private:
     void presentLanEvents(const Feedback& feedback);
     Lan::Client lanClient;
     bool lanPvp = false;
+    uint64_t observedExperiencePickups=0,observedExperienceLevelSounds=0;
+    bool replicaExperiencePickup=false,replicaExperienceLevel=false;
     bool replicaDeathNotified = false, replicaSleepStarted = false, replicaSleepEnded = false;
     bool hostWantsMorning = false;
     bool lanJoining = false, replicaWorldInfo = false, replicaOwnerState = false;

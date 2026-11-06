@@ -160,6 +160,14 @@ inline int run(const std::filesystem::path& assets) {
             client.inventory().count(quote.output.id) == quote.output.count &&
             host.tradeEntity(villagerId)->villager.uses[0] == 1,
             "reachable trade commits on the server and confirms inventory and stock");
+    const auto experiencePoints=[](const EntityManager& entities) {
+        uint64_t points=0;for(const auto& entity:entities.entities())if(entity.type==EntityType::ExperienceOrb)
+            points+=uint64_t(entity.experienceOrb.value)*entity.experienceOrb.count;
+        return points;
+    };
+    const auto tradeExperience=experiencePoints(host.entityState());
+    require(tradeExperience>=3&&tradeExperience<=6,"accepted LAN trade produces player experience orbs");
+
     guest.player.inventory().slot(0) = {quote.input.id, quote.input.count, 0}; guest.lastStateSent = -1;
     for (int i = 0; i < 20; ++i) pump();
     auto* changedVillager = const_cast<Entity*>(host.tradeEntity(villagerId));
@@ -178,8 +186,19 @@ inline int run(const std::filesystem::path& assets) {
     GameSessionTestAccess::entities(host).primeTnt({9,1,0}, 4, false);
     for (int i = 0; i < 40; ++i) pump();
     client.updatePlaying(.01f, nullptr, {}, false);
-    require(client.entityState().entities().size() == 4 && client.entityState().entityById(itemId)->ageSeconds > 0,
+    require(std::count_if(client.entityState().entities().begin(),client.entityState().entities().end(),
+                [](const Entity& entity){return entity.type!=EntityType::ExperienceOrb;}) == 4 &&
+            client.entityState().entities().size()==host.entityState().entities().size() &&
+            client.entityState().entityById(itemId)->ageSeconds > 0,
             "replica advances mob animation and item/arrow/TNT presentation without requiring models for transient entities");
+    require(experiencePoints(host.entityState())==tradeExperience && experiencePoints(client.entityState())==tradeExperience,
+            "rejected LAN trade adds no XP and replica preserves the accepted trade reward");
+    for(const auto& entity:host.entityState().entities())if(entity.type==EntityType::ExperienceOrb) {
+        const auto* replica=client.entityState().entityById(entity.id);
+        require(replica && replica->type==EntityType::ExperienceOrb && replica->experienceOrb.value==entity.experienceOrb.value &&
+                replica->experienceOrb.count==entity.experienceOrb.count && replica->ageSeconds>0,
+                "experience orb value/count and model-free presentation reach the replica");
+    }
     GameSessionTestAccess::entities(host).clear();
     for (int i = 0; i < 100 && !client.entityState().entities().empty(); ++i) pump();
     require(client.entityState().entities().empty(), "removed server entities leave the replica");

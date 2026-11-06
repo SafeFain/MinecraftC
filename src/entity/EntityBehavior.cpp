@@ -16,8 +16,7 @@ uint32_t aiHash(uint32_t value) {
     return value^(value>>16);
 }
 bool livingMob(const Entity& e) {
-    return e.health>0 && e.type!=EntityType::Item && e.type!=EntityType::Arrow &&
-           e.type!=EntityType::PrimedTnt && !nativeProjectile(e.type);
+    return e.health>0 && registeredMob(e.type);
 }
 }
 

@@ -12,10 +12,11 @@ Queries through inverted old names return inverted values too.
 `doFireTick false/true` sets radius 0/128; `allowFireTicksAwayFromPlayer true/false`
 sets -1/128. These are compatibility conversions; the last write wins.
 
-Each world owns its rules, shared across its registered dimensions. Save v22
+Each world owns its rules, shared across its registered dimensions. Save v23
 retains the typed canonical-ID rule table introduced in v15 and the world day/night
 duration introduced in v14. Older save metadata is inspectable, but opening requires
-v22 and the current generation version; legacy worlds are not upgraded. Unknown
+v22/v23 and the current generation version. V22 partitions upgrade on normal saving;
+v2–v21 worlds remain inspection-only. Unknown
 well-typed rule IDs round-trip in supported saves. Loading
 never changes the saved terrain generation version. Query/help/error/support messages
 remain visible with command feedback disabled. General feedback/status strings
@@ -125,7 +126,7 @@ Nether portal rules control the built-in Overworld/Nether network in singleplaye
 - **`freeze_damage`:** Allow powder-snow freezing damage; freezing is not implemented.
 - **`global_sound_events`:** Broadcast distant global events; no global sound event system exists.
 - **`immediate_respawn`:** Respawn automatically through the normal respawn flow without the death screen.
-- **`keep_inventory`:** Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.
+- **`keep_inventory`:** Keep inventory, armor, offhand and all experience on death; otherwise drop inventory normally, reset experience and drop `min(7 × level, 100)` experience points.
 - **`lava_source_conversion`:** Allow supported flowing lava between two source neighbors to become a source.
 - **`limited_crafting`:** Restrict crafting to unlocked recipes; recipe unlocking is not implemented.
 - **`locator_bar`:** Show multiplayer locator bar; multiplayer tracking is not implemented.

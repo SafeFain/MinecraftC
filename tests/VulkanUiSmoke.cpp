@@ -21,6 +21,7 @@
 #include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "ui/ExperienceHud.h"
 #include "ui/Menu.h"
 #include "ui/SettingsMenu.h"
 #include "ui/Inventory.h"
@@ -177,6 +178,30 @@ int main(int argc,char** argv) {
         }
         UIRenderer ui;Localization localization;localization.load(assets);
         ui.setLocalization(localization);ui.initialize(renderer,renderer.getBlockAtlasTexture(),assets);
+        if(argc==3&&std::string(argv[2])=="--experience") {
+            Experience xp;xp.addPoints(1420);
+            RenderEnvironment environment;const glm::vec3 camera{0,1,3};
+            const auto vp=glm::perspective(glm::radians(60.f),float(width)/height,.1f,30.f)*glm::lookAt(glm::vec3(0,1,3),glm::vec3(0,1,0),glm::vec3(0,1,0));
+            auto image=[&](bool hud,bool orbs) {
+                std::vector<ParticleRenderData> particles;
+                if(orbs)for(int i=0;i<5;++i)particles.push_back({{-.8f+i*.4f,.8f,0},float(ParticleKind::ExperienceOrb),float(i),0,.35f,0,glm::vec4(1)});
+                for(int frame=0;frame<4;++frame) {
+                    if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);
+                    renderer.beginFrame();renderer.setEnvironment(environment,camera);
+                    renderer.renderParticles(particles,vp,{1,0,0},{0,1,0},0); // Visible even with weather/ambience disabled.
+                    ui.beginUIFrame(width,height);ui.drawRect(0,0,1,1,{0,0,0,1});if(hud)renderExperienceHud(ui,xp,width);ui.endUIFrame();
+                    renderer.endFrame();
+                }
+                renderer.waitIdle();const auto result=VulkanGiSmokeProbe::readCapture(renderer);
+                if(result.size()!=size_t(width*height*4))throw std::runtime_error("Experience readback unavailable");return result;
+            };
+            const auto blank=image(false,false),hud=image(true,false),combined=image(true,true);
+            if(blank==hud||hud==combined)throw std::runtime_error("Experience HUD or orbs did not reach Vulkan pixels");
+            std::ofstream out(std::filesystem::temp_directory_path()/"minecraftc-experience.ppm",std::ios::binary);
+            out<<"P6\n"<<width<<' '<<height<<"\n255\n";for(size_t i=0;i<combined.size();i+=4)out.write(reinterpret_cast<const char*>(combined.data()+i),3);
+
+            std::cout<<"Experience HUD and orb Vulkan readback passed\n";return 0;
+        }
         // Font-file coverage alone cannot catch translations omitted from the
         // actual GPU atlas. Verify both layout and emitted glyph geometry.
         std::set<uint32_t> pluginCjk;

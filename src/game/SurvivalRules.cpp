@@ -586,27 +586,27 @@ const auto RECIPES = buildRecipes();
 const std::array<SmeltingRecipe, 23> SMELTING = {{
     {},
     {},
-    {ItemId::COBBLESTONE, {ItemId::STONE, 1, 0}, 200},
-    {ItemId::STONE_BRICKS, {ItemId::CRACKED_STONE_BRICKS, 1, 0}, 200},
-    {ItemId::SANDSTONE, {ItemId::SMOOTH_SANDSTONE, 1, 0}, 200},
-    {ItemId::CLAY_BALL, {ItemId::BRICK, 1, 0}, 200},
-    {ItemId::CACTUS, {ItemId::GREEN_DYE, 1, 0}, 200},
-    {ItemId::RAW_IRON, {ItemId::IRON_INGOT, 1, 0}, 200},
-    {ItemId::IRON_ORE, {ItemId::IRON_INGOT, 1, 0}, 200},
-    {ItemId::RAW_GOLD, {ItemId::GOLD_INGOT, 1, 0}, 200},
-    {ItemId::GOLD_ORE, {ItemId::GOLD_INGOT, 1, 0}, 200},
-    {ItemId::RAW_COD, {ItemId::COOKED_COD, 1, 0}, 200},
-    {ItemId::RAW_SALMON, {ItemId::COOKED_SALMON, 1, 0}, 200},
-    {ItemId::RAW_BEEF, {ItemId::STEAK, 1, 0}, 200},
-    {ItemId::RAW_CHICKEN, {ItemId::COOKED_CHICKEN, 1, 0}, 200},
-    {ItemId::RAW_PORKCHOP, {ItemId::COOKED_PORKCHOP, 1, 0}, 200},
-    {ItemId::MUTTON, {ItemId::COOKED_MUTTON, 1, 0}, 200},
-    {ItemId::SAND, {ItemId::GLASS, 1, 0}, 200},
-    {ItemId::RED_SAND, {ItemId::GLASS, 1, 0}, 200},
-    {ItemId::ANCIENT_DEBRIS,{ItemId::NETHERITE_SCRAP,1,0},200},
-    {ItemId::NETHERRACK,{ItemId::NETHER_BRICK,1,0},200},
-    {ItemId::NETHER_QUARTZ_ORE,{ItemId::QUARTZ,1,0},200},
-    {ItemId::NETHER_GOLD_ORE,{ItemId::GOLD_INGOT,1,0},200}
+    {ItemId::COBBLESTONE, {ItemId::STONE, 1, 0}, 200, 100},
+    {ItemId::STONE_BRICKS, {ItemId::CRACKED_STONE_BRICKS, 1, 0}, 200, 100},
+    {ItemId::SANDSTONE, {ItemId::SMOOTH_SANDSTONE, 1, 0}, 200, 100},
+    {ItemId::CLAY_BALL, {ItemId::BRICK, 1, 0}, 200, 300},
+    {ItemId::CACTUS, {ItemId::GREEN_DYE, 1, 0}, 200, 1000},
+    {ItemId::RAW_IRON, {ItemId::IRON_INGOT, 1, 0}, 200, 700},
+    {ItemId::IRON_ORE, {ItemId::IRON_INGOT, 1, 0}, 200, 700},
+    {ItemId::RAW_GOLD, {ItemId::GOLD_INGOT, 1, 0}, 200, 1000},
+    {ItemId::GOLD_ORE, {ItemId::GOLD_INGOT, 1, 0}, 200, 1000},
+    {ItemId::RAW_COD, {ItemId::COOKED_COD, 1, 0}, 200, 350},
+    {ItemId::RAW_SALMON, {ItemId::COOKED_SALMON, 1, 0}, 200, 350},
+    {ItemId::RAW_BEEF, {ItemId::STEAK, 1, 0}, 200, 350},
+    {ItemId::RAW_CHICKEN, {ItemId::COOKED_CHICKEN, 1, 0}, 200, 350},
+    {ItemId::RAW_PORKCHOP, {ItemId::COOKED_PORKCHOP, 1, 0}, 200, 350},
+    {ItemId::MUTTON, {ItemId::COOKED_MUTTON, 1, 0}, 200, 350},
+    {ItemId::SAND, {ItemId::GLASS, 1, 0}, 200, 100},
+    {ItemId::RED_SAND, {ItemId::GLASS, 1, 0}, 200, 100},
+    {ItemId::ANCIENT_DEBRIS,{ItemId::NETHERITE_SCRAP,1,0},200, 2000},
+    {ItemId::NETHERRACK,{ItemId::NETHER_BRICK,1,0},200, 100},
+    {ItemId::NETHER_QUARTZ_ORE,{ItemId::QUARTZ,1,0},200, 200},
+    {ItemId::NETHER_GOLD_ORE,{ItemId::GOLD_INGOT,1,0},200, 1000}
 }};
 
 } // namespace
@@ -847,4 +847,12 @@ float durabilityRemaining(const ItemStack& stack) {
     const uint16_t maximum = getItemProps(stack.id).maxDurability;
     if (maximum == 0) return 0.0f;
     return std::clamp(1.0f - static_cast<float>(stack.damage) / maximum, 0.0f, 1.0f);
+}
+
+std::string smeltingRecipeKey(const SmeltingRecipe& recipe) {
+    for (const auto& entry : Plugins::content().smelting)
+        if (&entry.second == &recipe) return entry.first;
+    for (size_t i=0;i<SMELTING.size();++i)
+        if (&SMELTING[i] == &recipe) return "minecraftc:smelting_"+std::to_string(i);
+    throw std::runtime_error("Unregistered smelting recipe");
 }

@@ -587,7 +587,7 @@
   "gamerule.description.freeze_damage": "詳細説明（英語）：Allow powder-snow freezing damage; freezing is not implemented.",
   "gamerule.description.global_sound_events": "詳細説明（英語）：Broadcast distant global events; no global sound event system exists.",
   "gamerule.description.immediate_respawn": "詳細説明（英語）：Respawn automatically through the normal respawn flow without the death screen.",
-  "gamerule.description.keep_inventory": "詳細説明（英語）：Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.",
+  "gamerule.description.keep_inventory": "詳細説明（英語）：Keep inventory, armor, offhand and experience on death; otherwise drop inventory, reset experience and drop up to 100 experience points.",
   "gamerule.description.lava_source_conversion": "詳細説明（英語）：Allow supported flowing lava between two source neighbors to become a source.",
   "gamerule.description.limited_crafting": "詳細説明（英語）：Restrict crafting to unlocked recipes; recipe unlocking is not implemented.",
   "gamerule.description.locator_bar": "詳細説明（英語）：Show multiplayer locator bar; multiplayer tracking is not implemented.",
@@ -875,5 +875,11 @@
   "item.431": "ゾグリンのスポーンエッグ",
   "item.432": "ストライダーのスポーンエッグ",
   "item.433": "エンダーマンのスポーンエッグ",
-  "effect.wither": "ウィザー"
+  "effect.wither": "ウィザー",
+  "message.experience_changed": "{0}：レベル {1}、現在のレベル内の経験値 {2}。",
+  "message.experience_target": "オンラインのプレイヤーを選択してください。照会は1人のみです。",
+  "message.experience_points": "経験値は次のレベルに必要な値未満にしてください。",
+  "message.experience_query": "{0} の{2}：{1}。",
+  "experience.levels": "レベル",
+  "experience.points": "経験値"
 }

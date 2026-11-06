@@ -587,7 +587,7 @@
   "gamerule.description.freeze_damage": "الشرح التفصيلي (بالإنجليزية): Allow powder-snow freezing damage; freezing is not implemented.",
   "gamerule.description.global_sound_events": "الشرح التفصيلي (بالإنجليزية): Broadcast distant global events; no global sound event system exists.",
   "gamerule.description.immediate_respawn": "الشرح التفصيلي (بالإنجليزية): Respawn automatically through the normal respawn flow without the death screen.",
-  "gamerule.description.keep_inventory": "الشرح التفصيلي (بالإنجليزية): Keep all inventory slots, armor and offhand on death; otherwise drop them normally. No XP system exists.",
+  "gamerule.description.keep_inventory": "الشرح التفصيلي (بالإنجليزية): Keep inventory, armor, offhand and experience on death; otherwise drop inventory, reset experience and drop up to 100 experience points.",
   "gamerule.description.lava_source_conversion": "الشرح التفصيلي (بالإنجليزية): Allow supported flowing lava between two source neighbors to become a source.",
   "gamerule.description.limited_crafting": "الشرح التفصيلي (بالإنجليزية): Restrict crafting to unlocked recipes; recipe unlocking is not implemented.",
   "gamerule.description.locator_bar": "الشرح التفصيلي (بالإنجليزية): Show multiplayer locator bar; multiplayer tracking is not implemented.",
@@ -875,5 +875,11 @@
   "item.431": "بيضة استدعاء زوغلين",
   "item.432": "بيضة استدعاء سترايدر",
   "item.433": "بيضة استدعاء إندرمان",
-  "effect.wither": "الذبول"
+  "effect.wither": "الذبول",
+  "message.experience_changed": "{0}: المستوى {1}، و{2} نقطة في هذا المستوى.",
+  "message.experience_target": "اختر لاعبًا متصلًا؛ يتطلب الاستعلام لاعبًا واحدًا فقط.",
+  "message.experience_points": "يجب أن تكون النقاط أقل من المطلوب للمستوى التالي.",
+  "message.experience_query": "لدى {0} عدد {1} من {2}.",
+  "experience.levels": "المستويات",
+  "experience.points": "نقاط الخبرة"
 }

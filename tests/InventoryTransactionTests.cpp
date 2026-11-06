@@ -80,5 +80,28 @@ int main() {
     packed.slot(0).count = 60;
     require(bulk.apply(packed, action(bulk, 4, InventoryOperation::QuickMove, {InventoryArea::Output, 0}), {}).accepted &&
             packed.slot(0).count == 64 && bulk.crafting()[0].empty(), "Bulk craft did not consume output atomically");
+    for(auto operation:{InventoryOperation::Click,InventoryOperation::QuickMove,InventoryOperation::SwapHotbar,
+                       InventoryOperation::SwapOffhand,InventoryOperation::Drop,InventoryOperation::Gather}) {
+        InventoryModel storage;InventoryTransaction transaction;BlockEntity xpFurnace;xpFurnace.type=BlockEntityType::Furnace;
+        xpFurnace.output={ItemId::IRON_INGOT,4,0};xpFurnace.furnaceExperience["minecraftc:smelting_7"]=2800;
+        InventoryContext xpContext;xpContext.container=&xpFurnace;xpContext.containerRevision=9;
+        auto request=action(transaction,1,operation,{InventoryArea::Container,2});request.containerRevision=9;
+        if(operation==InventoryOperation::Gather) {
+            transaction.restoreHeld({ItemId::IRON_INGOT,1,0},{});request.revision=transaction.revision();
+            request.targets={{InventoryArea::Container,2}};
+        }
+        auto outcome=transaction.apply(storage,request,xpContext);
+        require(outcome.accepted&&outcome.furnaceExperience.size()==1&&xpFurnace.furnaceExperience.empty(),"all furnace output gestures claim XP once");
+        require(!transaction.apply(storage,request,xpContext).accepted,"replayed furnace reward rejected");
+    }
+    {
+        InventoryModel storage;InventoryTransaction transaction;BlockEntity xpFurnace;xpFurnace.type=BlockEntityType::Furnace;
+        xpFurnace.output={ItemId::IRON_INGOT,4,0};xpFurnace.furnaceExperience["minecraftc:smelting_7"]=2800;
+        for(size_t i=0;i<36;++i)storage.slot(i)={ItemId::STONE,64,0};
+        InventoryContext xpContext;xpContext.container=&xpFurnace;
+        const auto outcome=transaction.apply(storage,action(transaction,1,InventoryOperation::QuickMove,{InventoryArea::Container,2}),xpContext);
+        require(outcome.furnaceExperience.empty()&&!xpFurnace.furnaceExperience.empty(),"full inventory cannot claim furnace XP");
+    }
+
     std::cout<<"Authoritative inventory transaction tests passed\n";
 }

@@ -255,6 +255,16 @@ void GameScenePresenter::render(
         if (fishingTipVisible)
             heldItemRenderer.renderFishing(session.fishingState(),renderOrigin,fishingTip,vp);
         session.particleState().buildRenderData(renderOrigin, particleRenderData);
+        // Reserve room for gameplay entities even when weather fills the particle budget.
+        size_t orbCount=0;for(const auto& entity:session.entityState().entities())if(entity.type==EntityType::ExperienceOrb&&entity.health>0)++orbCount;
+        const size_t reserved=std::min<size_t>(orbCount,ParticleSystem::MAX_PARTICLES);
+        if(particleRenderData.size()>ParticleSystem::MAX_PARTICLES-reserved)particleRenderData.resize(ParticleSystem::MAX_PARTICLES-reserved);
+        for(const auto& entity:session.entityState().entities()) {
+            if(entity.type!=EntityType::ExperienceOrb||entity.health<=0||particleRenderData.size()>=ParticleSystem::MAX_PARTICLES)continue;
+            const float size=.24f+.035f*std::log2(float(entity.experienceOrb.value)+1);
+            particleRenderData.push_back({glm::vec3(entity.position-renderOrigin)+glm::vec3(0,.15f,0),
+                float(ParticleKind::ExperienceOrb),entity.ageSeconds,0,size,0,glm::vec4(1)});
+        }
         appendBowTrajectory(session, renderOrigin);
         const auto* activeBehavior=Plugins::itemBehavior(session.playerState().activeItem().id);
         const auto activeAction=activeBehavior?Plugins::content().extensions.actions.find(activeBehavior->action):Plugins::content().extensions.actions.end();
