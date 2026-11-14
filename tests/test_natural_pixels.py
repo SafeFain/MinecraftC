@@ -49,7 +49,8 @@ class NaturalPixelsTests(unittest.TestCase):
             self.assertFalse(tg.validate_item_sprite(pixels,name))
         self.assertEqual(json.loads((PACK/'resources.sha256.json').read_text())['sha256'],inventory(PACK))
         manifest=content_package.manifest(PACK)
-        self.assertTrue(manifest['visual_only']);self.assertFalse(manifest['enabled_by_default'])
+        self.assertTrue(manifest['visual_only']);self.assertTrue(manifest['enabled_by_default'])
+        self.assertEqual(manifest['name'],'Natural Pixels')
         self.assertEqual(manifest['after'],['official_heaven'])
         self.assertNotIn('native',manifest)
         self.assertFalse(any(p.name.startswith('.') for p in PACK.rglob('*')),

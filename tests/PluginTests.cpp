@@ -84,7 +84,7 @@ int main(int argc,char** argv) try {
             require(!p.manifest.description("en_us").empty()&&!p.manifest.description("zh_cn").empty(),"official descriptions loaded from assets");
             require(p.manifest.description("en_us")!=p.manifest.description("zh_cn"),"official Chinese description supplied");
         }
-        for(const auto& p:plugins)if(p.manifest.id=="official_natural_textures")require(!p.enabled&&!p.active,"natural textures opt-in by default");else if(p.manifest.id=="bad_abi"||p.manifest.id=="bad_entry"||p.manifest.id=="extension_bad"||p.manifest.id=="render_bad"||p.manifest.id=="model_corrupt"||p.manifest.id=="model_unsupported")require(!p.active&&!p.status.empty(),"invalid native entries blocked");else require(p.active,"valid builtin/data/native plugin loaded");
+        for(const auto& p:plugins)if(p.manifest.id=="official_natural_textures")require(p.enabled&&p.active&&p.manifest.name=="Natural Pixels","natural textures enabled by default with English display name");else if(p.manifest.id=="bad_abi"||p.manifest.id=="bad_entry"||p.manifest.id=="extension_bad"||p.manifest.id=="render_bad"||p.manifest.id=="model_corrupt"||p.manifest.id=="model_unsupported")require(!p.active&&!p.status.empty(),"invalid native entries blocked");else require(p.active,"valid builtin/data/native plugin loaded");
         for(const auto* id:{"model_corrupt:prior","model_corrupt:bad","model_unsupported:prior","model_unsupported:bad"})
             rejects([&]{Plugins::resolveEntity(id);},"failed entity model did not roll back registration");
         require(Plugins::entityContent(Plugins::resolveEntity("model_valid:mob"))->asset!=nullptr,"registered entity did not retain its validated model");

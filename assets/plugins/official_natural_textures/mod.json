@@ -1,11 +1,11 @@
 {
   "id": "official_natural_textures",
-  "name": "自然像素 / Natural Pixels",
+  "name": "Natural Pixels",
   "version": "1.0.0",
   "api": 1,
   "package_format": 1,
   "visual_only": true,
-  "enabled_by_default": false,
+  "enabled_by_default": true,
   "after": [
     "official_heaven"
   ],

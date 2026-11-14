@@ -1,11 +1,12 @@
-# 自然像素 / Natural Pixels
+# Natural Pixels
 
 Natural Pixels is an original 16×16 block and item texture package inspired by
 general modern voxel pixel-art conventions. It is bundled on Linux, Windows,
-macOS, Android and iOS and is **disabled by default**.
+macOS, Android and iOS and is **enabled by default**.
 
-Open **Plugins**, enable **自然像素 / Natural Pixels**, and restart the game.
-Disable and restart to restore the default textures. Safe mode disables it.
+Open **Plugins** to change **Natural Pixels**, then restart the game.
+Disable and restart to restore the base textures. Existing saved enable/disable
+choices are preserved. Safe mode disables it.
 This visual-only choice does not change world requirements or LAN compatibility;
 each player may select their own textures. Heaven remains independently optional.
 
@@ -51,7 +52,7 @@ Tile PNGs use stored DEFLATE so zlib and zlib-ng reproduce identical resource
 bytes. Review-only large PNGs may use normal compression.
 
 The package's `mod.json` uses `package_format: 1`, `visual_only: true`,
-`enabled_by_default: false`, and `after: ["official_heaven"]`. It has no native
+`enabled_by_default: true`, and `after: ["official_heaven"]`. It has no native
 module or required Heaven dependency. PNG paths are package-relative. Existing
 plugin ordering decides overlapping replacements; later visual overrides win,
 and a failed registration rolls back the complete package.

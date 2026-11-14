@@ -33,10 +33,11 @@ ID, and remain visible in safe mode. This presentation catalog sits outside the
 gameplay package roots so editing official descriptions does not change save/LAN
 content fingerprints. The list wraps descriptions and shows at most three lines per entry.
 
-The builtin **自然像素 / Natural Pixels** (`official_natural_textures`) is
-disabled by default. Enable it on the Plugins page and restart to apply original
-16x16 natural pixel textures to all built-in blocks and items, including Nether
-and enabled Heaven content. Disable and restart to restore the default textures.
+The builtin **Natural Pixels** (`official_natural_textures`) is enabled by
+default and applies original 16x16 natural pixel textures to all built-in blocks
+and items, including Nether and enabled Heaven content. Disable it on the Plugins
+page and restart to restore the base textures. Existing saved enable/disable
+choices are preserved.
 It is visual-only: saves and LAN peers do not require matching texture choices.
 Heaven remains independently optional. Safe mode disables this pack as well.
 

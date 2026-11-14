@@ -16,7 +16,7 @@ inline int run() {
             auto config=[&](bool enabled){write(data/"plugins.json",nlohmann::json{{"official_heaven",heaven},{"official_natural_textures",enabled}}.dump());};
             config(false);
             Plugins::PluginManager baseline({assets,data});baseline.initialize();
-            require(!pack(baseline).enabled&&!pack(baseline).active,"package must be disabled by default");
+            require(!pack(baseline).enabled&&!pack(baseline).active,"explicit disable must override package default");
             const auto requirements=Plugins::content().requirements;
             const auto network=Plugins::content().networkDescription;
             const auto itemCount=Plugins::content().items.size(),blockCount=Plugins::content().blocks.size();
@@ -25,9 +25,11 @@ inline int run() {
             SaveStore save(data/"world");WorldMetadata worldMetadata;worldMetadata.displayName="Visual pack compatibility";
             worldMetadata.generationVersion=WorldGenContext::GENERATION_VERSION;worldMetadata.inventory.slot(0)={ItemId::STONE,7,0};save.saveMetadata(worldMetadata);
             const auto saved=bytes(data/"world/level.bin");
-            baseline.shutdown();config(true);
+            baseline.shutdown();
+            write(data/"plugins.json",nlohmann::json{{"official_heaven",heaven}}.dump());
             Plugins::PluginManager enabled({assets,data});enabled.initialize();
-            require(pack(enabled).active,pack(enabled).status.c_str());
+            require(pack(enabled).enabled&&pack(enabled).active,pack(enabled).status.c_str());
+            require(pack(enabled).manifest.defaultEnabled&&pack(enabled).manifest.name=="Natural Pixels","package default/name mismatch");
             require(Plugins::content().requirements==requirements&&Plugins::content().networkDescription==network,"visual pack changed save or LAN requirements");
             require(Plugins::content().items.size()==itemCount&&Plugins::content().blocks.size()==blockCount,"visual pack registered gameplay content");
             require(save.loadMetadata().inventory.slot(0).count==7&&bytes(data/"world/level.bin")==saved,"texture switch refused or rewrote an existing save");
