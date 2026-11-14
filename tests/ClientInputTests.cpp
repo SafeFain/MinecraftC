@@ -41,7 +41,9 @@ glm::vec2 UIRenderer::measureText(const std::string&,float) { return {0,0}; }
 std::string Localization::text(std::string_view key) const { return std::string(key); }
 
 int main()try {
-    require(SDL_SetHint(SDL_HINT_AUDIO_DRIVER,"dummy"),
+    // CI may already select an audio driver through the environment, which
+    // outranks normal hints even when both values are "dummy".
+    require(SDL_SetHintWithPriority(SDL_HINT_AUDIO_DRIVER,"dummy",SDL_HINT_OVERRIDE),
             "SDL dummy audio driver hint is accepted");
     {
         AudioSystem audio;

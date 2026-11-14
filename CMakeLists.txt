@@ -1415,6 +1415,9 @@ if(BUILD_TESTING)
         target_compile_options(client_input_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME client_settings_bindings_and_inventory_gestures COMMAND client_input_tests)
+    # Exercise the inherited audio-driver environment used by Linux CI.
+    set_tests_properties(client_settings_bindings_and_inventory_gestures PROPERTIES
+        ENVIRONMENT "SDL_AUDIODRIVER=dummy")
 
     add_executable(input_routing_tests
         tests/InputRoutingTests.cpp
