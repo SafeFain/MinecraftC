@@ -430,6 +430,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     VkExtent2D diagnosticCaptureExtent{};
     std::optional<VoxelGiConfig> diagnosticGiConfig;
     bool diagnosticGiReuseMask = false;
+    std::optional<double> diagnosticGiTime;
     std::optional<float> diagnosticParticleTime;
     bool sceneFinished = false;
     RendererPerformanceStats performance{};
@@ -1974,7 +1975,8 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             swapchain.voxelGiHistoryInitialized[imageIndex] &&
             postProcess.sceneId == voxelGiLastSceneId && rotationDelta < 0.45f &&
             voxelGiPreviousHistoryRevision[imageIndex] == voxelGiHistoryRevision;
-        const auto now = RuntimeClock{}.now();
+        const auto now = diagnosticGiTime ? RuntimeClock::fromSeconds(*diagnosticGiTime)
+                                          : RuntimeClock{}.now();
         const double historyAge = RuntimeClock::seconds(RuntimeClock::elapsed(
             voxelGiPreviousHistoryTime[imageIndex], now));
         uniforms.temporal = {config.strength, historyAvailable ? 1.0f : 0.0f,

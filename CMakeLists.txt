@@ -2070,6 +2070,19 @@ if(BUILD_TESTING)
         get_test_property(${test} LABELS test_labels)
         if("vulkan" IN_LIST test_labels)
             set_property(TEST ${test} APPEND PROPERTY LABELS "slow;integration")
+            # Start this device-locked serial chain immediately on fresh CI
+            # builds, overlapping it with the independent CPU tests.
+            set_property(TEST ${test} PROPERTY COST 1000)
         endif()
     endforeach()
+    # Seed fresh runners with approximate Linux timings (seconds). CTest has no
+    # duration history on a new checkout; registration order leaves long tests
+    # and the Vulkan chain queued behind short tests, extending the idle tail.
+    set_tests_properties(music_assets_determinism_format_and_loop PROPERTIES COST 303)
+    set_tests_properties(texture_generator_determinism_tiling_and_atlas PROPERTIES COST 259)
+    set_tests_properties(worldgen_determinism_boundaries_and_distribution PROPERTIES COST 218)
+    set_tests_properties(overworld_structure_placement_and_reservations PROPERTIES COST 180)
+    set_tests_properties(texture_recipes_sequences_and_workbench PROPERTIES COST 115)
+    set_tests_properties(world_orchestration_state_transitions PROPERTIES COST 110)
+    set_tests_properties(application_flow_state_transitions PROPERTIES COST 54)
 endif()

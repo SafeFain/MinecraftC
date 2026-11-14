@@ -57,7 +57,12 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     glm::vec3 lookDirection(0,-0.25f,1);
     RenderEnvironment environment = DayNightCycle{}.evaluate();
     uint64_t sceneId = 17;
+    // History expires after 0.5s. Software Vulkan frame time depends on runner
+    // load, so drive the real temporal shader with a controlled 60 Hz clock.
+    double giTime = 1.0;
     const auto frame = [&] {
+        giTime += 1.0 / 60.0;
+        VulkanDiagnostics::setGiTime(renderer, giTime);
         const auto view = glm::lookAt(camera, camera + lookDirection, glm::vec3(0,1,0));
         const auto vp = glm::perspective(glm::radians(70.0f), window.aspectRatio(), 0.1f, 512.0f)*view;
         renderer.beginFrame();
@@ -176,6 +181,12 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     for(size_t i=3;i<reuseMask.size();i+=4)if(reuseMask[i]==0)++reused;
     requireSmoke(reused>reuseMask.size()/40,"stationary GI did not reuse validated receivers");
     std::cout << "GI validated stationary reuse pixels=" << reused << '/' << reuseMask.size()/4 << '\n';
+    // A stalled presentation must still reject stale history on the GPU.
+    giTime += 0.6;
+    frame();
+    const auto expired = VulkanDiagnostics::readEffects(renderer);
+    for(size_t i=3;i<expired.size();i+=4)
+        requireSmoke(expired[i]>0,"expired GI history reused validated receivers");
     // Turn without changing source geometry: disoccluded/moving receivers must
     // reject the early exit even if the global history revision is unchanged.
     lookDirection.x=0.25f; frame();

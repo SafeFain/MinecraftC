@@ -23,6 +23,9 @@ public:
     static std::string deviceDescription(VulkanRenderer& renderer);
     static void configureDiagnostic(VulkanRenderer& renderer, const VoxelGiConfig& config);
     static void showReuseMask(VulkanRenderer& renderer, bool enabled);
+    // Supply a monotonically increasing GI presentation time for reproducible
+    // temporal readbacks on software GPUs; nullopt restores the runtime clock.
+    static void setGiTime(VulkanRenderer& renderer, std::optional<double> seconds);
     // Freeze shader particle animation for repeatable captures; nullopt restores
     // the normal presentation clock. Does not change simulated particle state.
     static void setParticleTime(VulkanRenderer& renderer, std::optional<float> seconds);

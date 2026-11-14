@@ -29,6 +29,20 @@ void VulkanDiagnostics::showReuseMask(VulkanRenderer& renderer, bool enabled) {
     renderer.m_impl->diagnosticGiReuseMask = enabled;
 }
 
+void VulkanDiagnostics::setGiTime(VulkanRenderer& renderer, std::optional<double> seconds) {
+    auto& impl = *renderer.m_impl;
+    if (seconds && (!std::isfinite(*seconds) || *seconds <= 0 ||
+        (impl.diagnosticGiTime && *seconds < *impl.diagnosticGiTime)))
+        throw std::invalid_argument("GI capture time must be positive, finite and monotonic");
+    if (seconds.has_value() != impl.diagnosticGiTime.has_value()) {
+        // Timestamps from different clock domains must never share history.
+        ++impl.voxelGiHistoryRevision;
+        std::fill(impl.voxelGiPreviousHistoryTime.begin(),
+                  impl.voxelGiPreviousHistoryTime.end(), 0);
+    }
+    impl.diagnosticGiTime = seconds;
+}
+
 void VulkanDiagnostics::setParticleTime(VulkanRenderer& renderer, std::optional<float> seconds) {
     if (seconds && !std::isfinite(*seconds))
         throw std::invalid_argument("particle capture time must be finite");
