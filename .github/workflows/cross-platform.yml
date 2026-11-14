@@ -38,7 +38,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=ON
       - name: Build
-        run: cmake --build build-ci -j2
+        run: cmake --build build-ci -j4
       - name: Test
         env:
           MINECRAFTC_TEST_XVFB: '1'
@@ -46,7 +46,7 @@ jobs:
         run: |
           export VK_DRIVER_FILES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
           test -n "$VK_DRIVER_FILES"
-          ctest --test-dir build-ci --output-on-failure
+          ctest --parallel 4 --test-dir build-ci --output-on-failure
       - name: Verify checked-in Vulkan shaders
         run: python3 tools/vulkan_shaders.py --root . --check
       - name: Install
@@ -172,9 +172,9 @@ jobs:
         # GPU readbacks execute in the provisioned Linux Lavapipe lane.
         run: cmake -S . -B build-ci -A ${{ matrix.platform }} -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
-        run: cmake --build build-ci --config Release --parallel 2
+        run: cmake --build build-ci --config Release --parallel 4
       - name: Test
-        run: ctest --test-dir build-ci -C Release --output-on-failure
+        run: ctest --parallel 4 --test-dir build-ci -C Release --output-on-failure
       - name: Verify checked-in Vulkan shaders
         run: python tools/vulkan_shaders.py --root . --check
       - name: Install and verify layout
@@ -256,9 +256,9 @@ jobs:
         # GPU readbacks execute in the provisioned Linux Lavapipe lane.
         run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
-        run: cmake --build build-ci -j2
+        run: cmake --build build-ci -j4
       - name: Test native slice
-        run: ctest --test-dir build-ci --output-on-failure
+        run: ctest --parallel 4 --test-dir build-ci --output-on-failure
       - name: Verify checked-in Vulkan shaders
         run: python3 tools/vulkan_shaders.py --root . --check
       - name: Install and verify universal executable
@@ -353,7 +353,7 @@ jobs:
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
             -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
             -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT"
-          cmake --build build-ios-simulator --config Release --parallel 2
+          cmake --build build-ios-simulator --config Release --parallel 4
       - name: Verify iOS Simulator bundle
         shell: bash
         run: |
