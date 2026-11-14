@@ -256,7 +256,7 @@ jobs:
     runs-on: macos-15
     env:
       SCCACHE_GHA_ENABLED: 'true'
-      SCCACHE_GHA_VERSION: macos-universal-build-v1
+      SCCACHE_GHA_VERSION: macos-universal-build-v2
       # v0.19 hashes preprocessing for each -arch separately.
       SCCACHE_CACHE_MULTIARCH: '1'
     steps:
@@ -292,7 +292,8 @@ jobs:
           brew install shaderc
       - name: Configure universal build
         # GPU readbacks execute in the provisioned Linux Lavapipe lane.
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DMINECRAFTC_VULKAN_TESTS=OFF
+        # SDL's architecture-specific PCH includes are incompatible with sccache.
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
         run: cmake --build build-ci -j4
       - name: Compiler cache statistics
@@ -361,7 +362,7 @@ jobs:
     runs-on: macos-15
     env:
       SCCACHE_GHA_ENABLED: 'true'
-      SCCACHE_GHA_VERSION: ios-build-v1
+      SCCACHE_GHA_VERSION: ios-build-v2
     steps:
       - uses: actions/checkout@v6
       - name: Set up compiler cache
@@ -396,8 +397,10 @@ jobs:
           brew install shaderc
       - name: Configure and build iOS Simulator
         run: |
+          # Xcode's SDL PCH artifacts cannot be reused through sccache.
           cmake -S . -B build-ios-simulator -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
             -DCMAKE_XCODE_ATTRIBUTE_C_COMPILER_LAUNCHER="$SCCACHE_PATH" \
             -DCMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_MODULES=NO \
             -DCMAKE_XCODE_ATTRIBUTE_COMPILER_INDEX_STORE_ENABLE=NO \
@@ -555,6 +558,7 @@ jobs:
           test -f build-ios-simulator/_deps/sdl3-src/CMakeLists.txt
           cmake -S . -B build-ios-device -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
             -DCMAKE_XCODE_ATTRIBUTE_C_COMPILER_LAUNCHER="$SCCACHE_PATH" \
             -DCMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_MODULES=NO \
             -DCMAKE_XCODE_ATTRIBUTE_COMPILER_INDEX_STORE_ENABLE=NO \

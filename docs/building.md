@@ -155,6 +155,14 @@ before Xcode. Index storage, compiler modules and response files are disabled in
 that CI lane as required by sccache's Xcode integration. The simulator and device
 retain separate build directories and SDK flags, and both build with four workers.
 
+Both Apple CI lanes set `CMAKE_DISABLE_PRECOMPILE_HEADERS=ON`. SDL's per-architecture
+PCH include flags fail through sccache in a universal macOS build, and the SDL PCH
+generated through Xcode's compiler launcher was rejected in the iOS simulator build in
+[run 43606487330](https://github.com/SafeFain/MinecraftC/actions/runs/43606487330).
+Ordinary translation units remain cached; simulator and device configurations use
+the same policy. Apple cache namespaces start at v2 to exclude artifacts from the
+failed PCH-enabled run. Other platforms and normal local builds retain their PCH settings.
+
 The baseline [Actions run 43598121257](https://github.com/SafeFain/MinecraftC/actions/runs/43598121257)
 spent 1195 seconds building Linux, 1162/1135 seconds building Windows x64/ARM64,
 and 1488 seconds building macOS universal. iOS simulator configuration/build took
