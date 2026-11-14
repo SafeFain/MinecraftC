@@ -25,7 +25,7 @@ def refresh(package):
 
 
 def check(target, expected, package_id="official_heaven"):
-    def verify(names, read):
+    def verify(names, read, digests=None):
         manifests = [name for name in names if name.endswith("plugins/" + package_id + "/" + MANIFEST)]
         if len(manifests) != 1:
             raise ValueError(f"expected one official package, found {len(manifests)}")
@@ -38,7 +38,8 @@ def check(target, expected, package_id="official_heaven"):
             raise ValueError("missing or unexpected official resource")
         for name, digest in expected["sha256"].items():
             path = PurePosixPath(name)
-            if path.is_absolute() or ".." in path.parts or hashlib.sha256(read(prefix + name)).hexdigest() != digest:
+            actual = digests.get(prefix + name) if digests is not None else hashlib.sha256(read(prefix + name)).hexdigest()
+            if path.is_absolute() or ".." in path.parts or actual != digest:
                 raise ValueError(f"invalid official resource: {name}")
         print(f"Official provider verified: {len(expected['sha256'])} resources in {target}")
 
@@ -52,9 +53,29 @@ def check(target, expected, package_id="official_heaven"):
                 raise ValueError("archive contains duplicate paths")
             verify(names, archive.read)
     else:
-        with tarfile.open(target) as archive:
-            files = {entry.name: entry for entry in archive.getmembers() if entry.isfile()}
-            verify(files, lambda name: archive.extractfile(files[name]).read())
+        # Seeking backwards in gzip restarts decompression. Manifest order need
+        # not match tar order (notably macOS bundles), so hash in archive order.
+        # Retain only digests and manifests, never the unpacked resource payloads.
+        files, manifests, digests = set(), {}, {}
+        marker = "plugins/" + package_id + "/"
+        with tarfile.open(target, "r|*") as archive:
+            for entry in archive:
+                if not entry.isfile():
+                    continue
+                if entry.name in files:
+                    raise ValueError("archive contains duplicate paths")
+                files.add(entry.name)
+                if marker not in entry.name:
+                    continue
+                with archive.extractfile(entry) as source:
+                    if entry.name.endswith(marker + MANIFEST):
+                        manifests[entry.name] = source.read()
+                    else:
+                        digest = hashlib.sha256()
+                        for block in iter(lambda: source.read(1024 * 1024), b""):
+                            digest.update(block)
+                        digests[entry.name] = digest.hexdigest()
+        verify(files, manifests.__getitem__, digests)
 
 
 def main():

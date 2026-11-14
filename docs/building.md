@@ -132,3 +132,34 @@ ctest --test-dir build-local -C Release --output-on-failure
 Build options and dependency pins are defined in [CMakeLists.txt](../CMakeLists.txt).
 See [development](development.md) for optional Vulkan checks and
 [release rules](releasing.md) for CI packaging.
+
+## CI compilation cache
+
+Linux, Windows, macOS and iOS CI use pinned sccache 0.19.0 with the GitHub Actions
+cache backend. Compiler inputs and options determine object reuse; each platform
+lane has its own cache namespace. Clean checkouts still configure, link, test and
+validate their packages. The first run populates the cache; later runs report hits
+and misses in the compiler cache statistics steps, before lengthy tests can let
+the cache server idle out. Android retains its Gradle build.
+
+Windows CI uses Ninja so CMake's C/C++ compiler launchers run. Before configuring
+from PowerShell, `tools/ci_msvc_environment.ps1 -Architecture x64` (or `arm64` on a
+native ARM64 host) selects MSVC and the SDK, requests English compiler output
+for header dependency tracking, and exports environment changes to later CI steps.
+Visual Studio generators remain supported for normal local builds.
+
+macOS universal compilation enables sccache's per-architecture preprocessing,
+whose cache-key correctness fixes require the pinned 0.19.0 release. iOS retains
+Xcode and uses its `C_COMPILER_LAUNCHER` build setting; the cache server starts
+before Xcode. Index storage, compiler modules and response files are disabled in
+that CI lane as required by sccache's Xcode integration. The simulator and device
+retain separate build directories and SDK flags, and both build with four workers.
+
+The baseline [Actions run 43598121257](https://github.com/SafeFain/MinecraftC/actions/runs/43598121257)
+spent 1195 seconds building Linux, 1162/1135 seconds building Windows x64/ARM64,
+and 1488 seconds building macOS universal. iOS simulator configuration/build took
+410 seconds; device configuration/build/packaging took 413 seconds. macOS resource
+verification alone took 465 seconds: compressed tar resources are now hashed in
+archive order to avoid repeated decompression when manifest order differs.
+New runner timings must be measured after CI execution, including cold/warm cache
+state; these historical durations are not promised speedups.

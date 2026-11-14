@@ -13,6 +13,36 @@ from check_official_package import check, inventory, MANIFEST
 
 
 class OfficialPackageTests(unittest.TestCase):
+    def test_tar_resource_order_and_rejections(self):
+        # Real bundles need not put manifests first or resources in JSON order.
+        data = {"a.bin": b"a" * 20000, "z.bin": b"z" * 30000}
+        manifest = {"version": 1, "sha256": {
+            name: hashlib.sha256(value).hexdigest() for name, value in data.items()}}
+        prefix = "release/MinecraftC.app/Contents/Resources/assets/plugins/official_heaven/"
+        entries = [(prefix + name, data[name]) for name in reversed(data)]
+        entries.append((prefix + MANIFEST, json.dumps(manifest).encode()))
+        cases = [(entries, None),
+                 ([(entries[0][0], b"tampered"), *entries[1:]], "invalid official resource"),
+                 (entries[1:], "missing or unexpected"),
+                 ([*entries, (prefix + "extra.bin", b"extra")], "missing or unexpected"),
+                 ([*entries, entries[0]], "duplicate paths"),
+                 ([*entries, ("other/" + prefix + MANIFEST, json.dumps(manifest).encode())],
+                  "expected one official package")]
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "bundle.tar.gz"
+            for files, error in cases:
+                with self.subTest(error=error):
+                    with tarfile.open(archive, "w:gz") as output:
+                        for name, value in files:
+                            entry = tarfile.TarInfo(name)
+                            entry.size = len(value)
+                            output.addfile(entry, io.BytesIO(value))
+                    if error:
+                        with self.assertRaisesRegex(ValueError, error):
+                            check(archive, manifest)
+                    else:
+                        check(archive, manifest)
+
     def test_source_manifest(self):
         root=Path(__file__).resolve().parents[1]/"assets"
         manifest=json.loads((root/"plugins/official_heaven"/MANIFEST).read_text())

@@ -28,17 +28,29 @@ jobs:
   linux:
     needs: version
     runs-on: ubuntu-24.04
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_GHA_VERSION: linux-build-v1
     steps:
       - uses: actions/checkout@v6
+      - name: Set up compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: v0.19.0
+      - name: Start compiler cache
+        run: sccache --start-server
       - name: Read project version
         shell: bash
         run: cmake -P tools/ci_version.cmake
       - name: Install graphics and virtual-display dependencies
         run: sudo apt-get update && sudo apt-get install -y glslc libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=ON
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=ON
       - name: Build
         run: cmake --build build-ci -j4
+      - name: Compiler cache statistics
+        if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
+        run: sccache --show-stats
       - name: Test
         env:
           MINECRAFTC_TEST_XVFB: '1'
@@ -113,6 +125,9 @@ jobs:
 
   windows:
     needs: version
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_GHA_VERSION: windows-${{ matrix.arch }}-build-v1
     name: Windows ${{ matrix.arch }}
     strategy:
       fail-fast: false
@@ -139,6 +154,12 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
+      - name: Set up compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: v0.19.0
+      - name: Start compiler cache
+        run: sccache --start-server
       - name: Read project version
         shell: pwsh
         run: cmake -P tools/ci_version.cmake
@@ -168,11 +189,17 @@ jobs:
           }
           "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$sdk/Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - name: Select native MSVC tools
+        shell: pwsh
+        run: ./tools/ci_msvc_environment.ps1 -Architecture ${{ matrix.platform }}
       - name: Configure
         # GPU readbacks execute in the provisioned Linux Lavapipe lane.
-        run: cmake -S . -B build-ci -A ${{ matrix.platform }} -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=OFF
+        run: cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
         run: cmake --build build-ci --config Release --parallel 4
+      - name: Compiler cache statistics
+        if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
+        run: sccache --show-stats
       - name: Test
         run: ctest --parallel 4 --test-dir build-ci -C Release --output-on-failure
       - name: Verify checked-in Vulkan shaders
@@ -227,8 +254,19 @@ jobs:
   macos-universal:
     needs: version
     runs-on: macos-15
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_GHA_VERSION: macos-universal-build-v1
+      # v0.19 hashes preprocessing for each -arch separately.
+      SCCACHE_CACHE_MULTIARCH: '1'
     steps:
       - uses: actions/checkout@v6
+      - name: Set up compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: v0.19.0
+      - name: Start compiler cache
+        run: sccache --start-server
       - name: Read project version
         shell: bash
         run: cmake -P tools/ci_version.cmake
@@ -254,9 +292,12 @@ jobs:
           brew install shaderc
       - name: Configure universal build
         # GPU readbacks execute in the provisioned Linux Lavapipe lane.
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DMINECRAFTC_VULKAN_TESTS=OFF
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
         run: cmake --build build-ci -j4
+      - name: Compiler cache statistics
+        if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
+        run: sccache --show-stats
       - name: Test native slice
         run: ctest --parallel 4 --test-dir build-ci --output-on-failure
       - name: Verify checked-in Vulkan shaders
@@ -318,8 +359,17 @@ jobs:
   ios-arm64:
     needs: version
     runs-on: macos-15
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_GHA_VERSION: ios-build-v1
     steps:
       - uses: actions/checkout@v6
+      - name: Set up compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: v0.19.0
+      - name: Start compiler cache
+        run: sccache --start-server
       - name: Read project version
         shell: bash
         run: cmake -P tools/ci_version.cmake
@@ -348,12 +398,19 @@ jobs:
         run: |
           cmake -S . -B build-ios-simulator -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_XCODE_ATTRIBUTE_C_COMPILER_LAUNCHER="$SCCACHE_PATH" \
+            -DCMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_MODULES=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_COMPILER_INDEX_STORE_ENABLE=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CLANG_USE_RESPONSE_FILE=NO \
             -DCMAKE_OSX_SYSROOT=iphonesimulator \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
             -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
             -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT"
           cmake --build build-ios-simulator --config Release --parallel 4
+      - name: Compiler cache statistics
+        if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
+        run: sccache --show-stats
       - name: Verify iOS Simulator bundle
         shell: bash
         run: |
@@ -498,6 +555,10 @@ jobs:
           test -f build-ios-simulator/_deps/sdl3-src/CMakeLists.txt
           cmake -S . -B build-ios-device -G Xcode \
             -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_XCODE_ATTRIBUTE_C_COMPILER_LAUNCHER="$SCCACHE_PATH" \
+            -DCMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_MODULES=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_COMPILER_INDEX_STORE_ENABLE=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CLANG_USE_RESPONSE_FILE=NO \
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
@@ -575,7 +636,7 @@ jobs:
           xcodebuild -project build-ios-device/MinecraftC.xcodeproj \
             -scheme minecraftc -configuration Release -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -archivePath "$archive" archive CODE_SIGNING_ALLOWED=NO
+            -archivePath "$archive" -parallelizeTargets -jobs 4 archive CODE_SIGNING_ALLOWED=NO
           app="$archive/Products/Applications/MinecraftC.app"
           if ! test -x "$app/MinecraftC"; then
             echo "Missing archived iOS executable: $app/MinecraftC" >&2
@@ -651,6 +712,9 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             build-ios-simulator/Release-iphonesimulator/MinecraftC.app \
             "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-simulator-arm64.zip"
+      - name: Compiler cache statistics
+        if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
+        run: sccache --show-stats
       - name: Verify official provider resources
         run: python3 tools/check_official_package.py "$RUNNER_TEMP/MinecraftC-$MINECRAFTC_VERSION-ios-arm64-unsigned.ipa"
       - name: Upload unsigned iOS device IPA
