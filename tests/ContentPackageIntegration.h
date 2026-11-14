@@ -78,8 +78,15 @@ inline int run(const std::filesystem::path& published,const std::filesystem::pat
         require(Plugins::content().extensions.nameKeys.at("split_data:zeta")=="split_data:zeta.name","localized same-key block/item binding");
         require(Plugins::content().extensions.translations.at("zh_cn").at("split_data:zeta.name")=="本地化方块","language bundle missing");
         require(Plugins::content().extensions.generators.count("split_data:flat"),"late generator for early dimension failed");
-        require(Plugins::content().extensions.renderResources.size()==3,"render dependency sort failed");
-        require(Plugins::content().extensions.renderResources.begin()->second.key=="split_data:frag","independent render resources lost stable path order");
+        const auto& resources=Plugins::content().extensions.renderResources;
+        const auto handle=[&](const char* key) {
+            const auto found=std::find_if(resources.begin(),resources.end(),[&](const auto& entry){return entry.second.key==key;});
+            require(found!=resources.end(),"render dependency resource missing");return found->first;
+        };
+        const auto vertex=handle("split_data:vert"),fragment=handle("split_data:frag"),pipeline=handle("split_data:pipeline");
+        const auto& descriptor=resources.at(pipeline).descriptor;
+        require(descriptor.vertex_shader==vertex&&descriptor.fragment_shader==fragment,
+                "pipeline did not resolve its forward shader dependencies");
         int grants=0;manager.operations.giveItem=[&](uint16_t item,uint32_t count){require(item==uint16_t(Plugins::resolveItem("package_demo:blue_brick")),"wrong granted item");grants+=int(count);return true;};
         auto ready=Plugins::event(MC_WORLD_READY);manager.dispatch(ready);
         require(manager.command("/package_demo:gift"),"native command missing");require(grants==0,"mutation was not queued");manager.flushOperations();require(grants==4,"native command did not grant");

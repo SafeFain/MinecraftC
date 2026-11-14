@@ -131,6 +131,7 @@ EntityModelRegistry::EntityModelRegistry(Loader loader)
     m_definitions.push_back({EntityType::BlazeFireball,"blaze_fireball.glb",{},{},{},false});
     m_definitions.push_back({EntityType::ThrownPotion,"thrown_potion.glb",{},{},{},false});
     m_definitions.push_back({EntityType::EnderPearl,"ender_pearl.glb",{},{},{},false});
+    m_definitions.push_back({EntityType::Slime,"slime.glb",{},{},{},false});
 }
 
 void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot, model::ModelAssetCache* cache) {

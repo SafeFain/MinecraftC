@@ -1,0 +1,19 @@
+{
+  "key": "damaged_anvil",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4255535512,
+    "images": [
+      "textures/materials/damaged_anvil-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/damaged_anvil-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/damaged_anvil-0-properties.png"
+    ]
+  }
+}

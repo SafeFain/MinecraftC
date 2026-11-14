@@ -538,6 +538,81 @@
     },
     "stone_button": {
       "texture": "stone"
+    },
+    "lapis_ore": {
+      "texture": "lapis_ore"
+    },
+    "deepslate_lapis_ore": {
+      "texture": "deepslate_lapis_ore"
+    },
+    "bookshelf": {
+      "texture": "bookshelf"
+    },
+    "iron_block": {
+      "texture": "iron_block"
+    },
+    "enchanting_table": {
+      "texture": "enchanting_table"
+    },
+    "anvil": {
+      "texture": "anvil"
+    },
+    "chipped_anvil": {
+      "texture": "chipped_anvil"
+    },
+    "damaged_anvil": {
+      "texture": "damaged_anvil"
+    },
+    "paper": {
+      "texture": "paper"
+    },
+    "book": {
+      "texture": "book"
+    },
+    "enchanted_book": {
+      "texture": "enchanted_book"
+    },
+    "lapis_lazuli": {
+      "texture": "lapis_lazuli"
+    },
+    "lever": {
+      "texture": "lever"
+    },
+    "redstone_torch": {
+      "texture": "redstone_torch"
+    },
+    "redstone_repeater": {
+      "texture": "redstone_repeater"
+    },
+    "redstone_comparator": {
+      "texture": "redstone_comparator"
+    },
+    "piston": {
+      "texture": "piston_top"
+    },
+    "sticky_piston": {
+      "texture": "sticky_piston_top"
+    },
+    "observer": {
+      "texture": "observer"
+    },
+    "redstone_lamp": {
+      "texture": "redstone_lamp"
+    },
+    "redstone_block": {
+      "texture": "redstone_block"
+    },
+    "redstone_ore": {
+      "texture": "redstone_ore"
+    },
+    "deepslate_redstone_ore": {
+      "texture": "deepslate_redstone_ore"
+    },
+    "slime_ball": {
+      "texture": "slime_ball"
+    },
+    "slime_spawn_egg": {
+      "texture": "slime_spawn_egg"
     }
   },
   "imports": [

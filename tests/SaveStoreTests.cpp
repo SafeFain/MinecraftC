@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "plugins/ContentQueries.h"
 #include "game/SaveStore.h"
@@ -39,9 +40,40 @@ std::vector<uint8_t> readBytes(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(input), {}};
 }
 
+// v25 retains the v24 metadata layout (its addition is chunk redstone state).
+// These offsets deliberately describe the frozen wire schema, not sizeof(C++).
+// A format change must review this independent legacy-fixture conversion.
+static_assert(SAVE_FORMAT_VERSION==25,"review historical fixture conversion for the new save format");
+// Remove v24 stack components and enchanting state from current metadata.
+void stripV24Metadata(std::vector<uint8_t>& bytes) {
+    size_t cursor = 24; std::vector<std::pair<size_t,size_t>> removed;
+    auto integer = [&](size_t width) { require(cursor+width <= bytes.size(),"v24 fixture bounds"); uint64_t value=0; for(size_t i=0;i<width;++i)value|=uint64_t(bytes[cursor++])<<(8*i); return value; };
+    auto string = [&] { const auto count=integer(2); require(cursor+count<=bytes.size(),"v24 string bounds"); cursor+=count; };
+    auto stack = [&] { cursor+=5; const auto start=cursor; cursor+=68; const auto count=integer(1); require(cursor+count<=bytes.size(),"v24 component name bounds"); cursor+=count; removed.emplace_back(start,cursor-start); };
+    auto count=integer(4); for(uint64_t i=0;i<count;++i){string();string();}
+    for(int palette=0;palette<2;++palette){count=integer(4);for(uint64_t i=0;i<count;++i){integer(2);string();}}
+    string(); cursor+=8+4+4+3+8+18+24+12;
+    if(integer(1))cursor+=12;
+    cursor+=13;
+    for(int i=0;i<41;++i)stack();
+    count=integer(4);
+    for(uint64_t i=0;i<count;++i) {
+        cursor+=45;stack();cursor+=52;
+        for(int food=0;food<8;++food)stack();
+        cursor+=26;string();string();cursor+=4+21;
+        const auto effects=integer(1);cursor+=effects*6+8;
+    }
+    require(bytes.size()>=4,"v24 seed tail exists");
+    constexpr size_t emptyHeldBytes = 12 * (5 + 69);
+    require(bytes.size() >= 4+emptyHeldBytes && std::all_of(bytes.end()-emptyHeldBytes,bytes.end(),[](uint8_t value) { return value == 0; }),"legacy fixture has empty v24 held slots");
+    bytes.resize(bytes.size()-4-emptyHeldBytes);
+    for(auto it=removed.rbegin();it!=removed.rend();++it)bytes.erase(bytes.begin()+it->first,bytes.begin()+it->first+it->second);
+}
+
 // Construct the frozen v21 layout by removing the appended v23 and v22
 // native fields. Read lengths from the wire, never from C++ struct padding.
 void stripV22Metadata(std::vector<uint8_t>& bytes, bool nativeFields=true) {
+    stripV24Metadata(bytes);
     bytes.resize(bytes.size()-12); // v23 player experience tail
     size_t cursor=24;std::vector<std::pair<size_t,size_t>> removed;
     auto integer=[&](size_t width) {
@@ -188,7 +220,7 @@ void transferJournalTests(const std::filesystem::path& root) {
 
 }
 
-int main() {
+int main() try {
     installHeavenFixture();
     const auto root = std::filesystem::temp_directory_path() /
         ("minecraftc-save-test-" + std::to_string(
@@ -367,6 +399,11 @@ int main() {
         {
             const auto oldDirectory=root/"compatible-v22";std::filesystem::create_directories(oldDirectory);
             auto bytes=readBytes(store.worldDirectory()/"level.bin");
+            auto v23Bytes=bytes; stripV24Metadata(v23Bytes);
+            writeLittleEndian(v23Bytes,8,23,4);writeLittleEndian(v23Bytes,12,v23Bytes.size()-24,4);writeLittleEndian(v23Bytes,16,payloadChecksum(v23Bytes,24),8);
+            {std::ofstream out(oldDirectory/"level.bin",std::ios::binary);out.write(reinterpret_cast<const char*>(v23Bytes.data()),v23Bytes.size());}
+            const auto v23=SaveStore(oldDirectory).loadMetadata();
+            require(v23.experience.level()==31&&v23.enchantmentSeed==1&&v23.inventory.slot(0).components.empty(),"v23 preserves XP and defaults new components/seed");
             stripV22Metadata(bytes,false);writeLittleEndian(bytes,8,22,4);
             writeLittleEndian(bytes,12,bytes.size()-24,4);writeLittleEndian(bytes,16,payloadChecksum(bytes,24),8);
             {std::ofstream out(oldDirectory/"level.bin",std::ios::binary);out.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());}
@@ -375,7 +412,7 @@ int main() {
             require(old.experience.level()==0&&old.experience.progress()==0&&old.inventory.count(ItemId::COAL)==source.inventory.count(ItemId::COAL),"v22 keeps inventory and defaults to zero XP");
             require(readBytes(oldDirectory/"level.bin")==before,"loading v22 never rewrites it");
             SaveStore(oldDirectory).saveMetadata(old);
-            require(readBytes(oldDirectory/"level.bin")[8]==23,"normal save upgrades v22 metadata");
+            require(readBytes(oldDirectory/"level.bin")[8]==SAVE_FORMAT_VERSION,"normal save upgrades v22 metadata");
             BlockEntity furnace;furnace.type=BlockEntityType::Furnace;furnace.furnaceExperience={{"minecraftc:smelting_7",2800}};
             SaveStore(oldDirectory).saveBlockEntities(-1,2,{{1,furnace}});
             require(SaveStore(oldDirectory).loadBlockEntities(-1,2).front().value.furnaceExperience==furnace.furnaceExperience,"pending furnace XP persists");
@@ -385,7 +422,13 @@ int main() {
             BlockEntity oldFurnace;oldFurnace.type=BlockEntityType::Furnace;oldFurnace.output={ItemId::IRON_INGOT,2,0};
             SaveStore(oldDirectory).saveBlockEntities(-2,3,{{7,oldFurnace}});
             const auto oldBlockPath=oldDirectory/"block_entities/b.-2.3.bin";
-            auto oldBlock=readBytes(oldBlockPath);oldBlock.resize(oldBlock.size()-2); // v22 has no empty XP-bank count.
+            auto oldBlock=readBytes(oldBlockPath);
+            require(oldBlock.size()==285,"Frozen vanilla furnace fixture layout");
+            for (size_t start : {size_t(206),size_t(132),size_t(58)}) {
+                require(std::all_of(oldBlock.begin()+start,oldBlock.begin()+start+69,[](uint8_t value){return value==0;}),"Frozen furnace default components");
+                oldBlock.erase(oldBlock.begin()+start,oldBlock.begin()+start+69);
+            }
+            oldBlock.resize(oldBlock.size()-2); // v22 has no empty XP-bank count.
             writeLittleEndian(oldBlock,8,22,4);writeLittleEndian(oldBlock,12,oldBlock.size()-24,4);writeLittleEndian(oldBlock,16,payloadChecksum(oldBlock,24),8);
             {std::ofstream out(oldBlockPath,std::ios::binary);out.write(reinterpret_cast<const char*>(oldBlock.data()),oldBlock.size());}
             const auto mixed=SaveStore(oldDirectory).loadBlockEntities(-2,3);
@@ -820,6 +863,39 @@ int main() {
             rejected = true;
         }
         require(rejected, "checksum rejects corrupt metadata");
+        {
+            SaveStore moving(root/"piston-recovery"),recovered(root/"piston-recovered");
+            Redstone::PistonMotion motion;motion.id=1;motion.base={-1,210,8};motion.piston.facing=Redstone::Face::East;motion.age=1;
+            motion.moves.push_back({{0,210,8},{1,210,8},static_cast<uint16_t>(BlockId::STONE)});
+            moving.savePistonMotion(motion);
+            SaveStore recoverSource(moving.worldDirectory(),SaveReadPolicy::RecoverPlugins);
+            recoverSource.recoverFileTo("pistons/1.dat",recovered.worldDirectory());
+            const auto original=moving.loadPistonMotions();
+            require(original.size()==1 && original[0].age==1,"Recovery changed the original motion journal");
+            require(recovered.loadPistonMotions().empty(),"Recovered motion journal could resurrect completed blocks");
+            const auto overrides=recovered.loadChunkOverrides(0,0);
+            const auto target=std::find_if(overrides.begin(),overrides.end(),[](const auto& value){return value.localIndex==static_cast<uint32_t>(1+8*16+Config::worldYToStorageY(210)*256);});
+            require(target!=overrides.end() && target->block==BlockId::STONE,"Staged recovery lost an in-flight block");
+        }
+        WorldMetadata enchanted;
+        enchanted.generationVersion = WorldGenContext::GENERATION_VERSION;
+        enchanted.enchantmentSeed = 0x12345678;
+        ItemStack equipment{ItemId::IRON_PICKAXE,1,27};
+        equipment.components.enchantments.set(EnchantmentId::Mending,1);
+        equipment.components.setCustomName("Restored tool");
+        equipment.components.repairCost = 7;
+        for (auto& slot : enchanted.heldItems) slot = equipment;
+        enchanted.inventory.slot(0) = equipment;
+        enchanted.inventory.offhand() = equipment;
+        SaveStore equippedStore(root / "enchanted-held-items");
+        equippedStore.saveMetadata(enchanted);
+        const auto restoredEquipment = equippedStore.loadMetadata();
+        require(restoredEquipment.enchantmentSeed == enchanted.enchantmentSeed &&
+                restoredEquipment.heldItems == enchanted.heldItems &&
+                restoredEquipment.inventory.slot(0) == equipment &&
+                restoredEquipment.inventory.offhand() == equipment,
+                "Enchantments, names, penalties, held window items and seed roundtrip");
+
     } catch (const std::exception& error) {
         std::cerr<<"Save fixture exception: "<<error.what()<<'\n';
         std::filesystem::remove_all(root);
@@ -829,4 +905,6 @@ int main() {
     std::filesystem::remove_all(root);
     std::cout << "Save store tests passed\n";
     return 0;
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

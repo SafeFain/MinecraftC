@@ -1,9 +1,11 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "world/Block.h"
 #include "world/Chunk.h"
 #include "game/Item.h"
 #include "renderer/BlockAtlasData.h"
 
+#include <nlohmann/json.hpp>
 #include <array>
 #include <cmath>
 #include <cctype>
@@ -27,6 +29,11 @@ int testAssets() {
     installHeavenFixture();
     const std::string root = MINECRAFTC_SOURCE_DIR;
     const BlockAtlasData atlas = buildBlockAtlasData(root + "/assets");
+    std::ifstream metadataInput(root + "/assets/textures/generated/atlas.json");
+    const auto metadata = nlohmann::json::parse(metadataInput);
+    const auto materialSlot = [&](const char* name) {
+        return metadata.at("textures").at(name).at("index").get<uint16_t>();
+    };
     require(atlas.texture.mipLevels.size() == 4, "atlas requires five tile-local levels");
     require(atlas.texture.width <= 1024 && atlas.tilesPerSide * 16 == atlas.texture.width &&
             atlas.sequences.size() == atlas.tilesPerSide * atlas.tilesPerSide,
@@ -148,34 +155,21 @@ int testAssets() {
             require(getFaceTexture(block, static_cast<FaceDir>(face)) == texture,
                     "new decoration maps all faces consistently");
     }
-    require(getAtlasTextureIndex(BlockTexture::TntBottom) == 143 &&
-            getAtlasTextureIndex(BlockTexture::StoneBricks) == 144 &&
-            getAtlasTextureIndex(BlockTexture::BlackWool) == 161,
-            "atlas slots beyond logical material count remain mapped to authored tiles");
-    require(getAtlasTextureIndex(BlockTexture::RootedDirt) == 162 &&
-            getAtlasTextureIndex(BlockTexture::BeachGrass) == 185 &&
-            getFaceTexture(BlockId::DRY_GRASS_BLOCK,FaceDir::BOTTOM) == BlockTexture::Dirt &&
+    for (const auto& mapping : std::array<std::pair<BlockTexture,const char*>,6>{{
+        {BlockTexture::TntBottom,"tnt_bottom"},{BlockTexture::StoneBricks,"stone_bricks"},
+        {BlockTexture::BlackWool,"black_wool"},{BlockTexture::RootedDirt,"rooted_dirt"},
+        {BlockTexture::BeachGrass,"beach_grass"},{BlockTexture::JungleLeaves,"jungle_leaves"}}})
+        require(getAtlasTextureIndex(mapping.first) == materialSlot(mapping.second),
+                "logical material did not resolve to the slot declared in metadata");
+    require(getFaceTexture(BlockId::DRY_GRASS_BLOCK,FaceDir::BOTTOM) == BlockTexture::Dirt &&
             getFaceTexture(BlockId::DRY_GRASS_BLOCK,FaceDir::FRONT) == BlockTexture::DryGrassSide &&
             getFaceTexture(BlockId::LEAF_LITTER_SOIL,FaceDir::FRONT) == BlockTexture::LeafLitterSide,
-            "natural material slots and semantic side faces resolve correctly");
-    for (uint16_t raw = 201; raw <= 224; ++raw) {
-        const auto block = static_cast<BlockId>(raw);
-        const auto texture = getFaceTexture(block,FaceDir::TOP);
-        const auto slot = getAtlasTextureIndex(texture);
-        require(slot == raw-39 && slot < atlas.tilesPerSide*atlas.tilesPerSide,
-                "all natural materials resolve their appended atlas slots");
-    }
-    for (uint16_t raw=225; raw<=252; ++raw) {
-        const auto block = static_cast<BlockId>(raw);
-        const auto slot = getFaceTextureIndex(block,FaceDir::TOP);
-        require(slot == raw-37 && slot < atlas.tilesPerSide*atlas.tilesPerSide,
-                "v16 blocks map to appended material slots");
-    }
-    for (uint16_t raw=253; raw<269; ++raw) {
-        const auto block=static_cast<BlockId>(raw);
-        require(getFaceTextureIndex(block,FaceDir::TOP)==raw-37,
-                "Heaven materials retain appended atlas mapping");
-    }
+            "semantic side and bottom faces resolve correctly");
+    for (uint16_t raw=1; raw<static_cast<uint16_t>(BlockId::COUNT); ++raw)
+        for (int face=0; face<6; ++face)
+            require(getFaceTextureIndex(static_cast<BlockId>(raw),static_cast<FaceDir>(face)) <
+                        atlas.tilesPerSide*atlas.tilesPerSide,
+                    "a registered block face refers outside the physical atlas");
     require(propertyAt(BlockTexture::StarCrystalLamp,8,8,2)>0,
             "star lamps inject authored emission into GI");
     require(propertyAt(BlockTexture::HangingCloudVine,3,8,2)==204 &&
@@ -260,10 +254,10 @@ int testAssets() {
             getFaceTexture(BlockId::GRASS, FaceDir::FRONT) ==
                 BlockTexture::GrassSide,
             "JSON block face mapping was not applied");
-    require(getAtlasTextureIndex(BlockTexture::Dirt) == 0 &&
-            getAtlasTextureIndex(BlockTexture::IronOre) == 16,
+    require(getAtlasTextureIndex(BlockTexture::Dirt) == materialSlot("dirt") &&
+            getAtlasTextureIndex(BlockTexture::IronOre) == materialSlot("iron_ore"),
             "atlas JSON indices were not applied");
-    require(getFaceTextureIndex(BlockId::IRON_ORE, FaceDir::TOP) == 16,
+    require(getFaceTextureIndex(BlockId::IRON_ORE, FaceDir::TOP) == materialSlot("iron_ore"),
             "block definition did not resolve through atlas metadata");
     const auto checkFaces = [] {
         require(getFaceTexture(BlockId::FURNACE, FaceDir::FRONT) == BlockTexture::Furnace &&
@@ -277,45 +271,15 @@ int testAssets() {
                     BlockTexture::JungleLeaves &&
                 getFaceTexture(BlockId::JUNGLE_LEAVES, FaceDir::FRONT) ==
                     BlockTexture::JungleLeaves &&
-                getAtlasTextureIndex(BlockTexture::JungleLog) == 34 &&
-                getAtlasTextureIndex(BlockTexture::JungleLeaves) == 35 &&
                 getAtlasTextureIndex(BlockTexture::JungleLeaves) !=
                     getAtlasTextureIndex(BlockTexture::JungleLog),
-                "jungle foliage must cross the atlas row boundary after bark");
+                "jungle leaves use foliage rather than bark on every face");
         require(getFaceTexture(BlockId::WHITE_BED, FaceDir::TOP) == BlockTexture::WhiteBedTop,
                 "bed must use linen top");
     };
     checkFaces();
-    const auto readText = [](const std::string& path) {
-        std::ifstream input(path);
-        return std::string(std::istreambuf_iterator<char>(input),
-                           std::istreambuf_iterator<char>());
-    };
-    const std::string chunkShader = readText(
-        root + "/assets/shaders/vulkan/chunk.frag");
-    const std::string shadowShader = readText(
-        root + "/assets/shaders/vulkan/shadow.vert");
-    require(chunkShader.find("int slotIndex=max(int(floor(tile)),0);") !=
-                std::string::npos &&
-            chunkShader.find("physicalSlot%tileCount") != std::string::npos &&
-            shadowShader.find("int tileIndex=max(int(floor(tileData.z)),0);") !=
-                std::string::npos &&
-            shadowShader.find("tileIndex%tileCount") != std::string::npos,
-            "world atlas lookup must use integer row-boundary addressing");
-    require(chunkShader.find(
-                "if(innerDistance<inner||outerDistance>=outer)discard;") !=
-                std::string::npos &&
-            chunkShader.find("bool isLod=frame.chunkOrigin.w>0.0;") !=
-                std::string::npos &&
-            chunkShader.find("float lodDistance=length(worldPosition.xz);") !=
-                std::string::npos &&
-            chunkShader.find("floor(phasedPosition/grid)") !=
-                std::string::npos &&
-            chunkShader.find("neighborInner>=inner&&neighborOuter<outer") !=
-                std::string::npos &&
-            chunkShader.find("innerCoverage") == std::string::npos &&
-            chunkShader.find("outerProgress") == std::string::npos,
-            "LOD rings must select one coherent material level per distance");
+    // Shader compilation/provenance and real Vulkan material readbacks cover
+    // GPU addressing. Formatting or renaming GLSL locals is not an asset contract.
     require(!loadTextureAssetDefinitions("missing-atlas.json", "missing-blocks.json",
                                          "missing-items.json"),
             "missing definitions did not activate compatibility fallback");
@@ -346,10 +310,12 @@ int testAssets() {
     return 0;
 }
 
-int main() {
+int main() try {
     try { return testAssets(); }
     catch (const std::exception& error) {
         std::cerr << "Asset definition tests failed: " << error.what() << '\n';
         return 1;
     }
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

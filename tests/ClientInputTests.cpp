@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "game/ClientSettings.h"
 #include "game/InventoryInteraction.h"
 #include "audio/AudioSystem.h"
@@ -39,7 +40,7 @@ void UIRenderer::renderText(const std::string&,float,float,float,const glm::vec3
 glm::vec2 UIRenderer::measureText(const std::string&,float) { return {0,0}; }
 std::string Localization::text(std::string_view key) const { return std::string(key); }
 
-int main(){
+int main()try {
     require(SDL_SetHint(SDL_HINT_AUDIO_DRIVER,"dummy"),
             "SDL dummy audio driver hint is accepted");
     {
@@ -610,4 +611,6 @@ int main(){
     require(droppedFrom.empty(),"dropping the final item clears the selected slot");
     std::filesystem::remove_all(root);
     std::cout<<"Client input and inventory interaction tests passed\n";
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

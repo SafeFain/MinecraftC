@@ -93,6 +93,7 @@ void VillagerTradeScreen::render(
                 UiTheme::WidgetState::Normal,false,0,enabled?1.0f:.55f,-1,-1,false,0,&m_feedback[i]);
         Rect input{m_rows[i].x+8*scale,m_rows[i].y+4*scale,44*scale,44*scale};
         drawStack(ui, input, quote.input, false);
+        if (!quote.secondInput.empty()) { Rect second = input; second.x += 50*scale; drawStack(ui,second,quote.secondInput,false); }
         UiTheme::sprite(ui, m_rows[i].x+118*scale,m_rows[i].y+16*scale,
                         2*scale, UiTheme::ARROW_RIGHT, UiTheme::ARROW_PALETTE,
                         enabled ? 1.0f : .35f);

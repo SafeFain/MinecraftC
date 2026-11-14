@@ -68,8 +68,8 @@ inline void modelReference(const model::ModelAsset& asset){
 inline void actionEquivalence(const std::filesystem::path& root){
     const int oldDistance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=0;
     for(uint64_t seed:{12ULL,123ULL,999ULL}){
-        GameSession session(root/"actions");GameSessionTestAccess::prepareActionScene(session,DimensionId::Heaven,seed);
-        auto& world=GameSessionTestAccess::world(session);auto& p=GameSessionTestAccess::player(session);
+        ScenarioSession session(root/"actions");SessionScenario::prepareActionScene(session,DimensionId::Heaven,seed);
+        auto& world=SessionScenario::world(session);auto& p=SessionScenario::player(session);
         Plugins::targetDispatcher()=[&](uint64_t id,const std::string& key,bool preview,MC_ActionTarget& out){return session.pluginActionTarget(id,key,preview,out);};
         Plugins::actionDispatcher()=[&](uint64_t id,const std::string& key){return session.pluginExecuteAction(id,key);};
         Plugins::useDispatcher()=[&](uint64_t id,const std::string& key){return session.pluginUseAction(id,key);};
@@ -135,13 +135,16 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     AssetStore assetStore(assets);uint64_t originalSignature=0;
     {
         Plugins::PluginManager plugins({assets,root});plugins.initialize();
-        check(Plugins::validDimension(1)&&Plugins::mutableContentState().requirements.size()==1&&Plugins::mutableContentState().requirements[0].first=="official_heaven","official provider not default enabled");
+        check(Plugins::validDimension(1)&&std::any_of(Plugins::content().requirements.begin(),Plugins::content().requirements.end(),
+            [](const auto& requirement){return requirement.first=="official_heaven";}),"official provider not default enabled");
         const auto& held=Plugins::mutableContentState().extensions.heldModels.at(static_cast<uint16_t>(ItemId::STARSTEP_SCEPTER));
-        check(held.path.parent_path()==assets/"plugins/official_heaven"&&held.asset->primitives.size()==1&&held.asset->primitives[0].vertices.size()==120&&held.asset->primitives[0].indices.size()==180,"scepter package/geometry mismatch");
+        const auto provider=std::find_if(plugins.plugins().begin(),plugins.plugins().end(),[](const auto& info){return info.manifest.id=="official_heaven";});
+        check(provider!=plugins.plugins().end()&&held.path.parent_path()==provider->root&&held.asset,"scepter model is not owned by its active provider");
         modelReference(*held.asset);originalSignature=Lan::contentSignature(Plugins::mutableContentState().networkDescription);
         check(getLightDampening(BlockId::SKYROOT_LEAVES)==1&&isLeafBlock(BlockId::SKYROOT_LEAVES)&&fuelTicks(ItemId::SKYROOT_PLANKS)==300,"official semantic rules not published");
         WorldCatalog catalog(root/"saves");const auto id=catalog.create("Enabled",12,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
-        check(SaveStore(root/"saves"/id).loadMetadata().generation.size()==3,"enabled save lost Heaven or native Nether");
+        const auto generation=SaveStore(root/"saves"/id).loadMetadata().generation;
+        check(generation.count(0)&&generation.count(1)&&generation.count(2),"enabled save lost Heaven or native Nether");
         Lan::PlayerProfile profile;profile.identity={std::string(32,'a'),std::string(32,'b'),"P0"};profile.inventory.slot(0)={ItemId::STARSTEP_SCEPTER,1,0};
         Lan::ProfileStore(root/"saves"/id/"players").save(profile);
         (void)Lan::ProfileStore::localIdentity(root);
@@ -168,27 +171,28 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         for(auto item:creativeInventoryItems())check(!Plugins::heavenItemSlot(item),"creative catalog leaked Heaven");
         for(const auto& recipe:craftingRecipes()){check(!Plugins::heavenItemSlot(recipe.output.id),"Heaven recipe output leaked");for(auto item:recipe.ingredients)check(!Plugins::heavenItemSlot(item),"Heaven recipe ingredient leaked");}
         check(!findSmeltingRecipe(ItemId::CLOUDBERRY),"Heaven smelting leaked");
-        const auto before=snapshot(root/"saves");GameSession session(root/"saves");
+        const auto before=snapshot(root/"saves");ScenarioSession session(root/"saves");
         rejects([&]{session.startWorld("enabled",false,0);},"disabled provider world opened");
         check(snapshot(root/"saves")==before,"refused session load wrote world/profile files");
         const auto listed=WorldCatalog(root/"saves").list();check(listed.size()==2&&!listed[0].compatible&&!listed[1].compatible,"incompatible worlds disappeared from inspection");
         rejects([&]{Lan::ProfileStore(root/"saves/enabled/players").load({std::string(32,'a'),std::string(32,'b'),"P0"});},"disabled profile content loaded");
         check(snapshot(root/"saves")==before,"profile refusal wrote files");
         const auto id=session.createWorld("Disabled",13,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
-        check(SaveStore(root/"saves"/id).loadMetadata().generation.size()==2,"native dimensions save cannot reload");
-        Lan::WorldInfo info;check(Lan::decodeWorldInfo(Lan::encodeWorldInfo(info)).generation.size()==2,"native dimensions LAN info failed");
-        Lan::PlayerProfile profile;profile.identity={std::string(32,'c'),std::string(32,'d'),"Off"};check(Lan::decodeProfile(Lan::encodeProfile(profile)).positions.size()==2,"native dimensions profile failed");
+        const auto nativeOnly=[](const auto& dimensions){return dimensions.count(0)&&dimensions.count(2)&&!dimensions.count(1);};
+        check(nativeOnly(SaveStore(root/"saves"/id).loadMetadata().generation),"disabled-provider save lost native dimensions or retained Heaven");
+        Lan::WorldInfo info;check(nativeOnly(Lan::decodeWorldInfo(Lan::encodeWorldInfo(info)).generation),"native dimensions LAN info failed");
+        Lan::PlayerProfile profile;profile.identity={std::string(32,'c'),std::string(32,'d'),"Off"};check(nativeOnly(Lan::decodeProfile(Lan::encodeProfile(profile)).positions),"native dimensions profile failed");
         const int distance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=2;
-        session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});session.startWorld(id,true,0);GameSessionTestAccess::prepareLanScene(session);
-        GameSession client(root/"off-client/saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+        session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});session.startWorld(id,true,0);SessionScenario::prepareLanScene(session);
+        ScenarioSession client(root/"off-client/saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
         check(session.openLanRoom(0,2,true)&&client.joinLanRoom("::1",session.lanPort(),0),"single-dimension LAN failed to start");
-        double now=0;for(int i=0;i<600&&!client.lanWorldReady();++i){now+=.005;session.pollLan(now);client.pollLan(now);GameSessionTestAccess::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));}
+        double now=0;for(int i=0;i<600&&!client.lanWorldReady();++i){now+=.005;session.pollLan(now);client.pollLan(now);SessionScenario::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));}
         check(client.lanWorldReady(),"single-dimension LAN did not become ready");
-        session.closeLanRoom();GameSessionTestAccess::disconnectReplica(client);session.abortPluginWorld();Config::RENDER_DISTANCE=distance;
+        session.closeLanRoom();SessionScenario::disconnectReplica(client);session.abortPluginWorld();Config::RENDER_DISTANCE=distance;
         plugins.shutdown();
     }
     {
-        Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::mutableContentState().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&Plugins::mutableContentState().requirements.empty(),"safe mode retained Heaven");safe.shutdown();
+        Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::validDimension(DimensionId::Overworld)&&Plugins::validDimension(DimensionId::Nether)&&!Plugins::validDimension(1)&&Plugins::mutableContentState().requirements.empty(),"safe mode retained Heaven");safe.shutdown();
     }
     write(root/"plugins.json","{}");
     {
@@ -240,7 +244,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         check(getLightDampening(plant)==0&&getBlockDrops(plant,{},0).empty()&&supportsBiomePlant(plant,ore)&&!supportsBiomePlant(plant,BlockId::STONE),"JSON explicit zero/empty/substrate mismatch");
         rejects([]{Plugins::resolveBlock("p0_bad:b");},"bad semantic registration did not roll back");
         check(!Plugins::mutableContentState().materials.count("p0_bad:m"),"bad semantic material survived rollback");
-        GameSession session(root/"native-session");GameSessionTestAccess::prepareLanScene(session);auto& p=GameSessionTestAccess::player(session);p.inventory().slot(0)={Plugins::resolveItem("capability_native:context_staff"),1,0};
+        ScenarioSession session(root/"native-session");SessionScenario::prepareLanScene(session);auto& p=SessionScenario::player(session);p.inventory().slot(0)={Plugins::resolveItem("capability_native:context_staff"),1,0};
         MC_ActionTarget target{};check(session.pluginActionTarget(0,"capability_native:context",true,target)&&target.valid&&target.position[0]==2.5,"native V2 view/services failed");
         InputState input;input.setVirtual(InputAction::Sneak,1);input.update({});p.handleMovement(input,0);check(session.pluginActionTarget(0,"capability_native:context",true,target)&&target.valid&&target.position[0]==-1.5,"native V2 did not receive sneak intent");
         input.clearVirtual();input.update({});p.handleMovement(input,0);

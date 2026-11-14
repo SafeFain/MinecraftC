@@ -3,6 +3,7 @@
 #include "game/InventoryTransaction.h"
 #include "game/InventoryInteraction.h"
 #include "game/SurvivalRules.h"
+#include "game/EnchantingRules.h"
 
 #include <algorithm>
 #include <optional>
@@ -15,7 +16,7 @@ bool armorAccepts(size_t slot,ItemId id) {
     if(id>=ItemId::NETHERITE_HELMET&&id<=ItemId::NETHERITE_BOOTS)return static_cast<uint16_t>(id)-static_cast<uint16_t>(ItemId::NETHERITE_HELMET)==slot;
     return static_cast<size_t>((static_cast<uint16_t>(id) - static_cast<uint16_t>(ItemId::LEATHER_HELMET)) % 4) == slot;
 }
-bool same(const ItemStack& a,const ItemStack& b) {return a.id==b.id && a.count==b.count && a.damage==b.damage;}
+bool same(const ItemStack& a,const ItemStack& b) {return a == b;}
 bool sameContainer(const BlockEntity& a,const BlockEntity& b) {
     for(size_t i=0;i<a.chest.size();++i) if(!same(a.chest[i],b.chest[i])) return false;
     return same(a.input,b.input) && same(a.fuel,b.fuel) && same(a.output,b.output);
@@ -27,6 +28,30 @@ struct Working {
     std::optional<BlockEntity> container;
     bool table;
     std::vector<ItemStack> drops;
+    Experience experience{};
+    uint32_t seed = 1, awardedExperience = 0;
+    bool creative = false, anvilUsed = false;
+    unsigned bookshelves = 0;
+    uint64_t randomState = 0x6a09e667f3bcc909ULL;
+    bool takeWorkstation(ItemStack& destination) {
+        if (!container || !destination.empty() || container->type == BlockEntityType::EnchantingTable) return false;
+        const auto result = container->type == BlockEntityType::Anvil ?
+            EnchantingRules::anvil(container->chest[0], container->chest[1], container->rename, creative) :
+            EnchantingRules::grindstone(container->chest[0], container->chest[1]);
+        if (result.item.empty() || result.tooExpensive || (!creative && static_cast<uint32_t>(experience.level()) < result.cost)) return false;
+        destination = result.item;
+        if (!creative) experience.addLevels(-static_cast<int32_t>(result.cost));
+        if (container->type == BlockEntityType::Anvil) {
+            container->chest[0].clear();
+            if (result.consumed) { container->chest[1].count -= static_cast<uint8_t>(result.consumed); if (!container->chest[1].count) container->chest[1].clear(); }
+            container->rename.reset(); anvilUsed = true;
+        } else {
+            container->chest[0].clear(); container->chest[1].clear();
+            if (result.experienceMinimum) { const auto half = (result.experienceMinimum + 1) / 2; awardedExperience += half + EquipmentRules::random(randomState) % half; }
+        }
+        container->output.clear();
+        return true;
+    }
     ItemStack* slot(InventorySlot reference) {
         switch(reference.area) {
         case InventoryArea::Storage: return reference.index<36?&inventory.slot(reference.index):nullptr;
@@ -35,6 +60,7 @@ struct Working {
         case InventoryArea::Crafting: return reference.index<(table?9:4)?&crafting[reference.index]:nullptr;
         case InventoryArea::Container:
             if(!container) return nullptr;
+            if (isWorkstation(container->type) && reference.index == 2) return nullptr;
             if(container->type==BlockEntityType::SmithingTable&&reference.index==3)return nullptr;
             return containerStack(*container,reference.index);
         case InventoryArea::Output: return nullptr;
@@ -53,6 +79,7 @@ struct Working {
         return result;
     }
     bool click(InventorySlot reference,bool right) {
+        if (reference.area == InventoryArea::Container && container && isWorkstation(container->type) && reference.index == 2) return takeWorkstation(cursor);
         if(reference.area==InventoryArea::Container&&container&&container->type==BlockEntityType::SmithingTable&&reference.index==3)
             return takeSmithingResult(*container,cursor);
         auto* target=slot(reference);if(!target) return false;
@@ -68,7 +95,7 @@ struct Working {
         std::array<ItemId,9> grid{};for(size_t i=0;i<grid.size();++i) grid[i]=crafting[i].id;
         const auto* recipe=findCraftingRecipe(grid,table?3:2,table?3:2);if(!recipe) return false;
         const auto output=recipe->output;
-        if(!cursor.empty() && (cursor.id!=output.id || cursor.damage!=output.damage)) return false;
+        if(!cursor.empty() && (!cursor.sameItem(output))) return false;
         if(static_cast<int>(cursor.count)+output.count>getItemProps(output.id).maxStack) return false;
         if(cursor.empty()) cursor=output;else cursor.count+=output.count;
         for(size_t i=0;i<(table?9u:4u);++i) if(!crafting[i].empty() && --crafting[i].count==0) crafting[i].clear();
@@ -88,12 +115,35 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
     if(action.revision!=m_revision || (context.container && action.containerRevision!=context.containerRevision) || action.targets.size()>64) return {};
     Working next{inventory,m_cursor,m_crafting,std::nullopt,context.craftingTable,{}};
     if(context.container) next.container=*context.container;
+    if (context.experience) next.experience = *context.experience;
+    if (context.enchantmentSeed) next.seed = *context.enchantmentSeed;
+    if (context.randomState) next.randomState = *context.randomState;
+    next.creative = context.creative; next.bookshelves = context.bookshelves;
     bool accepted=false;
     switch(action.operation) {
     case InventoryOperation::Click:
         accepted=action.slot.area==InventoryArea::Output?next.craft():next.click(action.slot,action.alternate);break;
     case InventoryOperation::Craft: accepted=next.craft();break;
+    case InventoryOperation::Enchant: {
+        if (!next.container || next.container->type != BlockEntityType::EnchantingTable || action.argument > 2 || !context.experience || !context.enchantmentSeed) break;
+        const auto offers = EnchantingRules::tableOffers(next.container->chest[0], next.bookshelves, next.seed);
+        const auto& offer = offers[action.argument];
+        if (offer.result.empty() || (!context.creative && (static_cast<uint32_t>(next.experience.level()) < offer.requiredLevel || next.container->chest[1].id != ItemId::LAPIS_LAZULI || next.container->chest[1].count < offer.cost))) break;
+        // A book stack must be split first; equipment is already unstackable.
+        if (next.container->chest[0].count != 1) break;
+        next.container->chest[0] = offer.result;
+        if (!context.creative) { next.experience.addLevels(-static_cast<int32_t>(offer.cost)); next.container->chest[1].count -= static_cast<uint8_t>(offer.cost); if (!next.container->chest[1].count) next.container->chest[1].clear(); }
+        uint64_t random = next.seed; next.seed = EquipmentRules::random(random); accepted = true; break;
+    }
+    case InventoryOperation::Rename:
+        if (next.container && next.container->type == BlockEntityType::Anvil && ItemComponents::validName(action.text)) { next.container->rename = action.text; accepted = true; }
+        break;
     case InventoryOperation::QuickMove: {
+        if (action.slot.area == InventoryArea::Container && next.container && isWorkstation(next.container->type) && action.slot.index == 2) {
+            ItemStack output;
+            if (next.takeWorkstation(output) && next.inventory.add(output) == 0) accepted = true;
+            break;
+        }
         if (action.slot.area == InventoryArea::Output) {
             for (int iteration = 0; iteration < 64; ++iteration) {
                 std::array<ItemId, 9> grid{}; for (size_t i = 0; i < 9; ++i) grid[i] = next.crafting[i].id;
@@ -136,6 +186,11 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
     }
     case InventoryOperation::SwapHotbar:
     case InventoryOperation::SwapOffhand: {
+        if (action.slot.area == InventoryArea::Container && next.container && isWorkstation(next.container->type) && action.slot.index == 2) {
+            if (action.operation == InventoryOperation::SwapHotbar && action.argument >= 9) break;
+            auto& destination = action.operation == InventoryOperation::SwapHotbar ? next.inventory.slot(action.argument) : next.inventory.offhand();
+            accepted = next.takeWorkstation(destination); break;
+        }
         if(action.slot.area==InventoryArea::Container&&next.container&&next.container->type==BlockEntityType::SmithingTable&&action.slot.index==3) {
             if(action.operation==InventoryOperation::SwapHotbar&&action.argument>=9)break;
             auto& destination=action.operation==InventoryOperation::SwapHotbar?next.inventory.slot(action.argument):next.inventory.offhand();
@@ -148,6 +203,9 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
         std::swap(*source,*target);accepted=true;break;
     }
     case InventoryOperation::Drop: {
+        if (action.slot.area == InventoryArea::Container && next.container && isWorkstation(next.container->type) && action.slot.index == 2) {
+            ItemStack output; accepted = next.takeWorkstation(output); if (accepted) next.drops.push_back(output); break;
+        }
         if(action.slot.area==InventoryArea::Container&&next.container&&next.container->type==BlockEntityType::SmithingTable&&action.slot.index==3) {
             ItemStack output;accepted=takeSmithingResult(*next.container,output);if(accepted)next.drops.push_back(output);break;
         }
@@ -181,29 +239,43 @@ InventoryOutcome InventoryTransaction::apply(InventoryModel& inventory,const Inv
         if(!context.creative || (action.slot.area!=InventoryArea::Storage && action.slot.area!=InventoryArea::Crafting)) break;
         auto* target=next.slot(action.slot);const auto item=static_cast<ItemId>(action.argument);
         if(!target || !isValidItemId(item) || item==ItemId::EMPTY) break;
-        InventoryInteraction::setCreativeItem(*target,item);accepted=true;break;
+        InventoryInteraction::setCreativeItem(*target,item);
+        if (item == ItemId::ENCHANTED_BOOK && !action.text.empty()) {
+            bool found = false;
+            for (size_t i = 0; i < ENCHANTMENTS.size(); ++i) if (ENCHANTMENTS[i].key == action.text) { target->components.storedEnchantments.set(static_cast<EnchantmentId>(i),ENCHANTMENTS[i].maximumLevel); found = true; break; }
+            if (!found) break;
+        }
+        accepted=true;break;
     }
     case InventoryOperation::CreativeClone: {
         if (!context.creative) break;
         const auto* source = next.slot(action.slot); if (!source || source->empty()) break;
-        InventoryInteraction::setCreativeItem(next.cursor, source->id); accepted = true; break;
+        next.cursor = source->withCount(getItemProps(source->id).maxStack); accepted = true; break;
     }
     case InventoryOperation::Close:
         next.returnStack(next.cursor);for(auto& stack:next.crafting) next.returnStack(stack);accepted=true;break;
     }
+    if (!context.creative) for (size_t i = 0; i < 4; ++i)
+        if (inventory.armor()[i].enchantment(EnchantmentId::BindingCurse) && inventory.armor()[i] != next.inventory.armor()[i]) return {};
     if(!accepted) return {};
+    if (context.container && context.container->type == BlockEntityType::Anvil && action.operation != InventoryOperation::Rename && context.container->chest[0] != next.container->chest[0]) next.container->rename.reset();
     std::map<std::string,uint64_t> experience;
     if(context.container && context.container->type==BlockEntityType::Furnace &&
        next.container->output.count < context.container->output.count)
         experience.swap(next.container->furnaceExperience);
     const bool changed=context.container && (!sameContainer(*context.container,*next.container) || !experience.empty());
+    if (context.experience) *context.experience = next.experience;
+    if (context.enchantmentSeed) *context.enchantmentSeed = next.seed;
+    if (context.randomState) *context.randomState = next.randomState;
     inventory=next.inventory;m_cursor=next.cursor;m_crafting=next.crafting;++m_revision;
     if(context.container) *context.container=*next.container;
-    return {true,changed,std::move(next.drops),std::move(experience)};
+    return {true,changed,std::move(next.drops),std::move(experience),next.awardedExperience,next.anvilUsed};
 }
 
 std::vector<ItemStack> InventoryTransaction::close(InventoryModel& inventory) {
     Working next{inventory,m_cursor,m_crafting,std::nullopt,false,{}};
+    for (auto& stack : recoveredWorkstationInputs) next.returnStack(stack);
+    if (workstation) { next.returnStack(workstation->chest[0]); next.returnStack(workstation->chest[1]); workstation.reset(); }
     next.returnStack(next.cursor);
     for (auto& stack:next.crafting) next.returnStack(stack);
     inventory=next.inventory;m_cursor=next.cursor;m_crafting=next.crafting;++m_revision;

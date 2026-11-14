@@ -1,3 +1,4 @@
+#include "game/EnchantingRules.h"
 #include "network/StatusEffectProtocol.h"
 #include "network/PlayerProfile.h"
 #include "core/Platform.h"
@@ -12,8 +13,8 @@
 namespace Lan {
 namespace {
 constexpr uint32_t PROFILE_MAGIC=0x504e414c;
-constexpr uint16_t PROFILE_VERSION=6;
-bool supportedProfileVersion(uint16_t version) {return version==5||version==PROFILE_VERSION;}
+constexpr uint16_t PROFILE_VERSION=7;
+bool supportedProfileVersion(uint16_t version) {return version==5||version==6||version==PROFILE_VERSION;}
 constexpr size_t MAX_PROFILE_BYTES=1024*1024;
 uint64_t checksum(const Bytes& bytes) {
     uint64_t value=14695981039346656037ull;
@@ -21,18 +22,22 @@ uint64_t checksum(const Bytes& bytes) {
     return value;
 }
 void writeStack(Writer& writer,const ItemStack& stack) {
-    if(!isValidItemId(stack.id) || stack.count>getItemProps(stack.id).maxStack || stack.damage>getItemProps(stack.id).maxDurability ||
+    if(!isValidItemId(stack.id) || !EnchantingRules::validComponents(stack) || stack.count>getItemProps(stack.id).maxStack || stack.damage>getItemProps(stack.id).maxDurability ||
         ((stack.id==ItemId::EMPTY)!=(stack.count==0))) throw ProtocolError("Invalid profile item stack");
     writer.u16(static_cast<uint16_t>(stack.id));writer.u8(stack.count);writer.u16(stack.damage);
+    writeItemComponents(stack.components, [&](uint8_t byte) { writer.u8(byte); });
 }
-ItemStack readStack(Reader& reader,const std::map<uint16_t,ItemId>& palette) {
+ItemStack readStack(Reader& reader,const std::map<uint16_t,ItemId>& palette, uint16_t version) {
     const auto raw=reader.u16();
     auto id=static_cast<ItemId>(raw);
     if(!palette.empty()) {auto found=palette.find(raw);if(found==palette.end())throw ProtocolError("Unknown profile palette item");id=found->second;}
     const auto count=reader.u8();const auto damage=reader.u16();
     if(!isValidItemId(id) || count>getItemProps(id).maxStack || damage>getItemProps(id).maxDurability || ((id==ItemId::EMPTY)!=(count==0)))
         throw ProtocolError("Invalid profile item stack");
-    return {id,count,damage};
+    ItemStack result{id,count,damage};
+    if (version >= 7) result.components = readItemComponents([&]() { return reader.u8(); });
+    if (!EnchantingRules::validComponents(result)) throw ProtocolError("Invalid item components");
+    return result;
 }
 void validatePosition(const glm::dvec3& position) {
     for(int i=0;i<3;++i) if(!std::isfinite(position[i]) || std::abs(position[i])>30000000.0) throw ProtocolError("Invalid profile position");
@@ -78,7 +83,7 @@ Bytes encodeProfile(const PlayerProfile& profile) {
     auto collect=[&](const ItemStack& stack){used.insert(stack.id);};
     for(const auto& stack:profile.inventory.storage())collect(stack);
     for(const auto& stack:profile.inventory.armor())collect(stack);
-    collect(profile.inventory.offhand());collect(profile.cursor);for(const auto& stack:profile.crafting)collect(stack);
+    collect(profile.inventory.offhand());collect(profile.cursor);for(const auto& stack:profile.crafting)collect(stack);for(const auto& stack:profile.workstationInputs)collect(stack);
     writer.u16(static_cast<uint16_t>(used.size()));
     for(auto id:used){writer.u16(static_cast<uint16_t>(id));writer.text(Plugins::itemKey(id),256);}
     writer.text(profile.identity.id,32);writer.text(profile.identity.credential,32);writer.text(profile.identity.nickname,64);
@@ -104,6 +109,8 @@ Bytes encodeProfile(const PlayerProfile& profile) {
     writeStack(writer,profile.inventory.offhand());
     writeStack(writer,profile.cursor); for (auto item : profile.crafting) writeStack(writer,item);
     writer.u32(static_cast<uint32_t>(profile.experience.level()));writer.f64(profile.experience.progress());
+    writer.u32(profile.enchantmentSeed);
+    for (const auto& stack : profile.workstationInputs) writeStack(writer,stack);
     const auto hash=checksum(writer.bytes);writer.u64(hash);return std::move(writer.bytes);
 }
 PlayerProfile decodeProfile(const Bytes& bytes) {
@@ -141,13 +148,14 @@ PlayerProfile decodeProfile(const Bytes& bytes) {
     const auto anchor=reader.u8();if(anchor>1)throw ProtocolError("Invalid anchor flag");
     if(anchor){glm::ivec3 p;for(int axis=0;axis<3;++axis)p[axis]=static_cast<int32_t>(reader.u32());validatePosition(glm::dvec3(p));if(p.y<0||p.y>=256)throw ProtocolError("Invalid anchor height");profile.netherAnchor=p;}
     profile.health=reader.f32();profile.hunger=reader.u8();profile.saturation=reader.f32();profile.exhaustion=reader.f32();profile.foodTickTimer=reader.u32();profile.effects=readStatusEffects(reader);
-    for(size_t i=0;i<36;++i) profile.inventory.slot(i)=readStack(reader,palette);
-    for(auto& stack:profile.inventory.armor()) stack=readStack(reader,palette);
-    profile.inventory.offhand()=readStack(reader,palette);
-    if (version >= 2) { profile.cursor=readStack(reader,palette); for (auto& item : profile.crafting) item=readStack(reader,palette); }
+    for(size_t i=0;i<36;++i) profile.inventory.slot(i)=readStack(reader,palette,version);
+    for(auto& stack:profile.inventory.armor()) stack=readStack(reader,palette,version);
+    profile.inventory.offhand()=readStack(reader,palette,version);
+    if (version >= 2) { profile.cursor=readStack(reader,palette,version); for (auto& item : profile.crafting) item=readStack(reader,palette,version); }
     if(version>=6) { const auto level=reader.u32();const auto progress=reader.f64();
         if(level>uint32_t(Experience::MAX_LEVEL)||!Experience::valid(static_cast<int32_t>(level),progress))throw ProtocolError("Invalid player experience");
         profile.experience.restore(static_cast<int32_t>(level),progress); }
+    if (version >= 7) { profile.enchantmentSeed = reader.u32(); for (auto& stack : profile.workstationInputs) stack = readStack(reader,palette,version); }
     reader.finish();validateStats(profile);return profile;
 }
 std::filesystem::path ProfileStore::path(const std::string& id) const {

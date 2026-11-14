@@ -282,7 +282,7 @@ void SurvivalInventoryScreen::takeCraftingOutput() {
     const ItemStack output = craftingOutput();
     if (output.empty()) return;
     if (!m_cursor.empty() &&
-        (m_cursor.id != output.id || m_cursor.damage != output.damage ||
+        (!m_cursor.sameItem(output) ||
          m_cursor.count + output.count > getItemProps(output.id).maxStack)) return;
     if (m_cursor.empty()) m_cursor = output;
     else m_cursor.count += output.count;

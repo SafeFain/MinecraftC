@@ -152,6 +152,10 @@ def _read_definition(path):
 
 from nether_materials import NETHER_MATERIALS
 NAMES += list(NETHER_MATERIALS)
+from enchanting_materials import COLORS as ENCHANTING_COLORS
+NAMES += list(ENCHANTING_COLORS)
+from redstone_materials import COLORS as REDSTONE_COLORS
+NAMES += list(REDSTONE_COLORS)
 
 DEFINITION_ROOT = Path(__file__).resolve().parents[1] / "assets/textures/definitions"
 
@@ -1287,6 +1291,20 @@ for _name, _spec in NETHER_MATERIALS.items():
     if 'ore' in _name:PALETTES[_name][-1]=(255,204,74,255) if 'gold' in _name else (239,225,201,255)
     if _spec['plant']:TRANSPARENT.add(_name)
 
+for _name, _color in ENCHANTING_COLORS.items():
+    PALETTES[_name] = _role_palette(_color, levels=7)
+    if 'lapis_ore' in _name: PALETTES[_name][3:] = [(28,46,118,255),(42,70,172,255),(61,98,205,255),(96,145,244,255)]
+    if _name == 'bookshelf': PALETTES[_name][4:] = [(72,131,143,255),(171,73,67,255),(198,174,85,255)]
+    if _name == 'enchanting_table': PALETTES[_name][5:] = [(221,192,143,255),(247,226,179,255)]
+
+for _name, _color in REDSTONE_COLORS.items():
+    PALETTES[_name] = _role_palette(_color, levels=7)
+    if _name.endswith('_ore'):
+        PALETTES[_name][3:] = [(119,31,25,255),(162,37,27,255),(207,49,31,255),(240,78,47,255)]
+    if 'dust' in _name:
+        PALETTES[_name][0] = (0,0,0,0)
+        TRANSPARENT.add(_name)
+
 for _name, _palette in PALETTES.items():
     PALETTES[_name] = [SemanticColor(color, role) for role, color in enumerate(_palette)]
 STRUCTURE_PALETTES = dict(PALETTES)
@@ -1294,6 +1312,12 @@ STRUCTURE_PALETTES = dict(PALETTES)
 
 def generate_texture(name,seed,local_seeds=None):
     local=resolve_seed(seed,name,local_seeds)
+    if name in REDSTONE_COLORS:
+        from redstone_materials import pixels
+        return pixels(sys.modules[__name__],name,local)
+    if name in ENCHANTING_COLORS:
+        from enchanting_materials import pixels
+        return pixels(sys.modules[__name__],name,local)
     if name in NETHER_MATERIALS:
         from nether_materials import pixels
         return pixels(sys.modules[__name__],name,local)
@@ -1751,6 +1775,18 @@ def generate_item_sprite(template,material,definitions):
     if template in ("potion","splash_potion","empty_bottle","smithing_template"):
         from nether_item_sprites import sprite
         return sprite(template,shades)
+    if template in ("paper", "book", "enchanted_book"):
+        image = [(0,0,0,0)]*(SIZE*SIZE)
+        for y in range(2,14):
+            for x in range(2,14):
+                border = x in (2,13) or y in (2,13)
+                if template == 'paper': color = shades[0 if border else (2 if y%3 else 1)]
+                else:
+                    color = shades[0 if border or x<5 else 2]
+                    if 5 <= x <= 11 and y in (4,6,8,10): color = shades[3]
+                    if template == 'enchanted_book' and abs(x-8)+abs(y-8)<=3: color = (174,104,237,255)
+                image[y*SIZE+x] = tuple(color)
+        return image
     outline=shades[0]
     handle=[_rgba(c) for c in definitions["handle_palette"]]
     image=[(0,0,0,0)]*(SIZE*SIZE)

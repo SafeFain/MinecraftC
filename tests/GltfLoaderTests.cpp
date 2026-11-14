@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "model/GltfLoader.h"
 
 #include <cstdlib>
@@ -159,7 +160,8 @@ void writeGlb(const std::filesystem::path& path, const std::string& json,
 }
 
 std::filesystem::path fixture(const char* name) {
-    const std::filesystem::path root = std::filesystem::temp_directory_path() / "minecraftc-gltf-loader-fixtures";
+    static TestSupport::TemporaryDirectory temporary;
+    const auto root=temporary.path();
     std::filesystem::create_directories(root);
     const std::vector<unsigned char> binary = modelBuffer(0);
     writeGlb(root / "skinned.glb", modelJson(binary.size(), false, false, false, false), binary);
@@ -206,7 +208,7 @@ std::filesystem::path fixture(const char* name) {
 #include "GltfUpgradeCases.h"
 #include "GltfBudgetCases.h"
 
-int main() {
+int main() try {
     upgradedCases();
     budgetCases();
     const auto valid = model::loadGltf(fixture("skinned.glb"));
@@ -284,9 +286,11 @@ int main() {
         if (!loaded) std::cerr << name << ": " << loaded.error << '\n';
         require(static_cast<bool>(loaded),
                 "generated runtime entity model failed loader validation");
-        require(loaded.asset->primitives.size() == 1 &&
-                    loaded.asset->bindings.size() == 1 && loaded.asset->bindings[0].skin == 0,
-                "generated entity primitive lost its GPU skin binding");
+        require(!loaded.asset->primitives.empty()&&!loaded.asset->bindings.empty(),
+                "generated entity lost geometry or GPU bindings");
+        for(const auto& binding:loaded.asset->bindings)
+            require(binding.skin>=0&&size_t(binding.skin)<loaded.asset->skins.size(),
+                "generated entity primitive lost a valid GPU skin binding");
     }
     const auto player = model::loadGltf(
         std::filesystem::path(MINECRAFTC_SOURCE_DIR) /
@@ -296,4 +300,6 @@ int main() {
             "generated player model or its required clips failed loader validation");
 
     std::cout << "gltf loader tests passed\n";
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

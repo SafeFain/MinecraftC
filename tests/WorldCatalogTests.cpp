@@ -1,8 +1,10 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "game/WorldCatalog.h"
 #include "world/WorldGenContext.h"
 
 #include <cstdlib>
+#include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <fstream>
@@ -16,6 +18,11 @@ void require(bool condition, const char* message) {
         std::cerr << "FAILED: " << message << '\n';
         std::exit(1);
     }
+}
+void finishRecovery(WorldRecovery& recovery) {
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+    while(!recovery.done()&&std::chrono::steady_clock::now()<deadline)recovery.step();
+    require(recovery.done(),"incremental world recovery did not finish before its deadline");
 }
 }
 
@@ -103,14 +110,14 @@ void runRecoveryTests(const std::filesystem::path& root) {
     {
         WorldRecovery failed(root/id,report.token);
         {std::ofstream obstacle(failed.backupPath().parent_path()/"staged/chunks");obstacle<<"not a directory";}
-        for(int n=0;!failed.done()&&n<100;++n)failed.step();
+        finishRecovery(failed);
         require(!failed.succeeded()&&!failed.error().empty()&&snapshotRecoveryFiles(root/id)==before,"staging write failure preserves original bytes");
     }
     {
         WorldRecovery changed(root/id,report.token);
         {std::ofstream mutation(root/id/"external-edit");mutation<<"changed since confirmation";}
         const auto edited=snapshotRecoveryFiles(root/id);
-        for(int n=0;!changed.done()&&n<100;++n)changed.step();
+        finishRecovery(changed);
         require(!changed.succeeded()&&snapshotRecoveryFiles(root/id)==edited,"external source change invalidates confirmation without overwriting it");
         std::filesystem::remove(root/id/"external-edit");
     }
@@ -118,18 +125,18 @@ void runRecoveryTests(const std::filesystem::path& root) {
         WorldRecovery collision(root/id,report.token);
         std::filesystem::create_directory(collision.backupPath());
         {std::ofstream sentinel(collision.backupPath()/"sentinel");sentinel<<"do not overwrite";}
-        for(int n=0;!collision.done()&&n<100;++n)collision.step();
+        finishRecovery(collision);
         require(!collision.succeeded()&&snapshotRecoveryFiles(root/id)==before&&std::filesystem::exists(collision.backupPath()/"sentinel"),"publication collision preserves the source and existing backup destination");
     }
     {
         WorldRecovery journalFailure(root/id,report.token);
         // A directory prevents opening the completion file after publication.
         std::filesystem::create_directory(journalFailure.backupPath().parent_path()/"committed");
-        for(int n=0;!journalFailure.done()&&n<100;++n)journalFailure.step();
+        finishRecovery(journalFailure);
         require(!journalFailure.succeeded()&&snapshotRecoveryFiles(root/id)==before&&!std::filesystem::exists(journalFailure.backupPath()),"completion-journal write failure rolls the published copy back to the original");
     }
     WorldRecovery recovery(root/id,report.token);
-    for(int n=0;!recovery.done()&&n<100;++n)recovery.step();
+    finishRecovery(recovery);
     if(!recovery.succeeded())std::cerr<<recovery.error()<<std::endl;
     require(recovery.succeeded(),"recovery publishes strictly loadable world");
     require(snapshotRecoveryFiles(recovery.backupPath())==before,"backup retains every original file byte");
@@ -162,13 +169,13 @@ void runRecoveryTests(const std::filesystem::path& root) {
     {
         WorldRecovery failed(noBackupWorld,noBackupReport.token,false);
         std::filesystem::create_directory(failed.backupPath().parent_path()/"committed");
-        for(int n=0;!failed.done()&&n<100;++n)failed.step();
+        finishRecovery(failed);
         require(!failed.succeeded()&&snapshotRecoveryFiles(noBackupWorld)==before,"no-backup publication failure restores the complete original");
     }
     WorldRecovery noBackup(noBackupWorld,noBackupReport.token,false);
     const auto temporaryOriginal=noBackup.backupPath();
     const auto noBackupTransaction=temporaryOriginal.parent_path();
-    for(int n=0;!noBackup.done()&&n<100;++n)noBackup.step();
+    finishRecovery(noBackup);
     require(noBackup.succeeded()&&noBackup.backupPath().empty()&&!noBackup.backupCleanupPending()&&!std::filesystem::exists(temporaryOriginal),"no-backup recovery deletes original only after successful publication");
     require(std::filesystem::exists(noBackupTransaction/"committed")&&std::filesystem::exists(noBackupTransaction/"discard-original"),"no-backup publication journals cleanup intent");
     SaveStore noBackupStore(noBackupWorld);
@@ -213,20 +220,22 @@ void runRecoveryTests(const std::filesystem::path& root) {
     SaveStore fallback(root/fallbackId);const auto fallbackReport=fallback.inspectCompatibility();
     require(fallbackReport.recoverable()&&std::any_of(fallbackReport.issues.begin(),fallbackReport.issues.end(),[](const auto& issue){return issue.kind=="extra_dimension";}),"newly installed dimension is reported");
     WorldRecovery fallbackRecovery(root/fallbackId,fallbackReport.token);
-    for(int n=0;!fallbackRecovery.done()&&n<100;++n)fallbackRecovery.step();
+    finishRecovery(fallbackRecovery);
     require(fallbackRecovery.succeeded()&&fallback.loadMetadata().generation.at(0).generator.empty()&&fallback.loadMetadata().generation.at(1)==heaven.generation,"missing generator falls back and added dimension gets current defaults");
     Plugins::mutableContentState()=*originalState;
 }
 }
 
-int main() {
+int main(int argc,char** argv) try {
     installHeavenFixture();
-    const auto root = std::filesystem::temp_directory_path() /
-        ("minecraftc-catalog-test-" + std::to_string(
-            static_cast<unsigned long long>(std::rand())));
-    std::filesystem::remove_all(root);
+    TestSupport::TemporaryDirectory temporary;
+    const auto root=temporary.path();
     try {
-        runRecoveryTests(root/"recovery-fixtures");
+        if(argc==2&&std::string(argv[1])=="--recovery") {
+            runRecoveryTests(root/"recovery-fixtures");
+            std::cout<<"World recovery transaction tests passed\n";return 0;
+        }
+        require(argc==1,"unknown world catalog test arguments");
         WorldCatalog catalog(root);
         const std::string first = catalog.create(
             "My Survival World", 42, GameMode::Survival, Difficulty::Normal, true);
@@ -244,18 +253,19 @@ int main() {
         legacy.displayName = "Surface v14";
         legacy.generationVersion = 14;
         SaveStore(root / "surface-v14").saveMetadata(legacy);
-        legacy.generationVersion = 15;
-        SaveStore(root / "surface-v15").saveMetadata(legacy);
+        legacy.generationVersion = 21;
+        SaveStore(root / "surface-v21").saveMetadata(legacy);
+        legacy.generationVersion=22;SaveStore(root / "surface-v22").saveMetadata(legacy);
         legacy.generationVersion = WorldGenContext::GENERATION_VERSION + 1;
         SaveStore(root / "future-world").saveMetadata(legacy);
         require(first == "my-survival-world", "display name creates a safe id");
         require(second == "my-survival-world-2", "duplicate names get unique ids");
         const auto worlds = catalog.list();
-        require(worlds.size() == 7, "catalog lists compatible and legacy saves");
+        require(worlds.size() == 8, "catalog lists compatible and legacy saves");
         bool sawLegacy = false;
         bool sawSuperflat = false;
         for (const auto& world : worlds) {
-            if (world.id == "surface-v14" || world.id == "surface-v15" || world.id == "future-world") {
+            if (world.id == "surface-v14" || world.id == "surface-v21" || world.id == "surface-v22" || world.id == "future-world") {
                 require(!world.compatible,
                         "catalog rejects every previous or future generation version");
                 continue;
@@ -312,4 +322,6 @@ int main() {
     std::filesystem::remove_all(root);
     std::cout << "World catalog tests passed\n";
     return 0;
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

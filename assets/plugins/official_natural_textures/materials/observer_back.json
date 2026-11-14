@@ -1,0 +1,19 @@
+{
+  "key": "observer_back",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4203737432,
+    "images": [
+      "textures/materials/observer_back-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/observer_back-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/observer_back-0-properties.png"
+    ]
+  }
+}

@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "entity/EntityModelRegistry.h"
 #include "plugins/ContentMutation.h"
 #include "plugins/ContentQueries.h"
@@ -12,7 +13,7 @@ void require(bool value, const char* message) {
 }
 }
 
-int main() {
+int main() try {
     std::map<std::string, int> loads;
     EntityModelRegistry registry([&](const std::filesystem::path& path) {
         ++loads[path.filename().string()];
@@ -38,17 +39,22 @@ int main() {
             "placeholder was not visibly magenta");
     require(registry.playAction(EntityType::Zombie, 42, "attack"),
             "fallback graph did not preserve hostile attack timing");
-    const auto fallbackEvents = registry.advance(EntityType::Zombie, 42, 0.31f);
+    const auto impact=[&](EntityType type) {
+        const auto* action=registry.definition(type).graph->findAction("attack");
+        require(action&&!action->events.empty(),"fallback attack has no event definition");
+        return action->events.front().time+.001f;
+    };
+    const auto fallbackEvents = registry.advance(EntityType::Zombie, 42, impact(EntityType::Zombie));
     require(fallbackEvents.size() == 1 && fallbackEvents[0].name == "melee",
             "fallback hostile attack did not emit its gameplay event");
     require(registry.playAction(EntityType::Skeleton, 43, "attack"),
             "fallback graph did not preserve skeleton attack timing");
-    const auto skeletonEvents = registry.advance(EntityType::Skeleton, 43, 0.46f);
+    const auto skeletonEvents = registry.advance(EntityType::Skeleton, 43, impact(EntityType::Skeleton));
     require(skeletonEvents.size() == 1 && skeletonEvents[0].name == "shoot",
             "fallback skeleton attack did not emit shoot");
     require(registry.playAction(EntityType::Blastling, 44, "attack"),
             "fallback graph did not preserve blastling attack timing");
-    const auto blastlingEvents = registry.advance(EntityType::Blastling, 44, 1.01f);
+    const auto blastlingEvents = registry.advance(EntityType::Blastling, 44, impact(EntityType::Blastling));
     require(blastlingEvents.size() == 1 && blastlingEvents[0].name == "explode",
             "fallback blastling attack did not emit explode");
     registry.beginFrame();registry.endFrame();
@@ -79,4 +85,6 @@ int main() {
     Plugins::mutableContentState().extensions.entities.erase(base.id);
     Plugins::mutableContentState().extensions.entities.erase(inherited.id);
     std::cout << "entity model registry tests passed\n";
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

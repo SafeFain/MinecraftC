@@ -1,0 +1,19 @@
+{
+  "key": "chipped_anvil",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 4042274615,
+    "images": [
+      "textures/materials/chipped_anvil-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/chipped_anvil-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/chipped_anvil-0-properties.png"
+    ]
+  }
+}

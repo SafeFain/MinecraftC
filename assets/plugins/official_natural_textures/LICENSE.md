@@ -8,3 +8,7 @@ The visual brief references only general modern voxel pixel-art conventions.
 Reproduce with `python3 tools/natural_pixels.py` from the repository root.
 Shared drawing, semantic maps and PNG encoding helpers: MinecraftC tools/texture_generator.py
 and tools/texture_recipes.py. Code follows the repository GPL-3.0-only license.
+
+Equipment progression materials and icons extend the original Natural Pixels palettes and procedural semantic masks. These original project assets contain no Mojang artwork.
+
+Redstone components, sixteen signal palettes, ore variants and slime icons extend the original authored Natural Pixels masks and palettes; generated entirely from original project code under CC0-1.0.

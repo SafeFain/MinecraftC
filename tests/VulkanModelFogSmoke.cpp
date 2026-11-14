@@ -1,7 +1,9 @@
+#include "TestSupport.h"
 #include "plugins/official_heaven/HeavenEnvironment.h"
 #include "core/Window.h"
 #include "model/ModelRenderer.h"
-#include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
+#include "renderer/backend/vulkan/VulkanDiagnostics.h"
+#include "renderer/backend/vulkan/VulkanRenderer.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
@@ -54,9 +56,9 @@ glm::vec3 capture(VulkanRenderer& renderer, model::ModelHandle model,
         renderer.endFrame();
     };
     for (int i = 0; i < 3; ++i) frame();
-    VulkanGiSmokeProbe::requestCapture(renderer);
+    VulkanDiagnostics::requestCapture(renderer);
     frame();
-    const auto rgba = VulkanGiSmokeProbe::readCapture(renderer);
+    const auto rgba = VulkanDiagnostics::readCapture(renderer);
     if (rgba.size() != width * height * 4)
         throw std::runtime_error("unexpected capture dimensions");
     if(!controlCapture.empty()) {
@@ -77,7 +79,7 @@ glm::vec3 capture(VulkanRenderer& renderer, model::ModelHandle model,
 
 #include "VulkanModelBatchCases.h"
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
     if (argc != 2 && argc != 3) return 2;
     try {
         if(argc==3) controlCapture=std::string(argv[2])+".control.ppm";
@@ -135,4 +137,6 @@ int main(int argc, char** argv) {
         std::cerr << error.what() << '\n';
         return 1;
     }
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

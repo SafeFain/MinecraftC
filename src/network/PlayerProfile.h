@@ -31,6 +31,8 @@ struct PlayerProfile {
     std::vector<ActiveStatusEffect> effects;
     InventoryModel inventory;
     Experience experience;
+    uint32_t enchantmentSeed = 1;
+    std::array<ItemStack,2> workstationInputs{};
     ItemStack cursor;
     std::array<ItemStack, 9> crafting{};
 };

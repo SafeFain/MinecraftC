@@ -35,6 +35,11 @@ void GameUiController::updateTextInputArea(
     // Calculate with the current surface size before opening the keyboard,
     // including the first frame and frames following a rotation or GUI change.
     guiScale = effectiveGuiScale(window.width(), window.height(), settings.guiScale);
+    if (containerOpen && containerScreen.wantsTextInput()) {
+        const auto safe = window.safeArea();
+        const auto area = projectTextInputArea(safe, window.windowWidth(), window.windowHeight(), window.width(), window.height());
+        window.setTextInputArea(&area); return;
+    }
     if (!commandOpen) {
         window.setTextInputArea(nullptr);
         return;
@@ -302,7 +307,7 @@ GameUiController::GameUiController(
     : survivalInventory(inventory),
       containerScreen(inventory),
       tradeScreen(inventory),
-      commandInput({}, 80, &clipboard) {}
+      commandInput({}, 80, &clipboard) { containerScreen.setClipboard(&clipboard); }
 
 void GameUiController::tick(float dt) {
     renderer.advanceTime(dt);

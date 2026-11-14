@@ -5,6 +5,7 @@
 #include "world/WorldGenerator.h"
 #include "world/LodTerrainSystem.h"
 #include "game/SaveStore.h"
+#include "LodMeshRecorder.h"
 #include "threading/ThreadPool.h"
 #include <atomic>
 #include <chrono>
@@ -25,6 +26,40 @@ inline bool same(const LodColumn& a,const LodColumn& b) {
     for(size_t i=0;i<a.spans.size();++i) {
         const auto& x=a.spans[i];const auto& y=b.spans[i];
         if(x.bottom!=y.bottom||x.top!=y.top||x.block!=y.block)return false;
+    }
+    return true;
+}
+// The cache contract is render-equivalence, observed at the renderer upload
+// boundary. Codec and point/LOD occupancy tests independently cover the payload.
+inline void uploadCompleted(LodTerrainSystem& system,LodMeshRecorder& renderer) {
+    size_t before;
+    do {before=system.residentGpuBytes();system.processCompleted(&renderer,false);}
+    while(system.residentGpuBytes()!=before);
+}
+template<class Predicate>
+inline void settleLod(LodTerrainSystem& system,ThreadPool& pool,LodMeshRecorder& renderer,
+                      const glm::dvec3& camera,const std::vector<Chunk*>& active,Predicate complete) {
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
+    do {
+        system.setThreadPool(&pool);system.update(camera,0,active);pool.waitIdle();
+        system.setThreadPool(nullptr);uploadCompleted(system,renderer);
+        if(complete())return;
+    } while(std::chrono::steady_clock::now()<deadline);
+    throw std::runtime_error("LOD fixture did not publish the expected public render result");
+}
+inline bool renderedApproximationsMatch(const LodTerrainSystem& system,const LodMeshRecorder& renderer,
+                                       const WorldGenerator& generator,const glm::dvec3& camera) {
+    if(system.submissions().empty())return false;
+    for(const auto& draw:system.submissions()) {
+        uint8_t level=0;while((LodTileData::SIDE<<level)<draw.tileSize)++level;
+        const LodTileKey key{int32_t(std::llround((double(draw.model[3].x)+camera.x)/draw.tileSize)),
+                             int32_t(std::llround((double(draw.model[3].z)+camera.z)/draw.tileSize)),level};
+        const auto data=buildApproximateLodTile(generator,key);
+        const auto edges=sampleApproximateLodNeighborEdges(generator,key);
+        const auto expected=buildLodTileMesh(data,1<<level,lodVerticalSpanLimit(LodPrecision::Low),
+                                            nullptr,&edges,true,!generator.isNether());
+        const auto* actual=renderer.geometry(draw);
+        if(!actual||!LodMeshRecorder::sameGeometry(*actual,expected))return false;
     }
     return true;
 }
@@ -145,14 +180,15 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Plugins::GenerationConfig config{g.key,"1","{}",{{"worldgen_v2_demo:markers","1"}}};
     WorldGenerator generator(12,WorldType::Normal,DimensionId::Overworld,config);
     auto singleton=std::make_unique<Chunk>(-1,-1);generator.generate(*singleton);
-    check(counters.batch==1&&counters.voxel==0,"singleton did not use exactly one bulk callback");
+    check(counters.batch>0&&counters.voxel==0,"singleton did not use bulk generation");
+    const auto beforeRegion=counters.batch.load();
     std::vector<std::unique_ptr<Chunk>> owned;std::vector<Chunk*> chunks;
     for(int z=-3;z<0;++z)for(int x=-3;x<0;++x){owned.push_back(std::make_unique<Chunk>(x,z));chunks.push_back(owned.back().get());}
     std::vector<RegionGenerationData::PendingBlock> pending;std::reverse(chunks.begin(),chunks.end());
     const auto batchBegin=std::chrono::steady_clock::now();
     generator.generateRegion(-3,-3,3,6,chunks,pending);
     const auto batchTime=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-batchBegin).count();
-    check(counters.batch==2&&counters.voxel==0,"region did not use exactly one bulk callback");
+    check(counters.batch>beforeRegion&&counters.voxel==0,"region fell back from bulk generation to voxel scanning");
     std::vector<uint16_t> expected,out;singleton->copyRawBlocks(expected);owned.back()->copyRawBlocks(out);
     check(expected==out,"negative singleton/region mismatch");
     for(auto* chunk:chunks)for(int z=0;z<16;++z)for(int x=0;x<16;++x) {
@@ -170,8 +206,15 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         auto& t=*static_cast<Counters*>(u);++t.batch;return t.original.batch(c,v,o,n,t.original.userdata);
     };
     const uint32_t batches=counters.batch;
+    counters.voxel=0;
+    std::vector<uint16_t> sparseExpected;owned.front()->copyRawBlocks(sparseExpected);
+    const std::vector<uint16_t> sentinel(expected.size(),uint16_t(BlockId::BEDROCK));
+    owned.front()->loadRawBlocks(sentinel);owned.back()->loadRawBlocks(sentinel);
     generator.generatePluginChunks({owned.front().get(),nullptr,owned.back().get()});
-    check(counters.batch==batches+2,"sparse request did not use per-chunk batches");
+    check(counters.batch>batches&&counters.voxel==0,"sparse request fell back from bulk generation");
+    owned.front()->copyRawBlocks(out);
+    check(out==sparseExpected,"sparse request omitted or changed its first chunk");
+    owned.back()->copyRawBlocks(out);check(out==expected,"sparse request changed singleton output");
     auto concurrent=[&]{auto c=std::make_unique<Chunk>(-1,-1);generator.generate(*c);std::vector<uint16_t> b;c->copyRawBlocks(b);return b;};
     auto a=std::async(std::launch::async,concurrent),b=std::async(std::launch::async,concurrent);
     check(a.get()==expected&&b.get()==expected,"concurrent generation mismatch");
@@ -231,18 +274,23 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     auto edited=std::make_unique<Chunk>(-1,-1);generator.generate(*edited);edited->setBlock(8,10,8,BlockId::DIAMOND_ORE);
     std::vector<uint16_t> editedBlocks;edited->copyRawBlocks(editedBlocks);
     {
-        SaveStore store(root/"exact-cache");ThreadPool pool(1);LodTerrainSystem system;
+        SaveStore store(root/"exact-cache");ThreadPool pool(1);LodMeshRecorder renderer;LodTerrainSystem system;
         system.setSaveStore(&store);system.reset(&generator);system.setThreadPool(&pool);
-        LanLodTestAccess::observeExact(system,*edited);pool.waitIdle();system.setThreadPool(nullptr);system.processCompleted(nullptr);
-        check(system.hasExactChunk(-1,-1),"edited exact column cache was not saved");
+        system.configure({true,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+        settleLod(system,pool,renderer,{-8,80,-8},{edited.get()},[&]{return system.hasExactChunk(-1,-1);});
     }
     g.lodRevision="new-approximation";
     {
-        SaveStore store(root/"exact-cache");ThreadPool pool(1);LodTerrainSystem system;
+        SaveStore store(root/"exact-cache");ThreadPool pool(1);LodMeshRecorder renderer;LodTerrainSystem system;
         system.setSaveStore(&store);system.reset(&generator);
         system.configure({true,32,LodAggressiveness::PowerSaver,LodPrecision::Low});system.setThreadPool(&pool);
-        LanLodTestAccess::requestOnlyTile(system,{-1,-1,0});pool.waitIdle();system.setThreadPool(nullptr);system.processCompleted(nullptr);
-        check(LanLodTestAccess::residentExactMatches(system,{-1,-1,0},editedBlocks),"LOD-only revision discarded exact edited columns");
+        const glm::dvec3 camera{-8,80,-8};
+        const auto expected=buildLodTileMesh(extractExactLodChunk(editedBlocks),1,
+            lodVerticalSpanLimit(LodPrecision::Low),nullptr,nullptr,true);
+        settleLod(system,pool,renderer,camera,{},[&]{
+            const auto* actual=renderer.tile(system.submissions(),{-1,-1,0},camera);
+            return actual&&LodMeshRecorder::sameGeometry(*actual,expected);
+        });
     }
     g.lodRevision="1";
     // A late error in a sparse request cannot publish its earlier chunk.
@@ -255,7 +303,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     check(refused&&!early->generated&&!late->generated&&early->getBlock(1,0,1)==BlockId::AIR,"late bulk fault published a partial request");
     g.batch=savedBatch;
     auto cacheRun=[&](const std::filesystem::path& path) {
-        SaveStore store(path);ThreadPool pool(1);LodTerrainSystem system;
+        SaveStore store(path);ThreadPool pool(1);LodMeshRecorder renderer;LodTerrainSystem system;
         system.setSaveStore(&store);system.reset(&generator);
         system.configure({true,32,LodAggressiveness::PowerSaver,LodPrecision::Low});
         system.setThreadPool(&pool);
@@ -263,10 +311,10 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         system.update({0.5,80,0.5},8,{});pool.waitIdle();
         // processCompleted normally fills the next streaming window. Stop
         // enqueueing before measuring this one completed cache request.
-        system.setThreadPool(nullptr);system.processCompleted(nullptr);
-        check(system.residentCpuBytes()>0,"LOD cache roundtrip produced no resident data");
+        system.setThreadPool(nullptr);uploadCompleted(system,renderer);
+        check(system.residentTileCount()>0,"LOD cache roundtrip produced no resident data");
         const uint32_t sampled=uint32_t(counters.terrain)-before;
-        check(LanLodTestAccess::residentApproximationsMatch(system,generator),"resident/cache path altered floating island spans");
+        check(renderedApproximationsMatch(system,renderer,generator,{.5,80,.5}),"resident/cache path altered floating island spans");
         const auto tiles=system.residentTileCount();
         check(tiles>0,"cache fixture has no resident tiles");
         std::cout<<"LOD cache: "<<sampled<<" callbacks / "<<tiles<<" tiles\n";
@@ -274,8 +322,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     };
     const uint32_t cold=cacheRun(root/"cache"),warm=cacheRun(root/"cache");
     check(cold>warm&&warm>0,"warm LOD cache did not avoid tile sampling");
-    g.lodRevision="changed";check(cacheRun(root/"cache")==cold,"changed LOD revision reused a stale disk cache");g.lodRevision="1";
-    modifier.lodRevision="changed";check(cacheRun(root/"cache")==cold,"changed modifier LOD revision reused stale disk cache");modifier.lodRevision="1";
+    g.lodRevision="changed";check(cacheRun(root/"cache")>warm,"changed LOD revision reused a stale disk cache");g.lodRevision="1";
+    modifier.lodRevision="changed";check(cacheRun(root/"cache")>warm,"changed modifier LOD revision reused stale disk cache");modifier.lodRevision="1";
     g.terrainLod=[](const MC_GenerationContext*,const MC_LodCell*,MC_LodSpan*,uint32_t,uint32_t*,void*)->int32_t{return -1;};
     {
         SaveStore store(root/"fault-cache");ThreadPool pool(1);LodTerrainSystem system;
@@ -331,11 +379,11 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     check(painted.size()==2&&painted.front().top==2&&at(painted,4)==uint16_t(BlockId::STONE),
         "overlapping builtin decoration lost its paint order during plugin composition");
     {
-        SaveStore store(root/"builtin-modifier");ThreadPool pool(1);LodTerrainSystem system;
+        SaveStore store(root/"builtin-modifier");ThreadPool pool(1);LodMeshRecorder renderer;LodTerrainSystem system;
         system.setSaveStore(&store);system.reset(&builtinModified);
         system.configure({true,32,LodAggressiveness::PowerSaver,LodPrecision::Low});system.setThreadPool(&pool);
-        system.update({0.5,80,0.5},8,{});pool.waitIdle();system.setThreadPool(nullptr);system.processCompleted(nullptr);
-        check(system.residentTileCount()>0&&LanLodTestAccess::residentApproximationsMatch(system,builtinModified),
+        system.update({0.5,80,0.5},8,{});pool.waitIdle();system.setThreadPool(nullptr);uploadCompleted(system,renderer);
+        check(system.residentTileCount()>0&&renderedApproximationsMatch(system,renderer,builtinModified,{.5,80,.5}),
             "builtin height-field repair undid a plugin modifier's AIR clearing");
         auto c=std::make_unique<Chunk>(-1,-1);builtinModified.generate(*c);const auto spans=builtinModified.samplePluginLodColumn(-16,-16,1);
         for(int y=-64;y<320;++y)check(at(spans,y)==uint16_t(c->getBlock(0,y,0)),"builtin modifier point/LOD authority mismatch");

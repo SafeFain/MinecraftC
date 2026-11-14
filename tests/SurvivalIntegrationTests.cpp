@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "game/SurvivalRules.h"
 #include "game/SurvivalSession.h"
 #include "game/SaveStore.h"
@@ -62,7 +63,7 @@ struct Progression {
     }
 };
 }
-int main() {
+int main() try {
     Progression game;
     game.harvest(BlockId::WOOD,ItemId::EMPTY,6);
     for(int i=0;i<6;++i) game.craft({ItemId::OAK_LOG},ItemId::OAK_PLANKS,4);
@@ -118,4 +119,6 @@ int main() {
     store.saveMetadata(metadata);
     require(store.loadMetadata().inventory.count(ItemId::DIAMOND)==3 && store.loadMetadata().inventory.count(ItemId::IRON_PICKAXE)==1,"recovered crafted progression survives reload");
     std::cout<<"Survival progression integration tests passed\n";
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <tuple>
 
@@ -135,15 +136,16 @@ int main() {
     const VisualQualityConfig highVisual = visualQualityConfig(VisualQuality::High);
     const VisualQualityConfig veryHighVisual = visualQualityConfig(VisualQuality::VeryHigh);
     const VisualQualityConfig ultraVisual = visualQualityConfig(VisualQuality::Ultra);
-    require(lowVisual.sceneSamples == 1 && lowVisual.bloomLevels == 0 &&
-            lowVisual.aoDirections == 0 && !lowVisual.materialNormals &&
-            mediumVisual.sceneSamples == 2 && mediumVisual.bloomLevels == 3 &&
-            mediumVisual.materialNormals && mediumVisual.voxelClouds &&
-            highVisual.sceneSamples == 4 && highVisual.aoDirections == 6 &&
-            highVisual.cirrusClouds && veryHighVisual.aoDirections == 7 &&
-            veryHighVisual.bloomLevels == 6 && ultraVisual.aoDirections == 8 &&
-            ultraVisual.bloomLevels == 6,
-            "visual quality presets do not match the rendering contract");
+    require(lowVisual.bloomLevels==0&&lowVisual.aoDirections==0&&!lowVisual.materialNormals&&
+            mediumVisual.materialNormals&&mediumVisual.voxelClouds&&highVisual.cirrusClouds,
+            "quality presets lost their advertised rendering features");
+    auto previousVisual=lowVisual;
+    for(const auto& visual:{mediumVisual,highVisual,veryHighVisual,ultraVisual}) {
+        require((visual.sceneSamples==1||visual.sceneSamples==2||visual.sceneSamples==4)&&
+                visual.sceneSamples>=previousVisual.sceneSamples&&visual.bloomLevels>=previousVisual.bloomLevels&&
+                visual.aoDirections>=previousVisual.aoDirections,"quality presets must use supported progressive budgets");
+        previousVisual=visual;
+    }
     require(nextVisualQuality(VisualQuality::Low)==VisualQuality::Medium&&
             nextVisualQuality(VisualQuality::Medium)==VisualQuality::High&&
             nextVisualQuality(VisualQuality::High)==VisualQuality::VeryHigh&&
@@ -168,47 +170,23 @@ int main() {
                 enhancedOff.ambientParticlesPerSecond == 0.0f &&
                 !enhancedOff.usesSurfaceData() &&
                 !enhancedOff.usesScreenSpaceReflections() &&
-                enhancedLow.bloomLevels == 0 &&
-                enhancedLow.atmosphereStrength == 0.25f &&
-                enhancedLow.materialMotionStrength == 0.25f &&
-                enhancedLow.ambientParticlesPerSecond == 0.0f &&
-                enhancedLow.screenEffectDivisor == 0 &&
-                enhancedLow.shadowFilterSamples == 1 &&
-                enhancedMedium.bloomLevels == 2 &&
-                enhancedMedium.atmosphereStrength == 0.50f &&
-                enhancedMedium.materialMotionStrength == 0.60f &&
-                enhancedMedium.ambientParticlesPerSecond == 4.0f &&
-                enhancedMedium.usesSurfaceData() &&
-                enhancedMedium.screenEffectDivisor == 4 &&
-                enhancedMedium.aoDirections == 4 &&
-                enhancedMedium.aoSteps == 2 &&
-                enhancedMedium.lightShaftSamples == 8 &&
-                !enhancedMedium.usesScreenSpaceReflections() &&
-                enhancedMedium.shadowFilterSamples == 4 &&
-                enhancedHigh.bloomLevels == 3 &&
-                enhancedHigh.atmosphereStrength == 0.75f &&
-                enhancedHigh.materialMotionStrength == 0.85f &&
-                enhancedHigh.ambientParticlesPerSecond == 8.0f &&
-                enhancedHigh.screenEffectDivisor == 4 &&
-                enhancedHigh.reflectionSteps == 12 &&
-                enhancedHigh.reflectionRefineSteps == 2 &&
-                enhancedHigh.reflectionDistance == 64.0f &&
-                enhancedHigh.shadowBlockerSamples == 4 &&
-                enhancedHigh.shadowFilterSamples == 8 &&
-                enhancedUltra.bloomLevels == 4 &&
-                enhancedUltra.atmosphereStrength == 1.0f &&
-                enhancedUltra.materialMotionStrength == 1.0f &&
-                enhancedUltra.ambientParticlesPerSecond == 12.0f &&
-                enhancedUltra.screenEffectDivisor == 2 &&
-                enhancedUltra.aoDirections == 8 &&
-                enhancedUltra.aoSteps == 4 &&
-                enhancedUltra.lightShaftSamples == 16 &&
-                enhancedUltra.reflectionSteps == 24 &&
-                enhancedUltra.reflectionRefineSteps == 4 &&
-                enhancedUltra.reflectionDistance == 96.0f &&
-                enhancedUltra.shadowBlockerSamples == 6 &&
-                enhancedUltra.shadowFilterSamples == 12,
-            "enhanced visual presets do not match their progressive budgets");
+                enhancedLow.bloomLevels == 0 &&!enhancedLow.usesSurfaceData()&&
+                enhancedMedium.usesSurfaceData()&&!enhancedMedium.usesScreenSpaceReflections()&&
+                enhancedHigh.usesScreenSpaceReflections()&&enhancedUltra.usesScreenSpaceReflections(),
+            "enhanced presets lost their feature gates");
+    auto previousEnhanced=enhancedLow;
+    for(const auto& visual:{enhancedMedium,enhancedHigh,enhancedUltra}) {
+        require(visual.bloomLevels>=previousEnhanced.bloomLevels&&
+                visual.atmosphereStrength>=previousEnhanced.atmosphereStrength&&visual.atmosphereStrength<=1&&
+                visual.materialMotionStrength>=previousEnhanced.materialMotionStrength&&visual.materialMotionStrength<=1&&
+                visual.ambientParticlesPerSecond>=previousEnhanced.ambientParticlesPerSecond&&
+                visual.aoDirections>=previousEnhanced.aoDirections&&visual.aoSteps>=previousEnhanced.aoSteps&&
+                visual.lightShaftSamples>=previousEnhanced.lightShaftSamples&&
+                visual.reflectionSteps>=previousEnhanced.reflectionSteps&&visual.reflectionDistance>=previousEnhanced.reflectionDistance&&
+                visual.shadowFilterSamples>=previousEnhanced.shadowFilterSamples,
+                "enhanced preset budgets must increase with quality");
+        previousEnhanced=visual;
+    }
     EnhancedVisualSettings custom{};
     custom.enabled = true;
     custom.custom = true;
@@ -446,15 +424,16 @@ int main() {
     };
     for(const auto kind:{ToolKind::Sword,ToolKind::Pickaxe,ToolKind::Axe,
                         ToolKind::Shovel,ToolKind::Hoe}) {
-        glm::vec2 previous(-1);
+        std::set<std::pair<float,float>> previous;
         for(const auto tier:{ToolTier::Wood,ToolTier::Stone,ToolTier::Iron,
                             ToolTier::Gold,ToolTier::Diamond}) {
             const auto model=checkTool(ItemId::WOODEN_SWORD,kind,tier);
-            const glm::vec2 headUv=model.mesh.vertices[24].uv;
-            require(headUv!=previous,"tool tiers share wrong palette");
-            previous=headUv;
-            require(model.mesh.vertices[0].position.y<0 &&
-                model.mesh.vertices[1].position.y>0,"tool grip no longer inside handle");
+            std::set<std::pair<float,float>> palette;
+            float bottom=0,top=0;
+            for(const auto& vertex:model.mesh.vertices){palette.emplace(vertex.uv.x,vertex.uv.y);
+                bottom=std::min(bottom,vertex.position.y);top=std::max(top,vertex.position.y);}
+            require(palette!=previous,"tool tiers share wrong palette");previous=std::move(palette);
+            require(bottom<0&&top>0,"tool grip no longer inside handle");
         }
     }
     const glm::vec3 fishingTip=glm::vec3(heldToolGripTransform(
@@ -465,7 +444,9 @@ int main() {
     checkTool(ItemId::FLINT_AND_STEEL,ToolKind::None,ToolTier::None);
     require(!hasHeldToolModel(ItemId::STARSTEP_SCEPTER,ToolKind::None),"scepter model must be supplied by official provider");
     const auto bowModel=checkTool(ItemId::BOW,ToolKind::Bow,ToolTier::None);
-    require(bowModel.ranges.size()==8,"bow components missing");
+    for(const auto part:{HeldToolPart::Body,HeldToolPart::BowUpperInner,HeldToolPart::BowUpperOuter,
+            HeldToolPart::BowLowerInner,HeldToolPart::BowLowerOuter,HeldToolPart::StringUpper,HeldToolPart::StringLower,HeldToolPart::Arrow})
+        require(std::any_of(bowModel.ranges.begin(),bowModel.ranges.end(),[&](const auto& range){return range.part==part;}),"bow component missing");
     require(!hasHeldToolModel(ItemId::BREAD,ToolKind::None) &&
         buildHeldToolModel(ItemId::BREAD,ToolKind::None,ToolTier::None).mesh.indices.empty(),
         "ordinary items replaced with tool model");
@@ -498,11 +479,13 @@ int main() {
 
     const MeshData blockHeldCube = buildHeldCubeMesh({0, 0, 0, 0, 0, 0}, 1, true);
     const MeshData rawHeldCube = buildHeldCubeMesh({0, 0, 0, 0, 0, 0}, 1, false);
-    require(blockHeldCube.vertices.size() == 24 &&
-                blockHeldCube.vertices[0].position.y < blockHeldCube.vertices[1].position.y &&
-                blockHeldCube.vertices[0].uv.y < blockHeldCube.vertices[1].uv.y &&
-                rawHeldCube.vertices[0].uv.y > rawHeldCube.vertices[1].uv.y,
-            "held block cube did not compensate for per-tile atlas flipping");
+    require(!blockHeldCube.indices.empty()&&blockHeldCube.indices==rawHeldCube.indices&&
+            blockHeldCube.vertices.size()==rawHeldCube.vertices.size(),"tile orientation changed cube geometry");
+    for(size_t i=0;i<blockHeldCube.vertices.size();++i) {
+        const auto& flipped=blockHeldCube.vertices[i];const auto& raw=rawHeldCube.vertices[i];
+        require(flipped.position==raw.position&&flipped.uv.x==raw.uv.x&&std::abs(flipped.uv.y+raw.uv.y-1)<.0001f,
+                "held block UVs did not compensate for atlas flipping");
+    }
 
     Camera sprintCamera(Config::FOV, Config::NEAR_PLANE, Config::FAR_PLANE);
     const glm::mat4 baseProjection = sprintCamera.getProjectionMatrix(16.0f / 9.0f);

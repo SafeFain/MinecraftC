@@ -103,7 +103,7 @@ bool isNetheriteEquipment(ItemId item) {
 ItemStack smithingResult(const ItemStack& pattern,const ItemStack& equipment,const ItemStack& material) {
     if(pattern.empty()||equipment.empty()||material.empty()||pattern.id!=ItemId::NETHERITE_UPGRADE_TEMPLATE||material.id!=ItemId::NETHERITE_INGOT)return {};
     switch(equipment.id) {
-#define NETHER_UPGRADE(id,key,label,base,durability) case ItemId::base:return {ItemId::id,1,equipment.damage};
+#define NETHER_UPGRADE(id,key,label,base,durability) case ItemId::base:return {ItemId::id,1,equipment.damage,equipment.components};
         MC_NETHER_EQUIPMENT(NETHER_UPGRADE)
 #undef NETHER_UPGRADE
         default:return {};

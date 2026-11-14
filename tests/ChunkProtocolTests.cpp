@@ -1,5 +1,6 @@
 #include "HeavenContentFixture.h"
 #include "network/ChunkProtocol.h"
+#include "network/PistonProtocol.h"
 #include "network/LodProtocol.h"
 #include "network/EventProtocol.h"
 #include "world/Block.h"
@@ -34,6 +35,32 @@ int main() {
     auto bad = bytes; for(size_t i=0;i<4;++i)bad[runOffset+i]=0xff;
     rejects([&] { Lan::decodeChunkSnapshot(bad); });
     bytes.push_back(0); rejects([&] { Lan::decodeChunkSnapshot(bytes); });
+    // The per-chunk codec cannot protect an atomic cross-chunk piston payload.
+    // Truncation/duplicate address controls must reject the entire transaction.
+    Lan::BlockTransaction transaction;transaction.dimension=DimensionId::Heaven;transaction.epoch=9;transaction.tick=13;
+    auto first=snapshot;first.blocks.assign(Config::CHUNK_VOLUME,0);
+    auto second=first;second.address.x+=1;
+    transaction.chunks={first,second};
+    Redstone::PistonMotion motion;motion.id=4;motion.base={-1,210,8};motion.piston.facing=Redstone::Face::East;motion.age=1;
+    motion.moves.push_back({{0,210,8},{1,210,8},static_cast<uint16_t>(BlockId::STONE)});transaction.motions.push_back(motion);
+    const auto transactionBytes=Lan::encodeBlockTransaction(transaction);
+    const auto atomic=Lan::decodeBlockTransaction(transactionBytes);
+    check(atomic.chunks.size()==2 && atomic.motions.size()==1 && atomic.motions[0].age==1 && atomic.motions[0].moves[0].block==static_cast<uint16_t>(BlockId::STONE),"Atomic chunk/motion packet lost state");
+    for(size_t size=0;size<transactionBytes.size();++size) {
+        auto cut=transactionBytes;cut.resize(size);rejects([&]{Lan::decodeBlockTransaction(cut);});
+    }
+    auto duplicate=transaction;duplicate.chunks[1]=duplicate.chunks[0];rejects([&]{Lan::encodeBlockTransaction(duplicate);});
+    auto invalidMotion=transaction;invalidMotion.motions[0].moves[0].to.x+=1;rejects([&]{Lan::encodeBlockTransaction(invalidMotion);});
+    auto large=transaction;large.chunks[0]=snapshot;large.chunks[1]=snapshot;large.chunks[1].address.x+=1;
+    const auto fragments=Lan::encodeBlockTransactionParts(large,1);
+    check(fragments.size()>1,"Worst-case cross-chunk transaction did not exercise fragmentation");
+    Lan::BlockTransactionAssembler assembly;
+    for(size_t i=0;i<fragments.size();++i) {
+        const auto result=assembly.push(fragments[i]);
+        check(bool(result)==(i+1==fragments.size()),"Partial transaction escaped assembly");
+        check(!assembly.push(fragments[i]),"Duplicate fragment published a transaction twice");
+    }
+    Lan::BlockTransactionAssembler reordered;rejects([&]{reordered.push(fragments.back());});
     Lan::ChunkDelta delta;
     delta.address = snapshot.address; delta.epoch = 9; delta.base = 77; delta.revision = 79;
     delta.edits = {{0, static_cast<uint16_t>(BlockId::GLASS)}, {Config::CHUNK_VOLUME - 1, 0}};
@@ -70,7 +97,8 @@ int main() {
     journal.record(snapshot.address, 81, {1, 3});
     check(!journal.since(snapshot.address, 79, 81), "History gap must require resnapshot");
     for (uint64_t revision = 82; revision < 600; ++revision) journal.record(snapshot.address, revision, {0, 2});
-    check(journal.size() == 512 && !journal.since(snapshot.address, 77, 599), "Per-chunk history is bounded");
+    // Acceptance memory ceilings may be reduced without changing the protocol.
+    check(journal.size()>0&&journal.size()<=512 && !journal.since(snapshot.address, 77, 599), "Per-chunk history exceeds its memory budget or retained obsolete history");
     for (int chunk = 0; chunk < 100; ++chunk)
         for (uint64_t revision = 1; revision <= 512; ++revision)
             journal.record({DimensionId::Overworld, chunk, 0}, revision, {0, 1});

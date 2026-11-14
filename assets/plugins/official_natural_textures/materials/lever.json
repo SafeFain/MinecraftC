@@ -1,0 +1,19 @@
+{
+  "key": "lever",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2684015238,
+    "images": [
+      "textures/materials/lever-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/lever-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/lever-0-properties.png"
+    ]
+  }
+}

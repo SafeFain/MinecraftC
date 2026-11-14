@@ -3,6 +3,7 @@
 #include "game/SurvivalSession.h"
 #include "plugins/ContentQueries.h"
 #include "world/WorldGenContext.h"
+#include "network/PistonProtocol.h"
 #include <algorithm>
 #include <cmath>
 
@@ -79,7 +80,9 @@ void GameSession::admitLanPlayer(uint64_t id) {
         if(!landing)throw std::runtime_error("Dimension has no safe landing");
         profile.positions[target]=*landing;profile.positioned[target]=true;
     }
-    auto guest = std::make_unique<LanPlayerRuntime>(runtime.world, runtime.entities, std::move(profile));
+    auto guest = services.guest?services.guest(runtime.world,runtime.entities,std::move(profile)):
+        std::make_unique<LanPlayerRuntime>(runtime.world,runtime.entities,std::move(profile));
+    if(!guest)throw std::runtime_error("Remote player factory returned no runtime");
     guest->player.configureRules(guest->profile.mode, worldMetadata.difficulty);
     guest->player.setRoomPlayerId(id);
     guest->player.setBedCallback([this, id](const glm::ivec3& bed) { (void)beginLanSleep(id, bed); });
@@ -110,12 +113,14 @@ void GameSession::saveLanPlayer(LanPlayerRuntime& guest) {
     profile.mode = guest.player.gameMode();
     profile.inventory = guest.player.inventory();
     profile.cursor = guest.window.cursor(); profile.crafting = guest.window.crafting();
+    profile.workstationInputs = guest.window.recoveredWorkstationInputs;
+    if (guest.window.workstation) for (size_t i = 0; i < 2; ++i) profile.workstationInputs[i] = guest.window.workstation->chest[i];
     const auto& stats = guest.player.survivalStats();
     profile.health = stats.health(); profile.hunger = stats.hunger();
     profile.saturation = stats.saturation(); profile.exhaustion = stats.exhaustion();
     profile.foodTickTimer = stats.foodTickTimer();
     profile.effects=guest.player.statusEffects().active();
-    profile.experience=guest.player.experience();
+    profile.experience=guest.player.experience(); profile.enchantmentSeed=guest.player.enchantmentSeed;
     if (guestProfiles) guestProfiles->save(profile);
 }
 
@@ -140,9 +145,10 @@ void GameSession::removeLanPlayer(uint64_t id) {
 }
 
 void GameSession::closeLanRoom() {
+    if(hostingLan() && saveStore && Plugins::content().runtimeFault.empty())flushDimensions(true);
     if (hostingLan()) closeAuthorityWindow(player, simulation(), hostWindow, hostWindowView);
     lodJobs.clear();
-    lanHost.close();
+    lanHost.close(Plugins::content().runtimeFault);
     for (auto& runtime : simulations) if (runtime) runtime->world.setBlockMutationCallback({});
     chunkJournal.clear();
     while (!guests.empty()) removeLanPlayer(guests.begin()->first);
@@ -288,6 +294,7 @@ void GameSession::updateLanPlayers(float dt) {
         if (guest.pendingRespawn && travelLanPlayer(guest, deathDimension(guest.profile.dimension), true)) continue;
         const Plugins::ActorScope actor({entry.first,static_cast<uint32_t>(guest.profile.dimension),MC_HOST});
         auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
+        if(runtime.world.redstoneTickPending())continue;
         const auto position = guest.player.getPosition();
         const int cx = World::worldToChunkX(position.x), cz = World::worldToChunkZ(position.z);
         bool ready = true;
@@ -340,6 +347,7 @@ void GameSession::updateLanPlayers(float dt) {
                     guest.fishing.update(0, guest.player.getEyePosition(), environment);
                     guest.fishingSlot = guest.player.selectedSlot();
                     guest.fishingRodDamage = item.damage;
+                    guest.fishing.setEnchantments(item.enchantment(EnchantmentId::LuckOfTheSea), item.enchantment(EnchantmentId::Lure));
                     guest.fishing.use(guest.player.getEyePosition(), guest.player.getForward(), guest.player.velocity(), environment);
                     guest.player.animateItemUse();
                 } else guest.player.handleMouseButton(binding.second, ButtonAction::Press);
@@ -365,8 +373,7 @@ void GameSession::updateLanPlayers(float dt) {
                 if (event.wear && guest.player.isSurvival() && guest.fishingSlot >= 0) {
                     auto& rod = guest.player.inventory().slot(static_cast<size_t>(guest.fishingSlot));
                     if (rod.id == ItemId::FISHING_ROD) {
-                        rod.damage = static_cast<uint16_t>(rod.damage + event.wear);
-                        if (rod.damage >= getItemProps(rod.id).maxDurability) rod.clear();
+                        EquipmentRules::damage(rod,event.wear,guest.player.m_equipmentRandom);
                         guest.fishingRodDamage = rod.damage;
                     }
                 }
@@ -384,22 +391,81 @@ void GameSession::simulateDimension(DimensionId id, const std::vector<EntityPlay
     auto& runtime = *simulations[static_cast<size_t>(id)];
     const auto& policy=Plugins::dimensionContent(id);
     if(policy.weather!=MC_WEATHER_NORMAL)runtime.weather.setWeather(static_cast<WeatherType>(policy.weather-1));
-    runtime.entities.update(views, dt, runtime.daylight.isDay(), worldMetadata.difficulty == Difficulty::Peaceful,
+    if(!runtime.world.redstoneTickPending())runtime.entities.update(views, dt, runtime.daylight.isDay(), worldMetadata.difficulty == Difficulty::Peaceful,
                             runtime.weather.thundering(), runtime.weather.raining(), runtime.ticks);
     std::vector<glm::dvec3> positions;
     for (const auto& view : views) positions.push_back(view.player->getPosition());
     runtime.tickRemainder += dt * 20;
     while (runtime.tickRemainder >= 1) {
-        ++runtime.ticks;
-        runtime.tickRemainder -= 1;
-        if (policy.weather==MC_WEATHER_NORMAL) {
-            runtime.weather.tick(worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather));
-
-        }
-        tickLightning(runtime,feedback);
         auto& world = runtime.world;
-        world.tickBlockEntities();
-        world.tickInteractiveBlocks([&](const glm::ivec3& p) { return runtime.entities.arrowTouchesButton(p); });
+        if(!world.redstoneTickPending()) {
+            ++runtime.ticks;
+            if(policy.weather==MC_WEATHER_NORMAL)runtime.weather.tick(worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather));
+            tickLightning(runtime,feedback);
+            world.tickBlockEntities();
+        }
+        if(!world.tickInteractiveBlocks([&](const glm::ivec3& p){return runtime.entities.arrowTouchesButton(p);},{}))break;
+        runtime.tickRemainder-=1;
+        for(const auto& sweep:world.takePistonSweeps()) {
+            runtime.entities.pushPiston(sweep);
+            for(const auto& view:views)view.player->pushPiston(sweep);
+        }
+        const auto transactions=world.takeBlockTransactions();
+        // Snapshots contain the final tick, so pushes sharing any chunk must
+        // travel together; otherwise one snapshot could expose half of a later
+        // push in the same chunk. Disjoint groups may publish independently.
+        std::vector<std::set<std::pair<int,int>>> groups;
+        std::map<std::pair<int,int>,size_t> owners;
+        for(const auto& transaction:transactions) {
+            std::set<size_t> overlaps;
+            for(const auto& chunk:transaction){const auto found=owners.find(chunk);if(found!=owners.end())overlaps.insert(found->second);}
+            size_t group=groups.size();
+            if(overlaps.empty())groups.emplace_back();
+            else {
+                group=*overlaps.begin();
+                for(const auto candidate:overlaps)if(groups[candidate].size()>groups[group].size())group=candidate;
+                for(const auto previous:overlaps)if(previous!=group) {
+                    for(const auto& chunk:groups[previous]){groups[group].insert(chunk);owners[chunk]=group;}
+                    groups[previous].clear();
+                }
+            }
+            for(const auto& chunk:transaction){groups[group].insert(chunk);owners[chunk]=group;}
+        }
+        groups.erase(std::remove_if(groups.begin(),groups.end(),[](const auto& group){return group.empty();}),groups.end());
+        std::sort(groups.begin(),groups.end());
+        if(hostingLan() && (!transactions.empty() || !world.pistonMotions().empty())) {
+            for(auto& peer:guests) {
+                auto& guest=*peer.second;if(guest.profile.dimension!=id)continue;
+                const auto transport=lanHost.peers().find(peer.first);
+                if(transport==lanHost.peers().end() || !transport->second.chunks)continue;
+                std::vector<std::set<std::pair<int,int>>> batches=groups;
+                if(batches.empty())batches.emplace_back(); // age/snapshot update, also clears finished motion
+                for(const auto& chunks:batches) {
+                    Lan::BlockTransaction packet;packet.dimension=id;packet.epoch=guest.chunkEpoch;packet.tick=runtime.ticks;
+                    const auto center=guest.player.getPosition();
+                    for(const auto& motion:world.pistonMotions()) {
+                        const auto delta=glm::dvec3(Redstone::vector(motion.base))-center;
+                        if(std::abs(delta.x)<=guest.radius*16+32 && std::abs(delta.z)<=guest.radius*16+32)packet.motions.push_back(motion);
+                    }
+                    for(const auto& key:chunks) {
+                        const int64_t dx=key.first-World::worldToChunkX(center.x),dz=key.second-World::worldToChunkZ(center.z);
+                        if(std::abs(dx)>guest.radius+1 || std::abs(dz)>guest.radius+1)continue;
+                        const auto* chunk=world.getChunk(key.first,key.second);
+                        Lan::ChunkSnapshot snapshot{{id,key.first,key.second},guest.chunkEpoch,chunk->blockRevision(),{}};
+                        chunk->copyRawBlocks(snapshot.blocks);packet.chunks.push_back(std::move(snapshot));
+                    }
+                    bool sent=true;
+                    try {
+                        for(auto& part:Lan::encodeBlockTransactionParts(packet,++guest.nextBlockTransaction))
+                            if(!lanHost.send(peer.first,{Lan::MessageType::BlockTransaction,0,std::move(part)},true)){sent=false;break;}
+                    } catch(const Lan::ProtocolError& error) {
+                        LOG_WARN("Circuit transaction transport: "<<error.what());sent=false;
+                    }
+                    if(!sent){lanHost.disconnect(peer.first);break;}
+                    for(const auto& chunk:packet.chunks)guest.sentChunkRevisions[{chunk.address.x,chunk.address.z}]=chunk.revision;
+                }
+            }
+        }
         for (const auto& drop : world.takeSupportDrops())
             runtime.entities.spawnItem(glm::dvec3(drop.first) + glm::dvec3(.5), drop.second);
         const size_t budget = std::min(Config::FLUID_UPDATES_PER_TICK, fluidRemaining);

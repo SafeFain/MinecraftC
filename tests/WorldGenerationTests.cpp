@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "world/HeightPipeline.h"
 #include "world/Noise.h"
@@ -43,9 +44,6 @@ using TreeKey = std::tuple<int, int, int, int, int>;
 #include "VillageLayoutScenarios.h"
 
 void testOverworld() {
-    testNewStructureBlueprints();
-    testBiomeSurfaceEcology();
-    testEcologyFormations();
     const auto nearest = locateNearestBiome(glm::ivec2(0, 0), Biome::PLAINS,
         [](int x, int z) { return x >= 48 && z >= -16 && z <= 16
             ? Biome::PLAINS : Biome::FOREST; }, 128, 32);
@@ -777,6 +775,72 @@ void testOverworld() {
             "no candidate seed placed a cross-boundary structure");
     verifyFullEquivalence(forcedStructureSeed, forcedOriginCX, forcedOriginCZ);
 
+    // Superflat generation is a fixed world-coordinate preset and must use
+    // the same four layers through both the region and singleton paths.
+    WorldGenerator flatRegionWorld(1234, WorldType::Superflat);
+    WorldGenerator flatOtherSeed(9876, WorldType::Superflat);
+    const int flatSurface = Config::WORLD_MIN_Y + 3;
+    require(flatRegionWorld.getTerrainHeight(-37, 91) == flatSurface &&
+            flatRegionWorld.queryHeightBiome(-37, 91).height == flatSurface &&
+            flatRegionWorld.queryHeightBiome(-37, 91).biome == Biome::PLAINS,
+            "superflat height and biome queries are fixed");
+    require(flatRegionWorld.sampleTerrainColumn(-37, 91).waterLevel ==
+                Config::WORLD_MIN_Y - 1 &&
+            !flatRegionWorld.sampleTerrainColumn(-37, 91).river,
+            "superflat columns have no water or river");
+
+    std::vector<std::unique_ptr<Chunk>> flatRegionOwned;
+    std::vector<Chunk*> flatRegionChunks;
+    for (int cz = 0; cz < 3; ++cz) {
+        for (int cx = 0; cx < 3; ++cx) {
+            flatRegionOwned.push_back(std::make_unique<Chunk>(cx - 1, cz - 1));
+            flatRegionChunks.push_back(flatRegionOwned.back().get());
+        }
+    }
+    std::vector<RegionGenerationData::PendingBlock> flatPending;
+    flatRegionWorld.generateRegion(-1, -1, 3, Config::REGION_PADDING,
+                                   flatRegionChunks, flatPending);
+    require(flatPending.empty(), "superflat region has no cross-chunk placements");
+    for (const Chunk* chunk : flatRegionChunks) {
+        require(chunk->generated.load(), "superflat region marks chunks generated");
+        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
+            for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
+                require(chunk->getColumnMaxY(x, z) == flatSurface,
+                        "superflat column max is the grass layer");
+                for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
+                    const BlockId expected = y == Config::WORLD_MIN_Y
+                        ? BlockId::BEDROCK
+                        : y <= Config::WORLD_MIN_Y + 2 ? BlockId::DIRT
+                        : y == flatSurface ? BlockId::GRASS : BlockId::AIR;
+                    require(chunk->getBlock(x, y, z) == expected,
+                            "superflat region contains an unexpected block");
+                }
+            }
+        }
+    }
+
+    auto flatSingleton = std::make_unique<Chunk>(-1, -1);
+    flatOtherSeed.generate(*flatSingleton);
+    for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y)
+        require(flatSingleton->getBlock(3, y, 11) ==
+                    flatRegionChunks.front()->getBlock(3, y, 11),
+                "superflat singleton differs from region output");
+
+    std::cout << "biomes=" << observedBiomes.size()
+              << "/" << allBiomes.size()
+              << " archetypes=" << observedArchetypes.size()
+              << "/" << allArchetypes.size()
+              << " rivers=" << riverColumns
+              << " swamp=" << biomeCounts[static_cast<size_t>(Biome::SWAMP)]
+              << " jungle=" << biomeCounts[static_cast<size_t>(Biome::JUNGLE)]
+              << " badlands=" << biomeCounts[static_cast<size_t>(Biome::BADLANDS)]
+              << " trees=" << regionSet.size() << '\n';
+}
+
+void testOverworldStructures() {
+    constexpr uint64_t seed = 1234567890ULL;
+    Noise legacy(seed);
+    HeightPipeline terrain(legacy, seed);
     // ── Structure placement ─────────────────────────────────────────────
     // Anchors, footprints, and layout variants are pure world-coordinate
     // functions. Two generators with the same seed produce identical
@@ -1260,6 +1324,10 @@ void testOverworld() {
                 "structure work blocks did not request block-entity registration");
     }
 
+}
+
+void testOverworldOres() {
+    constexpr uint64_t seed = 1234567890ULL;
     // Ore remains a sparse replacement of the host rock. This guards against
     // threshold regressions that turn most underground stone into ore.
     std::array<size_t, 4> oreCounts{};
@@ -1305,6 +1373,31 @@ void testOverworld() {
     OreGenerator sameEmeralds(sameEmeraldNoise, seed);
     WorldGenerator otherOreWorld(seed + 1);
     OreGenerator& otherEmeralds = otherOreWorld.getOreGenerator();
+    // Four chunks meet at the origin, covering negative coordinates and both
+    // sides of chunk boundaries. Full region/singleton determinism is exercised
+    // separately; this case protects host variants and buried-vein exposure.
+    size_t lapisCount = 0, lapisVariation = 0, buriedOnly = 0;
+    bool stoneLapis = false, deepLapis = false;
+    for (int z = -16; z < 16; ++z) for (int x = -16; x < 16; ++x)
+        for (int y = -64; y <= 64; ++y) {
+            const auto host = y < 0 ? BlockId::DEEPSLATE : BlockId::STONE;
+            const auto a = ores.getOre(x+.5f,y+.5f,z+.5f,host,Biome::PLAINS,[]{return false;});
+            if (a == BlockId::LAPIS_ORE || a == BlockId::DEEPSLATE_LAPIS_ORE) {
+                ++lapisCount;
+                stoneLapis |= a == BlockId::LAPIS_ORE;
+                deepLapis |= a == BlockId::DEEPSLATE_LAPIS_ORE;
+                require(a == (y < 0 ? BlockId::DEEPSLATE_LAPIS_ORE : BlockId::LAPIS_ORE),
+                        "lapis did not preserve its host-rock variant");
+                require(a == sameEmeralds.getOre(x+.5f,y+.5f,z+.5f,host,Biome::PLAINS,[]{return false;}),
+                        "same-seed lapis vein moved");
+                const auto exposed = ores.getOre(x+.5f,y+.5f,z+.5f,host,Biome::PLAINS,[]{return true;});
+                buriedOnly += exposed != a;
+                const auto other = otherEmeralds.getOre(x+.5f,y+.5f,z+.5f,host,Biome::PLAINS,[]{return false;});
+                lapisVariation += other != a;
+            }
+        }
+    require(lapisCount && lapisVariation && buriedOnly && stoneLapis && deepLapis,
+            "lapis must have both host variants, buried-only veins and seed variation");
     size_t emeraldCount = 0;
     size_t deepEmeraldCount = 0;
     size_t differentSeedDisagreements = 0;
@@ -1352,6 +1445,9 @@ void testOverworld() {
                 differentSeedDisagreements > 0,
             "emerald attempts lack stone/deepslate variants or seed variation");
 
+}
+
+void testWorldMeshContracts() {
     // CPU mesh classification: plants and leaves use opaque/cutout geometry,
     // water uses the translucent range, and leaves carry a shader marker.
     std::vector<uint16_t> meshBlocks(Config::CHUNK_VOLUME, 0);
@@ -1557,67 +1653,6 @@ void testOverworld() {
             activeMesh.translucentIndexCount == mesh.translucentIndexCount,
             "async mesh handoff dropped render-layer metadata");
 
-    // Superflat generation is a fixed world-coordinate preset and must use
-    // the same four layers through both the region and singleton paths.
-    WorldGenerator flatRegionWorld(1234, WorldType::Superflat);
-    WorldGenerator flatOtherSeed(9876, WorldType::Superflat);
-    const int flatSurface = Config::WORLD_MIN_Y + 3;
-    require(flatRegionWorld.getTerrainHeight(-37, 91) == flatSurface &&
-            flatRegionWorld.queryHeightBiome(-37, 91).height == flatSurface &&
-            flatRegionWorld.queryHeightBiome(-37, 91).biome == Biome::PLAINS,
-            "superflat height and biome queries are fixed");
-    require(flatRegionWorld.sampleTerrainColumn(-37, 91).waterLevel ==
-                Config::WORLD_MIN_Y - 1 &&
-            !flatRegionWorld.sampleTerrainColumn(-37, 91).river,
-            "superflat columns have no water or river");
-
-    std::vector<std::unique_ptr<Chunk>> flatRegionOwned;
-    std::vector<Chunk*> flatRegionChunks;
-    for (int cz = 0; cz < 3; ++cz) {
-        for (int cx = 0; cx < 3; ++cx) {
-            flatRegionOwned.push_back(std::make_unique<Chunk>(cx - 1, cz - 1));
-            flatRegionChunks.push_back(flatRegionOwned.back().get());
-        }
-    }
-    std::vector<RegionGenerationData::PendingBlock> flatPending;
-    flatRegionWorld.generateRegion(-1, -1, 3, Config::REGION_PADDING,
-                                   flatRegionChunks, flatPending);
-    require(flatPending.empty(), "superflat region has no cross-chunk placements");
-    for (const Chunk* chunk : flatRegionChunks) {
-        require(chunk->generated.load(), "superflat region marks chunks generated");
-        for (int z = 0; z < Config::CHUNK_SIZE_Z; ++z) {
-            for (int x = 0; x < Config::CHUNK_SIZE_X; ++x) {
-                require(chunk->getColumnMaxY(x, z) == flatSurface,
-                        "superflat column max is the grass layer");
-                for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y) {
-                    const BlockId expected = y == Config::WORLD_MIN_Y
-                        ? BlockId::BEDROCK
-                        : y <= Config::WORLD_MIN_Y + 2 ? BlockId::DIRT
-                        : y == flatSurface ? BlockId::GRASS : BlockId::AIR;
-                    require(chunk->getBlock(x, y, z) == expected,
-                            "superflat region contains an unexpected block");
-                }
-            }
-        }
-    }
-
-    auto flatSingleton = std::make_unique<Chunk>(-1, -1);
-    flatOtherSeed.generate(*flatSingleton);
-    for (int y = Config::WORLD_MIN_Y; y < Config::WORLD_MAX_Y; ++y)
-        require(flatSingleton->getBlock(3, y, 11) ==
-                    flatRegionChunks.front()->getBlock(3, y, 11),
-                "superflat singleton differs from region output");
-
-    std::cout << "biomes=" << observedBiomes.size()
-              << "/" << allBiomes.size()
-              << " archetypes=" << observedArchetypes.size()
-              << "/" << allArchetypes.size()
-              << " rivers=" << riverColumns
-              << " swamp=" << biomeCounts[static_cast<size_t>(Biome::SWAMP)]
-              << " jungle=" << biomeCounts[static_cast<size_t>(Biome::JUNGLE)]
-              << " badlands=" << biomeCounts[static_cast<size_t>(Biome::BADLANDS)]
-              << " trees=" << regionSet.size()
-              << " ores=" << totalOres << '/' << sampledHostBlocks << '\n';
 }
 
 void testHeaven() {
@@ -2129,7 +2164,7 @@ void testHeaven() {
 
 #include "NetherGenerationIntegration.h"
 
-int main(int argc,char** argv) {
+int main(int argc,char** argv) try {
     installHeavenFixture();
     const std::string scenario=argc==2 ? argv[1] : "--all";
     const auto run=[](const char* name,void (*test)()) {
@@ -2142,7 +2177,13 @@ int main(int argc,char** argv) {
     else if(scenario=="--heaven-migration-benchmark") run("heaven-migration-benchmark",benchmarkHeavenMigration);
     else if(scenario=="--village-layout-tests") run("village",testVillageLayouts);
     else if(scenario=="--overworld-tests") run("overworld",testOverworld);
+    else if(scenario=="--structure-tests") run("structures",testOverworldStructures);
+    else if(scenario=="--ore-tests") run("ores",testOverworldOres);
+    else if(scenario=="--mesh-tests") run("meshes",testWorldMeshContracts);
+    else if(scenario=="--ecology-tests") {run("surface-ecology",testBiomeSurfaceEcology);run("ecology-formations",testEcologyFormations);run("structure-blueprints",testNewStructureBlueprints);}
     else if(scenario=="--heaven-tests") run("heaven",testHeaven);
-    else if(scenario=="--all") {run("overworld",testOverworld);run("heaven",testHeaven);}
+    else if(scenario=="--all") {run("overworld",testOverworld);run("structures",testOverworldStructures);run("ores",testOverworldOres);run("meshes",testWorldMeshContracts);run("surface-ecology",testBiomeSurfaceEcology);run("ecology-formations",testEcologyFormations);run("structure-blueprints",testNewStructureBlueprints);run("heaven",testHeaven);}
     else {std::cerr<<"Unknown world generation scenario\n";return 2;}
 }
+
+catch (...) { return TestSupport::reportUnhandledException(__FILE__); }

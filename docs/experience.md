@@ -69,12 +69,12 @@ next level. Changing levels preserves the bar's fraction; subtraction clamps at
 zero. Arithmetic saturates at the supported Java-scale level limit 238609312.
 Commands require cheats and remain host-only in LAN games.
 
-New writes use world v23, player-profile v6 and LAN v8. World v22 and profiles v5
+New writes use world v24, player-profile v7 and LAN v9. See [equipment progression](enchanting.md) for Mending and component persistence. World v22 and profiles v5
 remain readable, with player experience and furnace banks initialized to zero.
 Loading does not rewrite them. Normal saving upgrades individual partitions;
-mixed v22/v23 partitions remain readable, including plugin recovery and entity
+mixed v22/v23/v24 partitions remain readable, including plugin recovery and entity
 transfer snapshots. The local `lan-identity` credential remains unchanged.
-V2–v21 worlds remain inspection-only; old programs refuse new-format files.
+Storage v2–v21 remains inspection-only; old programs refuse new-format files. Playing also requires generation v22, independently of storage readability.
 
 The host owns rewards and pickup. Guest snapshots carry their own experience and
 sound sequences; clients cannot request an experience grant or claim the same

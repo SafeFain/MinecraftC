@@ -1,6 +1,7 @@
 #include "renderer/NetherEnvironment.h"
 #include "plugins/Runtime.h"
 #include "app/GameScenePresenter.h"
+#include "game/FallingAnvilState.h"
 #include "plugins/EnvironmentPresentation.h"
 
 #include "Config.h"
@@ -199,8 +200,23 @@ void GameScenePresenter::render(
             if (entity.type!=EntityType::Item) continue;
             heldItemRenderer.renderDropped(entity.item,vp,
                 glm::vec3(entity.position-renderOrigin),entity.ageSeconds,entity.behaviorSeed,
-                session.worldState().sampleLight(entity.position+glm::dvec3(0,.25,0)));
+                session.worldState().sampleLight(entity.position+glm::dvec3(0,.25,0)), FallingAnvilState::decode(entity.pluginState) ? FallingAnvilState::decode(entity.pluginState)->block : BlockId::AIR);
         }
+        std::set<uint64_t> moving;
+        for(const auto& motion:session.worldState().pistonMotions()) {
+            moving.insert(motion.id);auto& presentation=pistonPresentation[motion.id];
+            if(presentation.age!=motion.age){presentation.age=motion.age;presentation.elapsed=0;}
+            presentation.elapsed=std::min(.05f,presentation.elapsed+std::max(0.f,dt));
+            const double progress=std::min(1.,(double(motion.age)+presentation.elapsed*20)*.5);
+            const auto direction=glm::dvec3(Redstone::vector(Redstone::offset(motion.extending?motion.piston.facing:Redstone::opposite(motion.piston.facing))));
+            const auto draw=[&](Redstone::Position from,BlockId block) {
+                const auto minimum=glm::dvec3(Redstone::vector(from))+direction*progress;
+                heldItemRenderer.renderMovingBlock(block,vp,glm::vec3(minimum-renderOrigin),session.worldState().sampleLight(minimum+glm::dvec3(.5)));
+            };
+            for(const auto& move:motion.moves)draw(move.from,static_cast<BlockId>(move.block));
+            draw(motion.extending?motion.base:motion.head(),motion.headBlock());
+        }
+        for(auto it=pistonPresentation.begin();it!=pistonPresentation.end();)if(!moving.count(it->first))it=pistonPresentation.erase(it);else ++it;
         std::set<uint64_t> present;
         for (const auto& remote : session.remotePlayers()) {
             present.insert(remote.id);

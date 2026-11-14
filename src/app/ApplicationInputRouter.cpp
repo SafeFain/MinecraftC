@@ -155,6 +155,7 @@ void ApplicationInputRouter::handleKeyEvent(
             return;
         }
     }
+    if (m_ui.containerOpen && m_ui.containerScreen.wantsTextInput() && (action == ButtonAction::Press || action == ButtonAction::Repeat) && m_ui.containerScreen.onKey(key,mods)) return;
     if (m_ui.commandOpen) {
         if (action == ButtonAction::Press) {
             if (key == Key::Tab) {
@@ -347,6 +348,7 @@ void ApplicationInputRouter::handleKeyEvent(
 }
 
 void ApplicationInputRouter::handleTextEvent(std::string_view text) {
+    if (m_ui.containerOpen && m_ui.containerScreen.wantsTextInput()) { m_ui.containerScreen.onText(text); return; }
     if (m_ui.commandOpen) m_ui.resetCommandCompletion();
     for (const uint32_t codepoint : decodeUtf8(text)) {
         if (m_ui.commandOpen) {
@@ -731,7 +733,7 @@ void ApplicationInputRouter::handleGameplayAction(bool use, ButtonAction action)
                 m_session.pluginUse(true);
                 return;
             }
-            if (const auto kind=blockEntityTypeForBlock(target); kind&&isInventoryContainer(*kind)) {
+            if (const auto kind=blockEntityTypeForBlock(target); (kind&&isInventoryContainer(*kind)) || workstationTypeForBlock(target)) {
                 if (m_ui.containerScreen.open(m_session, hit->blockPos)) {
                     m_session.pluginUse(true);
                     m_ui.tradeOpen = false;

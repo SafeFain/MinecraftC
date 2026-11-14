@@ -9,7 +9,10 @@ InventoryAction action(const InventoryTransaction& window,uint64_t sequence,Inve
     InventoryAction result;result.sequence=sequence;result.revision=window.revision();result.operation=operation;result.slot=slot;return result;
 }
 }
+#include "EnchantmentRulesCases.h"
+
 int main() {
+    runEquipmentProgressionCases();
     InventoryModel inventory;inventory.slot(0)={ItemId::STONE,32,0};InventoryTransaction window;InventoryContext context;
     auto take=action(window,1,InventoryOperation::Click);require(window.apply(inventory,take,context).accepted,"Pick up failed");
     require(window.cursor().count==32 && inventory.slot(0).empty(),"Cursor is not authoritative");

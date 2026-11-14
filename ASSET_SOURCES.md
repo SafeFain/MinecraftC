@@ -146,3 +146,6 @@ python3 tools/texture_generator.py --generate --validate --build-atlas --build-i
 - Source: original cuboid geometry, generated semantic skins, animations and pixel sprites.
 - No downloaded or copied Minecraft assets. Licensed under the repository GPL-3.0-only license.
 - Eleven mobs, four projectiles, native materials, equipment, potion bottles and spawn eggs.
+
+## Redstone and slime (2026-11-09)
+Original redstone textures and derived inventory icons: tools/redstone_materials.py, CC0-1.0. Original slime model, green skin and animation graph: tools/generate_nether_models.py and the existing original cuboid/glTF writer, CC0-1.0 for the new slime assets. No external or Minecraft asset files were copied.

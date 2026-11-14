@@ -14,8 +14,10 @@ CreativeInventory::CreativeInventory() {
 void CreativeInventory::selectCategory(CreativeItemCategory category) {
     m_activeCategory = category;
     m_slots.clear();
-    for (const ItemId id : creativeInventoryItemsIn(category))
-        m_slots.push_back({id,0,0,false,false,{}});
+    for (const ItemId id : creativeInventoryItemsIn(category)) {
+        if (id == ItemId::ENCHANTED_BOOK) for (size_t i = 0; i < ENCHANTMENTS.size(); ++i) m_slots.push_back({id,static_cast<EnchantmentId>(i),0,0,false,false,{}});
+        else m_slots.push_back({id,EnchantmentId::Count,0,0,false,false,{}});
+    }
     m_scrollRow = 0;
     m_focus = 0;
     m_tabMode = false;
@@ -142,7 +144,8 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
                            : UiTheme::WidgetState::Normal;
         UiTheme::slot(ui,item.x,item.y,slot,slot,state,
                       glm::vec4(background,1.0f),1,&item.feedback);
-        ui.drawItemIcon(item.x+4,item.y+4,slot-8,slot-8,{item.id,1,0});
+        ItemStack icon{item.id,1}; if (validEnchantment(item.enchantment)) icon.components.storedEnchantments.set(item.enchantment,ENCHANTMENTS[static_cast<size_t>(item.enchantment)].maximumLevel);
+        ui.drawItemIcon(item.x+4,item.y+4,slot-8,slot-8,icon);
         if(item.hovered)hovered=&item;
     }
 
@@ -154,7 +157,7 @@ void CreativeInventory::render(UIRenderer& ui,int width,int height,int mouseX,in
                            m_scrollRow,m_visibleRows,m_totalRows);
     }
     if(hovered)ui.drawTooltip(m_gamepadFocus?hovered->x+slot:mouseX+12.0f,
-        m_gamepadFocus?hovered->y+slot:mouseY+12.0f,{hovered->id,1,0});
+        m_gamepadFocus?hovered->y+slot:mouseY+12.0f,[&] { ItemStack value{hovered->id,1}; if (validEnchantment(hovered->enchantment)) value.components.storedEnchantments.set(hovered->enchantment,ENCHANTMENTS[static_cast<size_t>(hovered->enchantment)].maximumLevel); return value; }());
     else if(hoveredTab>=0){
         const auto& info=creativeCategoryInfo(
             static_cast<CreativeItemCategory>(hoveredTab));
@@ -252,4 +255,9 @@ ItemId CreativeInventory::hoveredItem() const {
     for (const auto& item : m_slots)
         if (item.visible && item.hovered) return item.id;
     return ItemId::EMPTY;
+}
+
+EnchantmentId CreativeInventory::hoveredEnchantment() const {
+    for (const auto& item : m_slots) if (item.visible && item.hovered) return item.enchantment;
+    return EnchantmentId::Count;
 }

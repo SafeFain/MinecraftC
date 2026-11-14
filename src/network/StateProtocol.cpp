@@ -1,3 +1,4 @@
+#include "game/EnchantingRules.h"
 #include "network/StatusEffectProtocol.h"
 #include "world/BlockEntityLogic.h"
 #include "network/ContentIds.h"
@@ -15,13 +16,17 @@ bool boolean(Reader& reader) {
     return value != 0;
 }
 void writeStack(Writer& writer, const ItemStack& stack) {
-    if (!isValidItemId(stack.id) ||
+    if (!isValidItemId(stack.id) || !EnchantingRules::validComponents(stack) ||
         stack.count > getItemProps(stack.id).maxStack || stack.damage > getItemProps(stack.id).maxDurability || ((stack.id == ItemId::EMPTY) != (stack.count == 0)))
-        throw ProtocolError("Invalid state item");
+        throw ProtocolError("Invalid state item id=" + std::to_string(static_cast<uint16_t>(stack.id)) + " count=" + std::to_string(stack.count) + " damage=" + std::to_string(stack.damage));
     writer.u16(encodeItemId(stack.id)); writer.u8(stack.count); writer.u16(stack.damage);
+    writeItemComponents(stack.components, [&](uint8_t byte) { writer.u8(byte); });
 }
 ItemStack readStack(Reader& reader) {
-    const ItemStack stack{decodeItemId(reader.u16()), reader.u8(), reader.u16()};
+    // Keep stateful wire reads separate from constructor/default-argument lowering.
+    ItemStack stack;
+    stack.id = decodeItemId(reader.u16()); stack.count = reader.u8(); stack.damage = reader.u16();
+    stack.components = readItemComponents([&]() { return reader.u8(); });
     Writer check; writeStack(check, stack); return stack;
 }
 void positionValid(const glm::dvec3& position) {
@@ -161,6 +166,12 @@ Bytes encodeAuthorityState(const AuthorityState& state) {
         const auto& container = *state.window.container; writer.u8(static_cast<uint8_t>(container.type));
         for (const auto& stack : container.chest) writeStack(writer, stack);
         writeStack(writer, container.input); writeStack(writer, container.fuel); writeStack(writer, container.output);
+        writer.u32(container.workCost); writer.u8(container.workTooExpensive); writer.u8(container.workFailure);
+        for (auto value : container.offerFailure) writer.u8(value);
+        for (auto value : container.offerRequired) writer.u8(value);
+        for (auto value : container.offerClue) writer.u8(value);
+        for (auto value : container.offerClueLevel) writer.u8(value);
+        writer.u8(container.rename.has_value()); if (container.rename) writer.text(*container.rename,200);
         writer.u16(container.burnRemaining); writer.u16(container.burnTotal); writer.u16(container.cookProgress); writer.u16(container.cookTotal);
     }
     writer.u32(static_cast<uint32_t>(state.experience.level()));writer.f64(state.experience.progress());
@@ -201,6 +212,13 @@ AuthorityState decodeAuthorityState(const Bytes& bytes) {
         container.type = static_cast<BlockEntityType>(reader.u8());
         for (auto& stack : container.chest) stack = readStack(reader);
         container.input = readStack(reader); container.fuel = readStack(reader); container.output = readStack(reader);
+        container.workCost = reader.u32(); container.workTooExpensive = boolean(reader); container.workFailure = reader.u8();
+        if (container.workFailure > 5) throw ProtocolError("Invalid workstation failure");
+        for (auto& value : container.offerFailure) { value = reader.u8(); if (value > 3) throw ProtocolError("Invalid offer failure"); }
+        for (auto& value : container.offerRequired) value = reader.u8();
+        for (auto& value : container.offerClue) { value = reader.u8(); if (value > static_cast<uint8_t>(EnchantmentId::Count)) throw ProtocolError("Invalid clue"); }
+        for (auto& value : container.offerClueLevel) value = reader.u8();
+        if (boolean(reader)) { const auto name = reader.text(200); if (!ItemComponents::validName(name)) throw ProtocolError("Invalid rename"); container.rename = name; }
         container.burnRemaining = reader.u16(); container.burnTotal = reader.u16(); container.cookProgress = reader.u16(); container.cookTotal = reader.u16();
     }
     const auto level=reader.u32();const auto progress=reader.f64();

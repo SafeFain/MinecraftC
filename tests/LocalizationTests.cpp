@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "game/ArabicShaper.h"
 #include "game/Localization.h"
@@ -36,35 +37,43 @@ std::multiset<std::string> placeholders(const std::string& value) {
 }
 }
 
-int main() {
+int main() try {
     installHeavenFixture();
     const std::filesystem::path root = MINECRAFTC_SOURCE_DIR;
     Localization localization;
     localization.load(root / "assets");
-    require(localization.text("menu.home.singleplayer") == "Singleplayer",
-            "English is the initial language");
+    const auto readDictionary=[&](const std::filesystem::path& path) {
+        std::ifstream input(path);nlohmann::json dictionary;input>>dictionary;
+        require(dictionary.is_object(),"authored language dictionary parses");return dictionary;
+    };
+    const auto english=readDictionary(root/"assets/lang/en_us.json");
+    const auto chinese=readDictionary(root/"assets/lang/zh_cn.json");
+    const auto chineseOverrides=readDictionary(root/"assets/lang/overrides/zh_cn.json");
+    require(localization.language()==Language::English &&
+            localization.text("menu.home.singleplayer")==english.at("menu.home.singleplayer"),
+            "English is the initial language and resolves the authored dictionary");
     localization.setLanguage(Language::SimplifiedChinese);
-    require(localization.text("menu.home.singleplayer") == "单人游戏",
-            "Simplified Chinese strings load");
-    require(localization.format("loading.chunks", {"2", "9"}) == "2 / 9 个区块",
-            "localized positional formatting");
-    require(localization.format("loading.lod", {"42"}) == "正在加载远景 LOD：42%",
-            "distant-terrain loading formats the coverage percentage");
-    require(localization.format("loading.enter_dimension", {
-                localization.dimensionName(DimensionId::Overworld)}) == "正在进入主世界",
-            "Overworld loading title is fully translated in Simplified Chinese");
-    require(localization.text("official_heaven:travel.heaven") == "前往天境" &&
-            localization.text("sleep.travel_heaven") == "前往天境" &&
-            localization.format("loading.enter_dimension", {
-                localization.dimensionName(DimensionId::Heaven)}) == "正在进入天境",
-            "Chinese plugin travel aliases and loading titles are fully translated");
-    require(localization.text("lan.heaven")=="天境" &&
-            localization.itemName(ItemId::SKYROOT_PLANKS)=="天穹木板" &&
-            localization.itemName(ItemId::SUNSTONE_BRICKS)=="曦金石砖",
-            "host corrections unify plugin names and historical aliases");
-    require(localization.text("item.134")=="苦力怕刷怪蛋" &&
-            localization.text("settings.touch_opacity")=="控件不透明度：{0}%",
-            "Chinese item and opacity terminology is accurate");
+    require(localization.text("menu.home.singleplayer")==chinese.at("menu.home.singleplayer"),
+            "changing language selects the corresponding dictionary");
+    // Controlled grammar fixture protects formatting independently of shipped copy.
+    auto& chinesePlugin=Plugins::mutableContentState().extensions.translations["zh_cn"];
+    chinesePlugin["audit:format"]="{1}:{0}/{1} {9}";
+    require(localization.format("audit:format",{"first","Second"})=="Second:first/Second {9}",
+            "format replaces repeated/out-of-order arguments and retains unmatched placeholders");
+    chinesePlugin.erase("audit:format");
+    require(localization.text("sleep.travel_heaven")==localization.text("official_heaven:travel.heaven"),
+            "historical travel key resolves the namespaced provider translation");
+    for(const auto dimension:{DimensionId::Overworld,DimensionId::Heaven}) {
+        const auto name=localization.dimensionName(dimension);
+        require(!name.empty() && localization.format("loading.enter_dimension",{name}).find(name)!=std::string::npos,
+                "dimension loading includes the localized dimension name");
+    }
+    require(localization.dimensionName(DimensionId::Heaven)==chineseOverrides.at("official_heaven:dimension.heaven"),
+            "host override takes precedence over the provider dictionary");
+    for(const auto item:{ItemId::SKYROOT_PLANKS,ItemId::SUNSTONE_BRICKS}) {
+        const auto& key=Plugins::content().extensions.nameKeys.at(Plugins::itemKey(item));
+        require(localization.itemName(item)==chineseOverrides.at(key),"item names honor host overrides");
+    }
     for (const Language language : languagesByEnglishName())
         require(localization.hasTranslation(language, "loading.lod"),
                 "distant-terrain loading is translated in every language");
@@ -101,9 +110,6 @@ int main() {
                 Language::SimplifiedChinese, "settings.frame_rate"),
             "frame-rate setting is translated");
     for (const Language language : languagesByEnglishName()) {
-        for (uint16_t item = 183; item <= 260; ++item)
-            require(localization.hasTranslation(language, "item." + std::to_string(item)),
-                    "all decoration and natural items have translations in every language");
         require(localization.hasTranslation(language, "message.given"),
                 "give command feedback is translated");
     }
@@ -154,22 +160,25 @@ int main() {
     // The language option lists every language sorted by the first letter of
     // its English name, and each code survives the settings round trip.
     const auto& order = languagesByEnglishName();
-    require(order.size() == 10, "ten languages are supported");
-    const char* expectedNames[] = {
-        "Arabic", "Simplified Chinese", "English", "French", "German",
-        "Japanese", "Korean", "Portuguese", "Russian", "Spanish"
+    require(order.size() == static_cast<size_t>(Language::Count), "language option must list every language");
+    std::set<Language> listedLanguages;
+    // The documented order uses the base language name (Chinese), while the
+    // display label identifies the supported variant as Simplified Chinese.
+    const auto sortName=[](Language language)->std::string_view {
+        return language==Language::SimplifiedChinese ? "Chinese" : languageEnglishName(language);
     };
     for (size_t index = 0; index < order.size(); ++index) {
-        require(languageEnglishName(order[index]) == expectedNames[index],
-                "language option is sorted by the English name");
+        require(listedLanguages.insert(order[index]).second, "duplicate language option");
+        require(index == 0 || sortName(order[index-1]) < sortName(order[index]),
+                "language option is sorted by its base English language name");
         require(parseLanguage(languageCode(order[index])) == order[index],
                 "language code round-trips");
         require(!languageNativeName(order[index]).empty(),
                 "every language has a native display name");
     }
-    require(nextLanguage(Language::Spanish) == Language::Arabic &&
-            nextLanguage(Language::Arabic) == Language::SimplifiedChinese,
-            "language cycling follows the sorted order and wraps around");
+    for(size_t index=0;index<order.size();++index)
+        require(nextLanguage(order[index])==order[(index+1)%order.size()],
+                "language cycling follows the sorted order and wraps around");
 
     // Every language file must cover the full English key set, and every
     // non-English file must also name every registered item.
@@ -245,7 +254,7 @@ int main() {
                     "every creative tab name is translated in every language");
     }
     localization.setLanguage(Language::English);
-    require(localization.text("menu.home.settings") == "Settings",
+    require(localization.text("menu.home.settings") == english.at("menu.home.settings"),
             "switching back to English restores English strings");
 
     // Arabic strings are shaped into joined presentation forms and reordered
@@ -268,9 +277,9 @@ int main() {
     require(shapeArabic("سرعة: 60") == "60 :ﺔﻋﺮﺳ",
             "digits move to the left of shaped Arabic text");
     localization.setLanguage(Language::Arabic);
-    // الإعدادات joins its leading lam with the alef-hamza-below ligature.
+    const auto arabic=readDictionary(root/"assets/lang/ar_sa.json");
     require(localization.text("menu.home.settings") ==
-            "ﺕﺍﺩﺍﺪﻋﻹﺍ",
+            shapeArabic(arabic.at("menu.home.settings").get<std::string>()),
             "Arabic UI strings are shaped for display");
     localization.setLanguage(Language::English);
 
@@ -278,11 +287,11 @@ int main() {
     for(const auto language:languagesByEnglishName()) {
         localization.setLanguage(language);
         const auto& dictionary=Plugins::mutableContentState().extensions.translations.at(std::string(languageCode(language)));
-        const auto expected=language==Language::SimplifiedChinese?std::string("天境"):
+        const auto expected=language==Language::SimplifiedChinese?chineseOverrides.at("official_heaven:dimension.heaven").get<std::string>():
             dictionary.at("official_heaven:dimension.heaven");
         require(localization.dimensionName(DimensionId::Heaven)==(language==Language::Arabic?shapeArabic(expected):expected),
                 "registered dimension name uses each packaged language");
-        require(localization.hasTranslation(language,"official_heaven:travel.heaven"),"registered travel label is translated in all ten languages");
+        require(localization.hasTranslation(language,"official_heaven:travel.heaven"),"registered travel label is translated in every registered language");
     }
     localization.setLanguage(Language::Arabic);
     require(localization.format("loading.enter_dimension",{localization.dimensionName(DimensionId::Heaven)})==
@@ -400,7 +409,7 @@ int main() {
         checkGlyphs(checkGlyphs,extra);
         if(file.filename()=="descriptions.json")for(const auto& plugin:extra.items())
             for(const auto language:languagesByEnglishName())
-                require(plugin.value().contains(std::string(languageCode(language))),"official descriptions cover all ten languages");
+                require(plugin.value().contains(std::string(languageCode(language))),"official descriptions cover every registered language");
         else for(const auto& entry:extra.items()) {
             const auto& en=Plugins::mutableContentState().extensions.translations.at("en_us");
             require(en.count(entry.key())!=0,"host correction only targets registered provider keys");
@@ -408,4 +417,6 @@ int main() {
         }
     }
     std::cout << "Localization and UTF-8 tests passed\n";
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

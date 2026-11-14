@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "plugins/official_heaven/HeavenEnvironment.h"
 #include "HeavenContentFixture.h"
 #include "core/Window.h"
@@ -12,7 +13,7 @@
 #include <iostream>
 #include <stdexcept>
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
     installHeavenFixture();
     if (argc < 2 || argc > 3) {
         std::cerr << "Usage: vulkan_decoration_smoke <asset-directory> [--natural|--natural-preview|--ecology|--ecology-preview|--heaven|--heaven-preview|--heaven-island]\n";
@@ -114,4 +115,6 @@ int main(int argc, char** argv) {
         std::cerr << "Decoration smoke failed: " << error.what() << '\n';
         return 1;
     }
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

@@ -1,4 +1,7 @@
 #include "entity/EntityManager.h"
+#include "entity/SlimeRules.h"
+#include "game/FallingAnvilState.h"
+#include "game/EnchantmentHitContext.h"
 #include "entity/EntityLogic.h"
 #include "entity/EntityPresentation.h"
 #include "entity/ProjectileCollision.h"
@@ -270,7 +273,7 @@ void EntityManager::spawnItem(
 }
 
 void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
-                               float damage, bool playerOwned, uint64_t shooterId) {
+                               float damage, bool playerOwned, uint64_t shooterId, ItemStack weapon, bool pickup, const std::string& owner) {
     Entity entity;
     entity.id = m_nextId++;
     entity.type = EntityType::Arrow;
@@ -278,6 +281,9 @@ void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velo
     entity.velocity = velocity;
     if (glm::length(velocity) > 0.0001f)
         entity.facing = glm::normalize(velocity);
+    entity.item = weapon;
+    entity.pluginState = nlohmann::json{{"native_owner",owner},{"arrow_pickup",pickup}}.dump();
+    entity.nativeOwner = owner;
     entity.projectileDamage = damage;
     entity.playerOwned = playerOwned;
     entity.shooterId = shooterId;
@@ -289,6 +295,7 @@ void EntityManager::spawnArrow(const glm::dvec3& position, const glm::vec3& velo
 void EntityManager::primeTnt(const glm::ivec3& position, float fuseSeconds,
                              bool removeBlock, bool playerIgnited) {
     if (removeBlock) {
+        if(m_world.redstoneTickPending())return;
         if (m_world.getBlock(position.x, position.y, position.z) != BlockId::TNT)
             return;
         m_world.setBlock(position.x, position.y, position.z, BlockId::AIR);
@@ -345,6 +352,7 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
     }
     if(nativeNetherMob(type))entity.health=nativeMobHealth(type);
     if(type==EntityType::MagmaCube)entity.health=16;
+    if(type==EntityType::Slime){entity.nether.magmaSize=static_cast<uint8_t>(entity.behaviorSeed%3);entity.health=float(slimeHealth(entity.nether.magmaSize));}
     if (collides(entity, position)) return false;
     pluginEvent(entity,MC_ENTITY_SPAWN);
     m_entities.push_back(entity);
@@ -354,6 +362,7 @@ bool EntityManager::spawnMob(EntityType type, const glm::dvec3& position) {
 }
 
 bool EntityManager::hostile(EntityType type) {
+    if(type==EntityType::Slime)return true;
     if(nativeNetherMob(type))return type!=EntityType::Strider;
     if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(type)))return e->hostile;
     return type == EntityType::Zombie || type == EntityType::Skeleton ||
@@ -501,7 +510,7 @@ void EntityManager::rebuildLogicalVillages() {
 }
 
 void EntityManager::spawnAroundPlayer(
-    const glm::dvec3& playerPosition, bool spawnHostile, bool underground) {
+    const glm::dvec3& playerPosition, bool spawnHostile, bool underground,bool slimeOnly) {
     const size_t mobCount = static_cast<size_t>(std::count_if(
         m_entities.begin(), m_entities.end(),
         [spawnHostile](const Entity& entity) {
@@ -511,6 +520,7 @@ void EntityManager::spawnAroundPlayer(
         }));
     if (mobCount >= (spawnHostile ? 24u : 16u)) return;
     const uint32_t random = hash32(++m_spawnSequence);
+    if(slimeOnly && m_world.dimension()!=DimensionId::Overworld)return;
     const float angle = static_cast<float>(random % 6283) * 0.001f;
     const float distance = 18.0f + static_cast<float>((random >> 16) % 15);
     const int x = static_cast<int>(std::floor(playerPosition.x + std::cos(angle) * distance));
@@ -524,8 +534,9 @@ void EntityManager::spawnAroundPlayer(
         }
         return;
     }
+    if(slimeOnly && !isSlimeChunk(m_world.generator().getSeed(),World::worldToChunkX(x),World::worldToChunkZ(z)))return;
     int surface = -1;
-    const int scanTop = m_world.dimension()==DimensionId::Nether?std::min(110,int(std::floor(playerPosition.y))+7):underground
+    const int scanTop = slimeOnly?std::min(38,int(std::floor(playerPosition.y))+7):m_world.dimension()==DimensionId::Nether?std::min(110,int(std::floor(playerPosition.y))+7):underground
         ? std::min(Config::WORLD_MAX_Y - 2,
                    static_cast<int>(std::floor(playerPosition.y)) + 7)
         : Config::WORLD_MAX_Y - 1;
@@ -549,6 +560,7 @@ void EntityManager::spawnAroundPlayer(
         m_world.getBlock(x, surface + 1, z) != BlockId::AIR) return;
     for (const auto& view : m_framePlayers)
         if (!view.player->isSpectator() && glm::distance(glm::dvec3(x+.5, surface, z+.5), view.player->getPosition()) < 18) return;
+    if(slimeOnly){if(surface>=40)return;spawnMob(EntityType::Slime,{x+.5,double(surface),z+.5});return;}
     if (underground && m_world.hasSkyAccess(x, surface, z)) return;
     if(m_world.dimension()==DimensionId::Nether) {
         const auto& generator=m_world.generator().nether();
@@ -627,7 +639,15 @@ float EntityManager::damageEntity(Entity& entity, float damage,
     // a lethal hit removes it and before the periodic village refresh.
     if(playerAttack && entity.type==EntityType::Villager)rebuildLogicalVillages();
     entity.health -= accepted;
-    if(playerAttack && registeredMob(entity.type))entity.playerHitRemaining=5.f;
+    if(playerAttack && registeredMob(entity.type)) {
+        entity.playerHitRemaining=5.f;
+        if (static_cast<uint16_t>(entity.type)<MC_BUILTIN_ENTITY_COUNT)
+            for (const auto& view : m_framePlayers) if (view.player && view.id==sourceId) {
+                const auto& identity=view.player->persistentIdentity();
+                entity.pluginState=EnchantmentHitContext::write(entity.pluginState,identity.empty()?"local":identity,5.f);
+                break;
+            }
+    }
     if(nativeNetherMob(entity.type)&&playerAttack) {entity.nether.angerTicks=600;if(entity.type==EntityType::Piglin||entity.type==EntityType::ZombifiedPiglin)angerPiglins(entity.position,entity.type==EntityType::ZombifiedPiglin);}
     if(entity.type==EntityType::Enderman)teleportEnderman(entity);
     if(entity.health<=0 && entity.type==EntityType::IronGolem)
@@ -669,10 +689,7 @@ bool EntityManager::collides(const Entity& entity, const glm::dvec3& position) c
     const int minZ=static_cast<int>(std::floor(position.z-halfZ));
     const int maxZ=static_cast<int>(std::floor(position.z+halfZ-1e-6));
     for(int y=minY;y<=maxY;++y) for(int z=minZ;z<=maxZ;++z) for(int x=minX;x<=maxX;++x) {
-        const BlockId block = m_world.getBlock(x,y,z);
-        const BlockCollisionBoxes boxes = blockCollisionBoxes(block);
-        for (uint8_t i = 0; i < boxes.count; ++i) {
-            const BlockCollisionBox& box = boxes.boxes[i];
+        for(const auto& box:m_world.collisionBoxesAt({x,y,z})) {
             if (position.x-halfX < x+box.max.x && position.x+halfX > x+box.min.x &&
                 position.y < y+box.max.y && position.y+size.y > y+box.min.y &&
                 position.z-halfZ < z+box.max.z && position.z+halfZ > z+box.min.z)
@@ -692,6 +709,15 @@ void EntityManager::update(Player& player, float dt, bool isDay, bool peaceful,
 void EntityManager::update(const std::vector<EntityPlayerView>& players, float dt,
                            bool isDay, bool peaceful, bool thunderstorm,
                            bool raining, uint64_t worldTick) {
+    for (const auto p : m_world.takeFallingAnvils()) {
+        const auto block = m_world.getLoadedBlock(p.x,p.y,p.z), below = m_world.getLoadedBlock(p.x,p.y-1,p.z);
+        if (!block || !isAnvil(*block) || !below || blockCollisionBoxes(*below).count != 0) continue;
+        Entity falling; falling.id = m_nextId++; falling.type = EntityType::Item; falling.health = 1;
+        falling.position = glm::dvec3(p) + glm::dvec3(.5,0,.5); falling.item = {itemForBlock(*block),1};
+        falling.pluginState = FallingAnvilState{*block,double(p.y)}.encode();
+        m_world.setBlock(p.x,p.y,p.z,BlockId::AIR);
+        m_entities.push_back(std::move(falling));
+    }
     m_framePlayers = players;
     m_framePlayers.erase(std::remove_if(m_framePlayers.begin(), m_framePlayers.end(),
         [](const EntityPlayerView& view) { return !view.player; }), m_framePlayers.end());
@@ -753,6 +779,8 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
             if ((m_world.dimension()==DimensionId::Nether || !underground || !peaceful) &&
                 (!spawnHostile || m_world.gameRules().boolean(GameRuleId::SpawnMonsters)))
                 spawnAroundPlayer(playerPosition, spawnHostile, underground);
+            if(!peaceful && m_world.gameRules().boolean(GameRuleId::SpawnMonsters) && m_world.dimension()==DimensionId::Overworld)
+                spawnAroundPlayer(playerPosition,true,true,true);
             m_spawnTimer = 0.0f;
         }
     } else {
@@ -775,6 +803,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
         entity.ageSeconds += dt;
         entity.actionCooldown = std::max(0.0f, entity.actionCooldown - dt);
         entity.playerHitRemaining=std::max(0.f,entity.playerHitRemaining-dt);
+        EnchantmentHitContext::tick(entity.pluginState,dt);
         if(entity.type==EntityType::ExperienceOrb){updateExperienceOrb(entity,dt);continue;}
         entity.hurtFlashSeconds = std::max(0.0f, entity.hurtFlashSeconds - dt);
         if(nativeProjectile(entity.type)){updateNativeProjectile(entity,dt);continue;}
@@ -788,6 +817,7 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
                 entity.health = 0.0f;
             continue;
         }
+        if (entity.type == EntityType::Item && FallingAnvilState::decode(entity.pluginState)) { updateFallingAnvil(entity,dt); continue; }
         if (entity.type == EntityType::Item) {
             const auto cell=glm::ivec3(glm::floor(entity.position));
             const auto block=m_world.getBlock(cell.x,cell.y,cell.z);
@@ -956,11 +986,12 @@ void EntityManager::update(const std::vector<EntityPlayerView>& players, float d
            (entity.playerHitRemaining>0 || (entity.type==EntityType::ZombifiedPiglin&&entity.nether.angerTicks>0)))
             spawnExperience(entity.position,mobExperience(entity.type,entity.nether.magmaSize,
                 (entity.type==EntityType::ZombieVillager)&&!entity.villager.adult(),experienceRandom()));
-        if(entity.type==EntityType::MagmaCube && entity.nether.magmaSize>0 && !peaceful) {
-            for(int child=0;child<4;++child) {
+        if(jumpingCube(entity.type) && entity.nether.magmaSize>0 && !peaceful) {
+            const int children=entity.type==EntityType::Slime?2+int(entity.behaviorSeed%3):4;
+            for(int child=0;child<children;++child) {
                 const auto position=entity.position+glm::dvec3((child%2-.5)*.9,0,(child/2-.5)*.9);
                 // Test the smaller child's footprint, never the parent's bounds.
-                Entity split;split.id=m_nextId++;split.type=EntityType::MagmaCube;split.position=position;
+                Entity split;split.id=m_nextId++;split.type=entity.type;split.position=position;
                 split.nether.magmaSize=entity.nether.magmaSize-1;split.health=float(1u<<(2*split.nether.magmaSize));
                 split.behaviorSeed=hash32(entity.behaviorSeed+child+1);
                 if(!collides(split,position))m_entities.push_back(split);
@@ -1021,6 +1052,7 @@ void EntityManager::dropMobLoot(const Entity& entity) {
         case EntityType::WitherSkeleton:
             loot={{ItemId::BONE,1,0},{ItemId::COAL,1,0}};
             if(entity.behaviorSeed%40==0)loot.push_back({ItemId::WITHER_SKELETON_SKULL,1,0});break;
+        case EntityType::Slime:if(entity.nether.magmaSize==0)loot={{ItemId::SLIME_BALL,static_cast<uint8_t>(entity.behaviorSeed%3),0}};break;
         case EntityType::MagmaCube:if(entity.behaviorSeed%4==0)loot={{ItemId::MAGMA_CREAM,1,0}};break;
         case EntityType::Piglin:case EntityType::PiglinBrute:case EntityType::ZombifiedPiglin:
             loot={{ItemId::GOLD_NUGGET,1,0}};break;
@@ -1038,7 +1070,27 @@ void EntityManager::dropMobLoot(const Entity& entity) {
         case EntityType::Item: break;
         case EntityType::PrimedTnt: break;
     }
-    for (const auto& stack : loot) spawnItem(entity.position, stack);
+    uint8_t looting = entity.playerHitRemaining>0 ? entity.lootingLevel : 0;
+    if (const auto hit=EnchantmentHitContext::read(entity.pluginState)) {
+        looting=0;
+        for (const auto& view : m_framePlayers) if (view.player) {
+            const auto& identity=view.player->persistentIdentity();
+            if (hit->owner==(identity.empty()?"local":identity)) {
+                looting=view.player->activeItem().enchantment(EnchantmentId::Looting); break;
+            }
+        }
+    }
+    uint64_t lootRandom = entity.behaviorSeed ^ uint64_t(entity.ageSeconds * 20);
+    for (auto stack : loot) {
+        if (looting && entity.type!=EntityType::IronGolem && stack.id!=ItemId::SADDLE) stack.count = static_cast<uint8_t>(std::min<unsigned>(getItemProps(stack.id).maxStack, stack.count + EquipmentRules::random(lootRandom) % (looting + 1)));
+        if (entity.burningSeconds > 0) {
+            if (stack.id == ItemId::RAW_BEEF) stack.id = ItemId::STEAK;
+            else if (stack.id == ItemId::RAW_PORKCHOP) stack.id = ItemId::COOKED_PORKCHOP;
+            else if (stack.id == ItemId::RAW_CHICKEN) stack.id = ItemId::COOKED_CHICKEN;
+            else if (stack.id == ItemId::MUTTON) stack.id = ItemId::COOKED_MUTTON;
+        }
+        spawnItem(entity.position, stack);
+    }
 }
 
 namespace {
@@ -1117,16 +1169,39 @@ MeleeAttackResult EntityManager::attackRay(
     glm::vec3 horizontal(direction.x, 0.0f, direction.z);
     if (glm::length(horizontal) > 0.001f)
         horizontal = glm::normalize(horizontal) *
-            (attack.sprintKnockback ? 6.0f : 4.0f);
+            ((attack.sprintKnockback ? 6.0f : 4.0f) + 2.f * attack.weapon.enchantment(EnchantmentId::Knockback));
     horizontal.y = 2.0f;
-    const auto playerDamage = [&origin](Player& victim, float amount, glm::vec3 impulse) {
+    const auto playerDamage = [this,&origin,playerId](Player& victim, float amount, glm::vec3 impulse) {
         DamageSourceInfo source; source.amount = amount; source.cause = DamageCause::Melee;
         source.shieldBlockable = source.hasOrigin = true; source.origin = origin; source.impulse = impulse;
+        source.retaliate = [this,playerId](float amount) {
+            for (const auto& view : m_framePlayers) if (view.player && view.id == playerId) { DamageSourceInfo thorns; thorns.amount = amount; thorns.cause = DamageCause::Thorns; view.player->takeDamage(thorns); break; }
+        };
         return victim.takeDamage(source).appliedDamage;
     };
-    result.primaryDamage = otherPlayer ? playerDamage(*otherPlayer, attack.damage, horizontal) :
-        damageEntity(*best, attack.damage, horizontal, true, origin, playerId == UINT64_MAX ? 0 : playerId);
+    const auto enchantmentDamage = [&](EntityType type) {
+        float bonus = 0;
+        const auto sharpness = attack.weapon.enchantment(EnchantmentId::Sharpness);
+        if (sharpness) bonus += .5f + sharpness * .5f;
+        if (undeadEntity(type)) bonus += 2.5f * attack.weapon.enchantment(EnchantmentId::Smite);
+        if (type == EntityType::Spider) bonus += 2.5f * attack.weapon.enchantment(EnchantmentId::BaneOfArthropods);
+        return bonus * attack.strength;
+    };
+    result.primaryDamage = otherPlayer ? playerDamage(*otherPlayer, attack.damage + enchantmentDamage(EntityType::Item), horizontal) :
+        damageEntity(*best, attack.damage + enchantmentDamage(best->type), horizontal, true, origin, playerId == UINT64_MAX ? 0 : playerId);
     result.primaryDamaged = result.primaryDamage > 0.0f;
+    if (result.primaryDamaged) {
+        const auto fire = attack.weapon.enchantment(EnchantmentId::FireAspect);
+        if (otherPlayer && fire) otherPlayer->ignite(4.f * fire);
+        if (best) {
+            best->lootingLevel = attack.weapon.enchantment(EnchantmentId::Looting);
+            if (fire && !nativeFireImmune(best->type) && !best->effects.level(StatusEffectType::FireResistance)) best->burningSeconds = std::max(best->burningSeconds,4.f*fire);
+            const auto bane = attack.weapon.enchantment(EnchantmentId::BaneOfArthropods);
+            if (bane && best->type == EntityType::Spider) best->effects.apply(StatusEffectType::Slowness,3,30 + hash32(best->behaviorSeed + uint32_t(best->ageSeconds*20)) % (1+10*bane));
+        }
+    }
+    const auto sweepingLevel = attack.weapon.enchantment(EnchantmentId::SweepingEdge);
+    const float sweepDamage = CombatRules::SWEEP_DAMAGE + attack.damage * sweepingLevel / (sweepingLevel + 1);
 
     if (!attack.sweeping || !result.primaryDamaged) return result;
     const glm::vec3 bestSize = primarySize;
@@ -1157,7 +1232,7 @@ MeleeAttackResult EntityManager::attackRay(
         if (glm::length(sweepKnockback) > 0.001f)
             sweepKnockback = glm::normalize(sweepKnockback) * 4.0f;
         sweepKnockback.y = 2.0f;
-        if (damageEntity(entity, CombatRules::SWEEP_DAMAGE,
+        if (damageEntity(entity, sweepDamage,
                          sweepKnockback, true, origin, playerId == UINT64_MAX ? 0 : playerId) > 0.0f)
             result.sweptPositions.push_back(center);
     }
@@ -1171,7 +1246,7 @@ MeleeAttackResult EntityManager::attackRay(
         auto impulse = glm::vec3(center - primaryPosition); impulse.y = 0;
         if (glm::length(impulse) > .001f) impulse = glm::normalize(impulse) * 4.0f;
         impulse.y = 2;
-        if (playerDamage(*view.player, CombatRules::SWEEP_DAMAGE, impulse) > 0) result.sweptPositions.push_back(center);
+        if (playerDamage(*view.player, sweepDamage, impulse) > 0) result.sweptPositions.push_back(center);
     }
     return result;
 }
@@ -1194,8 +1269,15 @@ bool EntityManager::hasAttackTarget(
 }
 
 void EntityManager::updateArrow(Entity& arrow, float dt) {
+    if (arrow.playerOwned) {
+        const auto owner = NativeProjectileState::owner(arrow.pluginState);
+        if (!owner.empty()) for (const auto& view : m_framePlayers)
+            if (view.player && view.player->persistentIdentity() == owner) { arrow.shooterId = view.id; break; }
+    }
     if (arrow.inGround) {
-        if (arrow.playerOwned && arrow.ageSeconds > 0.5f)
+        const auto state = nlohmann::json::parse(arrow.pluginState,nullptr,false);
+        const bool pickup = !state.is_object() || !state.contains("arrow_pickup") || (state["arrow_pickup"].is_boolean() && state["arrow_pickup"].get<bool>());
+        if (pickup && arrow.playerOwned && arrow.ageSeconds > 0.5f)
             for (const auto& view : m_framePlayers) {
                 if (!view.canPickup || glm::distance(arrow.position, view.player->getPosition()) >= 1.6) continue;
                 if (view.player->inventory().add({ItemId::ARROW, 1, 0}) == 0) {
@@ -1261,7 +1343,7 @@ void EntityManager::updateArrow(Entity& arrow, float dt) {
     if(victim && victim->type==EntityType::Enderman && teleportEnderman(*victim))return;
     glm::vec3 knockback(arrow.velocity.x, 0.0f, arrow.velocity.z);
     if (glm::length(knockback) > 0.001f)
-        knockback = glm::normalize(knockback) * 3.0f;
+        knockback = glm::normalize(knockback) * (3.0f + 2.f * arrow.item.enchantment(EnchantmentId::Punch));
     knockback.y = 1.5f;
     // Incoming side of the contact supplies the shield/retaliation direction.
     const glm::dvec3 sourceOrigin = arrow.position - glm::dvec3(arrow.velocity) * .01;
@@ -1273,11 +1355,28 @@ void EntityManager::updateArrow(Entity& arrow, float dt) {
         source.hasOrigin = true;
         source.origin = sourceOrigin;
         source.impulse = knockback;
-        if (hitPlayer->takeDamage(source).blocked) {
+        source.retaliate = [this,&arrow](float amount) {
+            for (const auto& view : m_framePlayers) if (view.player && view.id == arrow.shooterId) {
+                DamageSourceInfo thorns; thorns.amount = amount; thorns.cause = DamageCause::Thorns;
+                view.player->takeDamage(thorns); return;
+            }
+            for (auto& shooter : m_entities) if (shooter.id == arrow.shooterId && registeredMob(shooter.type)) {
+                damageEntity(shooter,amount,glm::vec3(0),false,arrow.position); return;
+            }
+        };
+        const auto outcome = hitPlayer->takeDamage(source);
+        if (outcome.appliedDamage > 0 && arrow.item.enchantment(EnchantmentId::Flame)) hitPlayer->ignite(5);
+        if (outcome.blocked) {
             arrow.velocity *= -0.2f;
             arrow.playerOwned = true;
             const auto reflected = std::find_if(m_framePlayers.begin(), m_framePlayers.end(), [hitPlayer](const EntityPlayerView& view) { return view.player == hitPlayer; });
             arrow.shooterId = reflected == m_framePlayers.end() ? UINT64_MAX : reflected->id;
+            arrow.nativeOwner = hitPlayer->persistentIdentity().empty() ? "local" : hitPlayer->persistentIdentity();
+            auto reflectedState = nlohmann::json::parse(arrow.pluginState,nullptr,false);
+            if (!reflectedState.is_object()) reflectedState = nlohmann::json::object();
+            const auto identity = nlohmann::json::parse(NativeProjectileState::encode(arrow.nativeOwner));
+            for (auto it = identity.begin(); it != identity.end(); ++it) reflectedState[it.key()] = it.value();
+            arrow.pluginState = reflectedState.dump();
             if (glm::length(arrow.velocity) > 0.0001f)
                 arrow.facing = glm::normalize(arrow.velocity);
             // Consume the rest of this frame after reflection. Ownership now
@@ -1287,8 +1386,15 @@ void EntityManager::updateArrow(Entity& arrow, float dt) {
             return;
         }
     } else {
-        damageEntity(*victim, arrow.projectileDamage, knockback,
+        const auto applied = damageEntity(*victim, arrow.projectileDamage, knockback,
                      arrow.playerOwned, sourceOrigin, arrow.shooterId);
+        if (applied > 0) {
+            const auto owner=NativeProjectileState::owner(arrow.pluginState);
+            if (arrow.playerOwned && !owner.empty() && static_cast<uint16_t>(victim->type)<MC_BUILTIN_ENTITY_COUNT)
+                victim->pluginState=EnchantmentHitContext::write(victim->pluginState,owner,5.f);
+            if (arrow.item.enchantment(EnchantmentId::Flame) && !nativeFireImmune(victim->type) && !victim->effects.level(StatusEffectType::FireResistance)) victim->burningSeconds = std::max(victim->burningSeconds,5.f);
+            for (const auto& view : m_framePlayers) if (view.player && (view.id == arrow.shooterId || view.player->persistentIdentity() == NativeProjectileState::owner(arrow.pluginState))) victim->lootingLevel = view.player->activeItem().enchantment(EnchantmentId::Looting);
+        }
     }
     arrow.health = 0.0f;
 }
@@ -1404,6 +1510,7 @@ void EntityManager::explode(const glm::dvec3& center,
 }
 
 glm::vec3 EntityManager::renderSize(EntityType type) {
+    if(type==EntityType::Slime)return {.51f,.51f,.51f};
     switch(type) {
 #define NETHER_SIZE(type,egg,key,label,h,x,y,z,s,d,monster,fire) case EntityType::type:return {x,y,z};
         MC_NETHER_MOBS(NETHER_SIZE)
@@ -1472,7 +1579,7 @@ void EntityManager::applyEntityPotion(Entity& target,const PotionDefinition& pot
         case EntityType::Chicken:maximum=4;break;
         case EntityType::Spider:maximum=16;break;
         case EntityType::IronGolem:maximum=100;break;
-        case EntityType::MagmaCube:maximum=float(1u<<(2*target.nether.magmaSize));break;
+        case EntityType::Slime:case EntityType::MagmaCube:maximum=float(1u<<(2*target.nether.magmaSize));break;
         default:break;
     }
     if(effect.type==StatusEffectType::Healing)target.health=std::min(maximum,target.health+float(4u<<effect.amplifier)*intensity);
@@ -1589,7 +1696,7 @@ bool EntityManager::useNativeMob(Player& player,uint64_t playerId) {
         if(selected.id==ItemId::WARPED_FUNGUS_ON_A_STICK) {
             for(auto& entity:m_entities)if(entity.riderId==playerId && entity.nether.boostTicks==0) {
                 if(player.isSurvival()&&selected.damage+1>=getItemProps(selected.id).maxDurability)return false;
-                entity.nether.boostTicks=100;if(player.isSurvival())++selected.damage;return true;
+                entity.nether.boostTicks=100;if(player.isSurvival())EquipmentRules::damage(selected,1,player.m_equipmentRandom);return true;
             }
         }
         return false;
@@ -1811,5 +1918,68 @@ void EntityManager::updateExperienceOrb(Entity& orb,float dt) {
         target->player->collectExperience(orb.experienceOrb.value);
         m_experiencePickupCooldown[target->id]+=.1f;
         if(--orb.experienceOrb.count==0)orb.health=0;
+    }
+}
+
+void EntityManager::updateFallingAnvil(Entity& entity, float dt) {
+    const auto state = FallingAnvilState::decode(entity.pluginState);
+    if (!state) return;
+    const int x = int(std::floor(entity.position.x)), z = int(std::floor(entity.position.z));
+    const auto drop = [&] {
+        if (m_world.gameRules().boolean(GameRuleId::BlockDrops)) {
+            Entity item; item.type = EntityType::Item; item.item = entity.item; item.position = entity.position; item.health = 1; item.actionCooldown = .5f;
+            m_nativeSpawns.push_back(std::move(item));
+        }
+    };
+    float remaining = std::min(dt,.25f);
+    while (remaining > 0 && entity.health > 0) {
+        const float step = std::min(remaining,.025f); remaining -= step;
+        entity.velocity.y -= 9.81f * step;
+        const double next = entity.position.y + entity.velocity.y * step;
+        if (next < -64) { drop(); entity.health = 0; return; }
+        bool landed = false;
+        double supportY = 0;
+        for (int y = int(std::floor(next)); y <= int(std::floor(entity.position.y)); ++y) {
+            const auto block = m_world.getLoadedBlock(x,y,z);
+            if (!block) { entity.velocity.y = 0; entity.ageSeconds = std::max(0.f,entity.ageSeconds-dt); return; }
+            const auto boxes = blockCollisionBoxes(*block);
+            for (unsigned i = 0; i < boxes.count; ++i) {
+                const double top = y + boxes.boxes[i].max.y;
+                if (top <= entity.position.y + .001 && top >= next) { if (!landed || top > supportY) supportY = top; landed = true; }
+            }
+        }
+        if (!landed) { entity.position.y = next; if (next < -64 || entity.ageSeconds > 30) { drop(); entity.health = 0; } continue; }
+        entity.position.y = supportY;
+        const double distance = std::max(0.,state->originY - supportY);
+        const float damage = static_cast<float>(std::min(40.,std::max(0.,std::ceil(distance)-1)*2));
+        if (damage > 0) {
+            for (const auto& view : m_framePlayers) if (view.player && view.damageable && std::abs(view.player->getPosition().x-entity.position.x)<.8 && std::abs(view.player->getPosition().z-entity.position.z)<.8 && view.player->getPosition().y < supportY+1 && view.player->getPosition().y+view.player->currentHeight()>supportY) {
+                DamageSourceInfo source; source.amount = damage; source.cause = DamageCause::FallingBlock; source.hasOrigin = true; source.origin = entity.position; view.player->takeDamage(source);
+            }
+            for (auto& victim : m_entities) if (&victim != &entity && registeredMob(victim.type) && std::abs(victim.position.x-entity.position.x)<.8 && std::abs(victim.position.z-entity.position.z)<.8 && victim.position.y < supportY+1 && victim.position.y+entitySize(victim).y>supportY) damageEntity(victim,damage,glm::vec3(0),false,entity.position);
+        }
+        BlockId block = state->block;
+        uint64_t random = entity.behaviorSeed ^ uint64_t(entity.ageSeconds*20);
+        const bool damaged = distance > 1 && EquipmentRules::random(random) % 1000 < std::min(1000.,50. + 50.*distance);
+        bool destroyed = false;
+        if (damaged) { if (anvilDamage(block) == 2) destroyed = true; else block = static_cast<BlockId>(static_cast<uint16_t>(block)+1); }
+        const int y = int(std::ceil(supportY));
+        if (!destroyed) {
+            const auto target = m_world.getLoadedBlock(x,y,z);
+            if (target && !isSolid(*target) && supportY == std::floor(supportY)) m_world.setBlock(x,y,z,block);
+            else { entity.item = {itemForBlock(block),1}; drop(); }
+        }
+        m_world.recordWorkstationSound({x,int(std::floor(supportY)),z},destroyed ? 4 : 3);
+        entity.health = 0;
+    }
+}
+
+void EntityManager::pushPiston(const Redstone::PistonSweep& sweep) {
+    for(auto& entity:m_entities) {
+        const auto displacement=Redstone::sweptPush(sweep,entity.position,glm::dvec3(entitySize(entity)));
+        if(glm::dot(displacement,displacement)==0 || collides(entity,entity.position+displacement))continue;
+        m_dirtyEntityChunks.insert(entityChunk(entity.position));
+        entity.position+=displacement;m_dirtyEntityChunks.insert(entityChunk(entity.position));
+        entity.inGround=false;
     }
 }

@@ -34,11 +34,12 @@ class MaterialRecipeTests(unittest.TestCase):
         mask=r['masks']['crystal'];self.assertTrue(any(mask));self.assertTrue(any(not x for x in mask))
         props=tr.material_maps(tg,'stone',r,tg.load_material_profiles()['stone'])[1]
         for i,p in enumerate(props):self.assertEqual(p[2],255 if mask[i] else 0)
+        original_density=d['examples']['glowing_crystal']['layers'][0]['density']
         inherited=copy.deepcopy(d);inherited['recipes']['inherited']={'parent':'glowing_crystal','overrides':{'crystal':{'density':.5}}}
         _,resolved=tr.load_recipes(tg,document=inherited)
         self.assertEqual(resolved['inherited'][1]['density'],.5)
-        self.assertEqual(resolved['glowing_crystal'][1]['density'],.20)
-        self.assertEqual(inherited['examples']['glowing_crystal']['layers'][0]['density'],.20)
+        self.assertEqual(resolved['glowing_crystal'][1]['density'],original_density)
+        self.assertEqual(inherited['examples']['glowing_crystal']['layers'][0]['density'],original_density)
         changed=copy.deepcopy(d);changed['examples']['glowing_crystal']['layers'][0]['properties']['height']=.9
         r2=tr.generate_material(tg,'stone',11,document=changed)
         self.assertNotEqual(tr.material_maps(tg,'stone',r,tg.load_material_profiles()['stone']),tr.material_maps(tg,'stone',r2,tg.load_material_profiles()['stone']))

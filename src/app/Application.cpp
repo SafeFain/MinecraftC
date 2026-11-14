@@ -287,6 +287,7 @@ private:
             m_audio.playBlockInteraction(metal,opening,button);
         };
         m_sessionFeedback.playExperience = [this](bool levelUp){m_audio.playExperience(levelUp);};
+        m_sessionFeedback.playWorkstation = [this](uint8_t kind){m_audio.playWorkstation(kind);};
         m_sessionFeedback.playFishing = [this](FishingEventKind kind) {
             switch (kind) {
                 case FishingEventKind::Cast: m_audio.playFishing(FishingSound::Cast); break;
@@ -544,7 +545,7 @@ private:
         m_lastFrameTick = now;
         dt = std::min(dt, 0.1f);
         m_ui.tick(dt);
-        m_router.beginFrame(now, m_ui.commandOpen ||
+        m_router.beginFrame(now, m_ui.commandOpen || (m_ui.containerOpen && m_ui.containerScreen.wantsTextInput()) ||
             (m_ui.activeMenu && m_ui.activeMenu->wantsTextInput()));
         return {frameStarted, now, dt};
     }

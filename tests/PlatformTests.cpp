@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "core/Platform.h"
 
 #include <cstdlib>
@@ -40,11 +41,9 @@ RuntimePathInputs baseInputs(const fs::path& root) {
 
 } // namespace
 
-int main() {
-    const fs::path root = fs::temp_directory_path() /
-        fs::u8path("minecraftc-platform-test-" + std::to_string(
-            static_cast<unsigned long long>(std::rand())) + u8"-路径");
-    fs::remove_all(root);
+int main() try {
+    TestSupport::TemporaryDirectory temporary;
+    const fs::path root = temporary.path() / fs::u8path(u8"路径");
 
     try {
         makeAssets(root / "share" / "minecraftc" / "assets");
@@ -144,4 +143,6 @@ int main() {
     fs::remove_all(root);
     std::cout << "Platform tests passed\n";
     return 0;
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

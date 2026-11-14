@@ -72,6 +72,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     altered["shape/block_shapes_data:button"]="different release policy";check(Lan::contentSignature(altered)!=signature,"behavior mismatch leaves handshake unchanged");
     // Namespaced palettes and canonical wire IDs survive a different local allocation order.
     const auto original=Plugins::mutableContentState();
+    MC_BlockState stairState{};stairState.size=sizeof(stairState);
+    check(!api->state(&ctx,static_cast<uint16_t>(architecturalStateBlock(a)),&stairState),"stair state before remapping");
     WorldMetadata metadata;metadata.displayName="Shape palette";metadata.generationVersion=WorldGenContext::GENERATION_VERSION;
     SaveStore palette(root/"palette");palette.saveMetadata(metadata);palette.saveChunkOverrides(-1,-1,{{0,architecturalStateBlock(a)}});
     std::vector<uint16_t> raw;chunk.copyRawBlocks(raw);const auto wire=Lan::encodeChunkSnapshot({{DimensionId::Overworld,-1,-1},1,1,raw});
@@ -81,14 +83,17 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Plugins::freezeContent();
     check(static_cast<uint16_t>(palette.loadChunkOverrides(-1,-1)[0].block)==static_cast<uint16_t>(architecturalStateBlock(a))+500,"save palette state remapping");
     const auto decoded=Lan::decodeChunkSnapshot(wire);check(decoded.blocks[(211-Config::WORLD_MIN_Y)*256+15+15*16]==static_cast<uint16_t>(box)+500,"wire state remapping");
-    MC_BlockState remapped{};remapped.size=sizeof(remapped);check(!api->state(&ctx,static_cast<uint16_t>(stair)+507,&remapped)&&remapped.family==static_cast<uint16_t>(stair)+500,"remapped state family identity");
+    MC_BlockState remapped{};remapped.size=sizeof(remapped);
+    check(!api->state(&ctx,static_cast<uint16_t>(architecturalStateBlock(a))+500,&remapped)&&
+        remapped.family==stairState.family+500&&remapped.kind==stairState.kind&&
+        remapped.direction==stairState.direction&&remapped.half==stairState.half,"remapped state family identity");
     const auto revision=Plugins::mutableContentState().revision;Plugins::mutableContentState()=original;Plugins::mutableContentState().revision=revision;Plugins::freezeContent();
     const int oldDistance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=1;
     {
-        GameSession session(root/"saves");EntityAiTestRenderer renderer;session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+        ScenarioSession session(root/"saves");EntityAiTestRenderer renderer;session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
         const auto path=session.createWorld("Shapes",42,GameMode::Creative,Difficulty::Normal,true,WorldType::Superflat);session.startWorld(path,true,0);
         RuntimeClock clock;bool loaded=false;for(int i=0;i<4000;++i){if(session.advanceLoading(&renderer,clock.now())){loaded=true;break;}std::this_thread::sleep_for(std::chrono::milliseconds(2));}check(loaded,"shape world loading");
-        auto& world=GameSessionTestAccess::world(session);
+        auto& world=SessionScenario::world(session);
         for(int x=0;x<=3;++x)for(int z=0;z<=3;++z)for(int y=210;y<=213;++y)world.setBlock(x,y,z,y==210?BlockId::STONE:BlockId::AIR);
         DoorState d;decodeDoor(door,d);check(world.placeDoor({0,211,1},d)&&world.setDoorOpen({0,212,1},true),"plugin paired door use");
         DoorState upper;check(decodeDoor(world.getBlock(0,212,1),upper)&&upper.family==d.family&&upper.upper&&upper.open,"paired update changed family");
@@ -113,22 +118,22 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         for(int tick=0;tick<2;++tick)world.tickInteractiveBlocks([](const auto&){return false;});
         bool failed=false;session.saveNow([&]{failed=true;});check(!failed,"shape state save");session.leaveWorld();session.startWorld(path,false,0);
         loaded=false;for(int i=0;i<4000;++i){if(session.advanceLoading(&renderer,clock.now())){loaded=true;break;}std::this_thread::sleep_for(std::chrono::milliseconds(2));}check(loaded,"shape state reload");
-        auto& reloaded=GameSessionTestAccess::world(session);check(decodeButton(reloaded.getBlock(1,211,2),b)&&b.pressed&&b.family==static_cast<uint16_t>(button),"saved pressed state lost identity");
+        auto& reloaded=SessionScenario::world(session);check(decodeButton(reloaded.getBlock(1,211,2),b)&&b.pressed&&b.family==static_cast<uint16_t>(button),"saved pressed state lost identity");
         for(int tick=0;tick<2;++tick)reloaded.tickInteractiveBlocks([](const auto&){return false;});
         check(decodeButton(reloaded.getBlock(1,211,2),b)&&b.pressed,"saved remaining timer lost");
         reloaded.tickInteractiveBlocks([](const auto&){return false;});check(decodeButton(reloaded.getBlock(1,211,2),b)&&!b.pressed,"saved timer failed to release");
         check(decodeButton(reloaded.getBlock(2,211,2),slow)&&slow.pressed,"long saved timer was rejected or truncated");
         reloaded.setBlock(0,212,1,BlockId::AIR);check(reloaded.getBlock(0,211,1)==BlockId::AIR,"plugin door partner not removed");
         check(session.openLanRoom(0,2,true),"shape LAN host start");
-        GameSession client(root/"client"/"saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+        ScenarioSession client(root/"client"/"saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
         check(client.joinLanRoom("::1",session.lanPort(),0),"shape LAN client start");
-        double now=0;auto pump=[&]{now+=.005;session.pollLan(now);client.pollLan(now);GameSessionTestAccess::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
+        double now=0;auto pump=[&]{now+=.005;session.pollLan(now);client.pollLan(now);SessionScenario::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
         for(int i=0;i<1000&&!client.lanWorldReady();++i)pump();
         check(client.lanWorldReady()&&!client.lanConnectionFailed(),"shape LAN registry handshake");
         check(!client.pluginBlockInteraction(0,1,211,2,true,true),"replica accepted state mutation");
         check(session.pluginBlockInteraction(0,1,211,2,true,true),"host button interaction");
-        for(int i=0;i<1000;++i){pump();if(decodeButton(GameSessionTestAccess::world(client).getBlock(1,211,2),b)&&b.pressed)break;}
-        check(decodeButton(GameSessionTestAccess::world(client).getBlock(1,211,2),b)&&b.pressed&&b.family==static_cast<uint16_t>(button),"LAN button state replication");
+        for(int i=0;i<1000;++i){pump();if(decodeButton(SessionScenario::world(client).getBlock(1,211,2),b)&&b.pressed)break;}
+        check(decodeButton(SessionScenario::world(client).getBlock(1,211,2),b)&&b.pressed&&b.family==static_cast<uint16_t>(button),"LAN button state replication");
         client.leaveWorld();session.closeLanRoom();
         session.leaveWorld();
     }

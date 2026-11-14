@@ -1,8 +1,10 @@
 #include "plugins/ContentQueries.h"
 #include "game/SurvivalRules.h"
+#include "world/RedstoneBlocks.h"
 
 #include <algorithm>
 #include <array>
+#include <set>
 
 #include "game/InventoryModel.h"
 
@@ -229,6 +231,21 @@ std::array<BlockSurvivalProperties, static_cast<size_t>(BlockId::COUNT)> buildBl
     set(BlockId::MAGMA_SPAWNER,5.f,ToolKind::Pickaxe,ToolTier::Wood);
     for(auto id:{BlockId::NETHER_PORTAL_X,BlockId::NETHER_PORTAL_Z})
         set(id,-1.f,ToolKind::None,ToolTier::None,true);
+    for(unsigned raw=unsigned(BlockId::REDSTONE_FIRST);raw<=unsigned(BlockId::REDSTONE_LAST);++raw) {
+        const auto id=static_cast<BlockId>(raw);const auto state=Redstone::blockState(id);
+        if(Redstone::ore(Redstone::nativeSlot(id)))set(id,3.f+((unsigned(Redstone::nativeSlot(id))-unsigned(Redstone::NativeBlock::REDSTONE_ORE))%2?1.5f:0.f),ToolKind::Pickaxe,ToolTier::Iron);
+        else if(state && Redstone::thin(state->kind))set(id,state->kind==Redstone::Kind::Lever?.5f:0.f);
+        else set(id,state && state->kind==Redstone::Kind::Piston?1.5f:.3f);
+    }
+    set(BlockId::LAPIS_ORE, 3, ToolKind::Pickaxe, ToolTier::Stone);
+    set(BlockId::DEEPSLATE_LAPIS_ORE, 4.5f, ToolKind::Pickaxe, ToolTier::Stone);
+    set(BlockId::BOOKSHELF, 1.5f, ToolKind::Axe);
+    set(BlockId::IRON_BLOCK, 5, ToolKind::Pickaxe, ToolTier::Stone);
+    set(BlockId::ENCHANTING_TABLE, 5, ToolKind::Pickaxe, ToolTier::Wood);
+    for (uint16_t raw = static_cast<uint16_t>(BlockId::ANVIL); raw <= static_cast<uint16_t>(BlockId::DAMAGED_ANVIL_EAST); ++raw)
+        if (raw != static_cast<uint16_t>(BlockId::FROSTED_ICE)) set(static_cast<BlockId>(raw), 5, ToolKind::Pickaxe, ToolTier::Wood);
+    for (uint16_t raw = static_cast<uint16_t>(BlockId::GRINDSTONE_STATE_FIRST); raw <= static_cast<uint16_t>(BlockId::GRINDSTONE_STATE_LAST); ++raw) set(static_cast<BlockId>(raw),3.5f,ToolKind::Pickaxe,ToolTier::Wood);
+    set(BlockId::FROSTED_ICE, .5f);
     return values;
 }
 
@@ -503,6 +520,26 @@ std::vector<CraftingRecipe> buildRecipes() {
         recipes.push_back(shaped(3,1,{ingredient,ingredient,ingredient},{slab,6,0},false));
         recipes.push_back(shaped(3,3,{ingredient,E,E,ingredient,ingredient,E,ingredient,ingredient,ingredient},{static_cast<ItemId>(static_cast<uint16_t>(slab)+1),4,0}));
     }
+    recipes.push_back(shaped(3, 1, {ItemId::REEDS, ItemId::REEDS, ItemId::REEDS}, {ItemId::PAPER, 3}, false));
+    recipes.push_back(shaped(2, 2, {ItemId::PAPER, ItemId::PAPER, ItemId::PAPER, ItemId::LEATHER}, {ItemId::BOOK, 1}, false)); recipes.back().shapeless = true;
+    recipes.push_back(shaped(3, 3, {ItemId::OAK_PLANKS, ItemId::OAK_PLANKS, ItemId::OAK_PLANKS, ItemId::BOOK, ItemId::BOOK, ItemId::BOOK, ItemId::OAK_PLANKS, ItemId::OAK_PLANKS, ItemId::OAK_PLANKS}, {ItemId::BOOKSHELF, 1}, false));
+    recipes.push_back(shaped(3, 3, {ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT}, {ItemId::IRON_BLOCK, 1}, false));
+    recipes.push_back(shaped(1, 1, {ItemId::IRON_BLOCK}, {ItemId::IRON_INGOT, 9}, false));
+    recipes.push_back(shaped(3, 3, {E, ItemId::BOOK, E, ItemId::DIAMOND, ItemId::OBSIDIAN, ItemId::DIAMOND, ItemId::OBSIDIAN, ItemId::OBSIDIAN, ItemId::OBSIDIAN}, {ItemId::ENCHANTING_TABLE, 1}, false));
+    recipes.push_back(shaped(3, 3, {ItemId::IRON_BLOCK, ItemId::IRON_BLOCK, ItemId::IRON_BLOCK, E, ItemId::IRON_INGOT, E, ItemId::IRON_INGOT, ItemId::IRON_INGOT, ItemId::IRON_INGOT}, {ItemId::ANVIL, 1}, false));
+    const auto R=ItemId::REDSTONE_DUST,T=ItemId::REDSTONE_TORCH,C=ItemId::COBBLESTONE,S=ItemId::STONE;
+    recipes.push_back(shaped(1,2,{ItemId::STICK,C},{ItemId::LEVER,1},false));
+    recipes.push_back(shaped(1,2,{R,ItemId::STICK},{T,1},false));
+    recipes.push_back(shaped(3,2,{T,R,T,S,S,S},{ItemId::REDSTONE_REPEATER,1},false));
+    recipes.push_back(shaped(3,3,{E,T,E,T,ItemId::QUARTZ,T,S,S,S},{ItemId::REDSTONE_COMPARATOR,1},false));
+    const auto P=ItemId::OAK_PLANKS;
+    recipes.push_back(shaped(3,3,{P,P,P,C,ItemId::IRON_INGOT,C,C,R,C},{ItemId::PISTON,1},false));
+    recipes.push_back(shaped(1,2,{ItemId::SLIME_BALL,ItemId::PISTON},{ItemId::STICKY_PISTON,1},false));
+    recipes.push_back(shaped(2,1,{ItemId::SLIME_BALL,ItemId::BLAZE_POWDER},{ItemId::MAGMA_CREAM,1},false));recipes.back().shapeless=true;
+    recipes.push_back(shaped(3,3,{C,C,C,R,R,ItemId::QUARTZ,C,C,C},{ItemId::OBSERVER,1},false));
+    recipes.push_back(shaped(3,3,{E,R,E,R,ItemId::GLOWSTONE,R,E,R,E},{ItemId::REDSTONE_LAMP,1},false));
+    recipes.push_back(shaped(3,3,{R,R,R,R,R,R,R,R,R},{ItemId::REDSTONE_BLOCK,1},false));
+    recipes.push_back(shaped(1,1,{ItemId::REDSTONE_BLOCK},{R,9},false));
     return recipes;
 }
 
@@ -640,10 +677,31 @@ std::vector<ItemStack> getBlockDrops(
         for(const auto& d:b->drops)if(randomValue%d.denominator<d.numerator){const auto count=d.minimum+randomValue%(d.maximum-d.minimum+1);if(count)drops.push_back({Plugins::resolveItem(d.item),static_cast<uint8_t>(count),0});}
         return drops;
     }
-    if(isNetherWart(block))return {{ItemId::NETHER_WART,static_cast<uint8_t>(block==BlockId::NETHER_WART?2+randomValue%3:1),0}};
+    if(Redstone::native(block) && Redstone::ore(Redstone::nativeSlot(block))) {
+        if(toolStack.enchantment(EnchantmentId::SilkTouch))return {{itemForBlock(block),1}};
+        const auto fortune=toolStack.enchantment(EnchantmentId::Fortune);
+        return {{ItemId::REDSTONE_DUST,static_cast<uint8_t>(4+randomValue%2+(fortune?((randomValue>>8)%(fortune+1)):0))}};
+    }
+    const auto fortune = toolStack.enchantment(EnchantmentId::Fortune);
+    const auto multiplier = fortune ? std::max(1u, randomValue % (fortune + 2)) : 1u;
+    if (toolStack.enchantment(EnchantmentId::SilkTouch) &&
+        (block == BlockId::STONE || block == BlockId::GRASS || block == BlockId::PODZOL || block == BlockId::CLAY || block == BlockId::GLASS || block == BlockId::ICE || block == BlockId::BOOKSHELF ||
+         block == BlockId::COAL_ORE || block == BlockId::IRON_ORE || block == BlockId::GOLD_ORE || block == BlockId::DIAMOND_ORE || block == BlockId::EMERALD_ORE || block == BlockId::DEEPSLATE_EMERALD_ORE || block == BlockId::LAPIS_ORE || block == BlockId::DEEPSLATE_LAPIS_ORE || block == BlockId::NETHER_QUARTZ_ORE || block == BlockId::NETHER_GOLD_ORE || block == BlockId::GLOWSTONE || isLeafBlock(block))) {
+        const auto item = itemForBlock(block); if (item != ItemId::EMPTY) return {{item, 1}};
+    }
+    if (block == BlockId::LAPIS_ORE || block == BlockId::DEEPSLATE_LAPIS_ORE) return {{ItemId::LAPIS_LAZULI, static_cast<uint8_t>(std::min(64u, (4 + randomValue % 6) * multiplier))}};
+    if (block == BlockId::BOOKSHELF) return {{ItemId::BOOK, 3}};
+    if (block == BlockId::FROSTED_ICE || block == BlockId::ICE) return {};
+    if (block == BlockId::GRASS || block == BlockId::PODZOL) return {{ItemId::DIRT,1}};
+    if (block == BlockId::CLAY) return {{ItemId::CLAY_BALL,4}};
+    if (block == BlockId::DIAMOND_ORE || block == BlockId::EMERALD_ORE || block == BlockId::DEEPSLATE_EMERALD_ORE || block == BlockId::COAL_ORE || block == BlockId::IRON_ORE || block == BlockId::GOLD_ORE || block == BlockId::NETHER_QUARTZ_ORE) {
+        const auto item = block == BlockId::DIAMOND_ORE ? ItemId::DIAMOND : block == BlockId::COAL_ORE ? ItemId::COAL : block == BlockId::IRON_ORE ? ItemId::RAW_IRON : block == BlockId::GOLD_ORE ? ItemId::RAW_GOLD : block == BlockId::NETHER_QUARTZ_ORE ? ItemId::QUARTZ : ItemId::EMERALD;
+        return {{item, static_cast<uint8_t>(multiplier)}};
+    }
+    if(isNetherWart(block))return {{ItemId::NETHER_WART,static_cast<uint8_t>(block==BlockId::NETHER_WART?2+randomValue%(3+fortune):1),0}};
     if(block==BlockId::NETHER_QUARTZ_ORE)return {{ItemId::QUARTZ,1,0}};
-    if(block==BlockId::NETHER_GOLD_ORE)return {{ItemId::GOLD_NUGGET,static_cast<uint8_t>(2+randomValue%5),0}};
-    if(block==BlockId::GLOWSTONE)return {{ItemId::GLOWSTONE_DUST,static_cast<uint8_t>(2+randomValue%3),0}};
+    if(block==BlockId::NETHER_GOLD_ORE)return {{ItemId::GOLD_NUGGET,static_cast<uint8_t>(std::min(64u,(2+randomValue%5)*multiplier)),0}};
+    if(block==BlockId::GLOWSTONE)return {{ItemId::GLOWSTONE_DUST,static_cast<uint8_t>(std::min(4u,2+randomValue%3+randomValue%(fortune+1))),0}};
     if(block==BlockId::BLAZE_SPAWNER||block==BlockId::MAGMA_SPAWNER||block==BlockId::SOUL_FIRE)return {};
     switch (block) {
         case BlockId::STONE: return {{ItemId::COBBLESTONE, 1, 0}};
@@ -665,8 +723,8 @@ std::vector<ItemStack> getBlockDrops(
         case BlockId::SPRUCE_LEAVES:
         case BlockId::JUNGLE_LEAVES:
         case BlockId::ACACIA_LEAVES: {
-            if(block==BlockId::LEAVES && randomValue%200==1)return {{ItemId::APPLE,1,0}};
-            if (randomValue % 20 != 0) return {};
+            if(block==BlockId::LEAVES && randomValue%(fortune == 0 ? 200 : fortune == 1 ? 180 : fortune == 2 ? 160 : 120)==1)return {{ItemId::APPLE,1,0}};
+            if (randomValue % (block == BlockId::JUNGLE_LEAVES ? (fortune == 0 ? 40 : fortune == 1 ? 36 : fortune == 2 ? 32 : 24) : (fortune == 0 ? 20 : fortune == 1 ? 16 : fortune == 2 ? 12 : 10)) != 0) return {};
             const uint16_t offset = block == BlockId::LEAVES ? 0 :
                 block == BlockId::BIRCH_LEAVES ? 1 :
                 block == BlockId::SPRUCE_LEAVES ? 2 :
@@ -674,12 +732,12 @@ std::vector<ItemStack> getBlockDrops(
             return {{static_cast<ItemId>(static_cast<uint16_t>(ItemId::OAK_SAPLING) + offset), 1, 0}};
         }
         case BlockId::GRAVEL:
-            return randomValue % 10 == 0
+            return randomValue % (fortune >= 3 ? 1 : fortune == 2 ? 4 : fortune == 1 ? 7 : 10) == 0
                 ? std::vector<ItemStack>{{ItemId::FLINT, 1, 0}}
                 : std::vector<ItemStack>{{ItemId::GRAVEL, 1, 0}};
         case BlockId::WHEAT_7:
             return {{ItemId::WHEAT, 1, 0},
-                    {ItemId::WHEAT_SEEDS, static_cast<uint8_t>(1 + randomValue % 4), 0}};
+                    {ItemId::WHEAT_SEEDS, static_cast<uint8_t>(std::min(64u,1 + randomValue % (4 + fortune))), 0}};
         case BlockId::WHEAT_0: case BlockId::WHEAT_1: case BlockId::WHEAT_2:
         case BlockId::WHEAT_3: case BlockId::WHEAT_4: case BlockId::WHEAT_5:
         case BlockId::WHEAT_6:
@@ -710,6 +768,8 @@ float miningSeconds(BlockId block, const ItemStack& toolStack,
             case ToolTier::None: break;
         }
     }
+    const auto efficiency = toolStack.enchantment(EnchantmentId::Efficiency);
+    if (speed > 1 && efficiency) speed += efficiency * efficiency + 1;
     const bool harvest = canHarvest(blockProps, tool);
     float seconds = blockProps.hardness * (harvest ? 1.5f : 5.0f) / speed;
     if (underwater) seconds *= 5.0f;
@@ -751,6 +811,13 @@ const CraftingRecipe* findCraftingRecipe(
     if (gridWidth == 0 || gridWidth > 3 || gridHeight == 0 || gridHeight > 3)
         return nullptr;
     for (const auto& recipe : craftingRecipes()) {
+        if (recipe.shapeless) {
+            std::multiset<ItemId> expected, actual;
+            for (const auto item : recipe.ingredients) if (item != ItemId::EMPTY) expected.insert(item);
+            for (size_t i = 0; i < size_t(gridWidth)*gridHeight; ++i) if (grid[i] != ItemId::EMPTY) actual.insert(grid[i]);
+            if (actual == expected) return &recipe;
+            continue;
+        }
         if (recipe.width > gridWidth || recipe.height > gridHeight) continue;
         for (uint8_t oy = 0; oy <= gridHeight - recipe.height; ++oy) {
             for (uint8_t ox = 0; ox <= gridWidth - recipe.width; ++ox) {

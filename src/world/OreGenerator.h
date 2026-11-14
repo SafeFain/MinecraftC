@@ -6,6 +6,7 @@
 #include "FastNoiseLite.h"
 
 #include <cstdint>
+#include <functional>
 
 class Noise;
 
@@ -14,7 +15,8 @@ public:
     OreGenerator(const Noise& legacyNoise, uint64_t seed);
 
     BlockId getOre(float worldX, float worldY, float worldZ,
-                   BlockId existingBlock, Biome biome = Biome::PLAINS) const;
+                   BlockId existingBlock, Biome biome = Biome::PLAINS,
+                   const std::function<bool()>& exposed = {}) const;
     static bool emeraldBiome(Biome biome);
 
 private:

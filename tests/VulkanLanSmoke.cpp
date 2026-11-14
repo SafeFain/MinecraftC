@@ -1,4 +1,6 @@
+#include "TestSupport.h"
 #include "app/GameSession.h"
+#include "SessionScenario.h"
 #include "plugins/PluginManager.h"
 #include "app/GameScenePresenter.h"
 #include "app/GameUiController.h"
@@ -6,7 +8,8 @@
 #include "core/Window.h"
 #include "game/ClientSettings.h"
 #include "core/Clipboard.h"
-#include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
+#include "renderer/backend/vulkan/VulkanDiagnostics.h"
+#include "renderer/backend/vulkan/VulkanRenderer.h"
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -22,37 +25,45 @@ private:
     std::string text;
 };
 }
-struct GameSessionTestAccess {
+struct LanSmokeScenario {
     static bool netherTravel(GameSession& session);
     static void scene(GameSession& session) {
-        session.world().setThreadPool(nullptr);
+        SessionScenario::ensureWorld(session);
+        SessionScenario::metadata(session,[](WorldMetadata& saved){saved.worldSpawn={0,0,0};});
+        auto& world=SessionScenario::world(session);
+        auto& entities=SessionScenario::entities(session);
+        auto& player=SessionScenario::player(session);
+        SessionScenario::context(session)->workers.waitIdle();
+        world.setThreadPool(nullptr);
         for (int z = -2; z <= 2; ++z) for (int x = -2; x <= 2; ++x) {
-            auto* chunk = session.world().getChunk(x,z);
+            auto* chunk = world.getChunk(x,z);
             for (int lz = 0; lz < 16; ++lz) for (int lx = 0; lx < 16; ++lx) chunk->setBlock(lx,0,lz,BlockId::GRASS);
             chunk->generated = true; chunk->lifecycle = Chunk::LifecycleState::Renderable;
         }
-        session.worldMetadata.worldSpawn = {0,0,0}; session.terrainGenerated = true;
-        session.world().update({.5,1.01,.5},0); session.entities().setNaturalSpawningEnabled(false);
-        session.player.setPosition({.5,1.01,8.5}); session.player.setOrientation(180,0);
-        session.player.inventory().slot(0) = {ItemId::DIAMOND_SWORD,1,0};
+        world.update({.5,1.01,.5},0); entities.setNaturalSpawningEnabled(false);
+        player.setPosition({.5,1.01,8.5}); player.setOrientation(180,0);
+        session.inventory().slot(0) = {ItemId::DIAMOND_SWORD,1,0};
         WorldMetadata::PersistedEntity villager; villager.type = static_cast<uint8_t>(EntityType::Villager);
         villager.position = {-2,1.01,6.5}; villager.health = 20; villager.villager.profession = VillagerProfession::Farmer;
-        session.entities().loadEntities({villager}); session.entities().spawnItem({2.5,1.3,6.5},{ItemId::EMERALD,2,0});
+        entities.loadEntities({villager}); entities.spawnItem({2.5,1.3,6.5},{ItemId::EMERALD,2,0});
         if(!Plugins::content().blocks.empty()) {
-            session.world().setBlock(1,1,5,Plugins::resolveBlock("official_content:crystal_block"));
+            world.setBlock(1,1,5,Plugins::resolveBlock("official_content:crystal_block"));
         }
-        session.dayNightCycle().setPhase(.25f);
+        SessionScenario::runtime(session,session.activeDimension()).daylight.setPhase(.25f);
     }
-    static Player& player(GameSession& session) { return session.player; }
-    static void serverTick(GameSession& session, float dt) { session.updateLanPlayers(dt); }
-    static bool moved(const GameSession& session) {
-        return !session.guests.empty() && session.guests.begin()->second->player.getPosition().z > .75;
+    static void serverTick(GameSession& session, float dt) { session.updatePlaying(dt,nullptr,{},false); }
+    static bool moved(GameSession& session) {
+        for(const auto& entry:session.roomRoster())if(entry.id) {
+            uint32_t dimension=0;const auto* actor=session.pluginActor(entry.id,dimension);
+            if(actor&&actor->getPosition().z>.75)return true;
+        }
+        return false;
     }
 };
 
 #include "NetherLanScene.h"
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
     if (argc != 4 && argc != 5 && argc != 6 && argc != 7) { std::cerr << "Usage: vulkan_lan_smoke --host|--client <assets> <isolated-run-directory> [width height] [--plugins]\n"; return 2; }
     try {
         const bool pluginMode=(argc==5||argc==7)&&std::string(argv[argc-1])=="--plugins";
@@ -72,19 +83,22 @@ int main(int argc, char** argv) {
         const auto started = std::chrono::steady_clock::now();
         auto now = [&] { return std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count(); };
         if (role == "--host") {
-            GameSession session(root / "host" / "saves"); session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+            ScenarioSession session(root / "host" / "saves"); session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
             Plugins::contextProvider()=[&]{return session.pluginContext();};
-            const auto world = session.createWorld("Rendered LAN",42,GameMode::Survival,Difficulty::Peaceful,true,WorldType::Superflat);
-            session.startWorld(world,true,0); GameSessionTestAccess::scene(session); session.setLanNickname("Host");
+            // The Nether fixture contains a piglin; the real simulation must
+            // keep it instead of applying Peaceful's hostile-mob removal.
+            const auto world = session.createWorld("Rendered LAN",42,GameMode::Survival,
+                netherMode?Difficulty::Normal:Difficulty::Peaceful,true,WorldType::Superflat);
+            session.startWorld(world,true,0); LanSmokeScenario::scene(session); session.setLanNickname("Host");
             require(session.openLanRoom(0,2,true),"listen room failed");
             { std::ofstream port(root / "port"); port << session.lanPort(); }
             double previous = now(); bool moved = false,transferred=false;
             while (now() < 90 && !std::filesystem::exists(root / "client-done")) {
                 const double elapsed = now(); session.pollLan(elapsed);
-                if(netherMode&&!transferred)transferred=GameSessionTestAccess::netherTravel(session);
+                if(netherMode&&!transferred)transferred=LanSmokeScenario::netherTravel(session);
                 if(netherMode&&transferred&&session.lanGuestCount()==0&&!std::filesystem::exists(root/"guest-left"))std::ofstream(root/"guest-left")<<"profile persisted";
-                GameSessionTestAccess::serverTick(session, static_cast<float>(std::clamp(elapsed - previous, 0.0, .05))); previous = elapsed;
-                moved = moved || GameSessionTestAccess::moved(session);
+                LanSmokeScenario::serverTick(session, static_cast<float>(std::clamp(elapsed - previous, 0.0, .05))); previous = elapsed;
+                moved = moved || LanSmokeScenario::moved(session);
                 std::this_thread::sleep_for(std::chrono::milliseconds(4));
             }
             require(std::filesystem::exists(root / "client-done") && moved,"separate client did not complete authoritative movement/rendering");
@@ -94,12 +108,12 @@ int main(int argc, char** argv) {
             uint16_t port = 0; { std::ifstream input(root / "port"); input >> port; } require(port != 0,"missing host port");
             Window window(width,height,"MinecraftC LAN smoke",Window::SurfaceMode::Vulkan,false,false);
             VulkanRenderer renderer; renderer.initialize(window,assets); renderer.setVisualQuality(VisualQuality::Medium); renderer.setEnhancedVisuals(false);
-            std::cout << VulkanGiSmokeProbe::deviceDescription(renderer) << '\n';
-            GameSession session(root / "client" / "saves"); session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low}); session.setLanNickname("Guest");
+            std::cout << VulkanDiagnostics::deviceDescription(renderer) << '\n';
+            ScenarioSession session(root / "client" / "saves"); session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low}); session.setLanNickname("Guest");
             session.initializeEntityModels(assets,renderer);
             Plugins::contextProvider()=[&]{return session.pluginContext();};
             GameScenePresenter presenter; presenter.initialize(renderer,assets);
-            SmokeClipboard clipboard; GameUiController ui(GameSessionTestAccess::player(session).inventory(),clipboard);ui.hotbar.setInventory(&session.inventory());
+            SmokeClipboard clipboard; GameUiController ui(session.inventory(),clipboard);ui.hotbar.setInventory(&session.inventory());
             ui.localization.load(assets); ui.renderer.initialize(renderer,renderer.getBlockAtlasTexture(),assets); ui.renderer.setLocalization(ui.localization);
             ClientSettings settings; settings.renderClouds = netherMode; settings.guiScale = 1;
             if(plugins)plugins->operations.hudText=[&](float x,float y,const std::string& text,const glm::vec4& color){ui.renderer.renderTextAlpha(text,x,y,1,glm::vec3(color),color.a);};
@@ -121,16 +135,19 @@ int main(int argc, char** argv) {
                 movement.setVirtual(InputAction::MoveForward,frames < 18 ? 1.0f : 0.0f); movement.update({});
                 session.handleMovement(movement,dt); session.updatePlaying(dt,&renderer,{},true);
                 presenter.updateCamera(session.worldState(),session.playerState(),dt,false);
-                const bool capture = frames == 99; if (capture) VulkanGiSmokeProbe::requestCapture(renderer);
+                const bool capture = frames == 99; if (capture) VulkanDiagnostics::requestCapture(renderer);
                 presenter.render(session,renderer,settings,window,ui.localization,GameState::Playing,true,dt,RuntimeClock{}.now());
                 ui.render(session,settings,inputs,window,GameState::Playing,true); renderer.endFrame();
                 if (capture) {
+                    std::cout<<"capture frame="<<frames<<" dimension="<<uint32_t(session.activeDimension())
+                        <<" remote="<<session.remotePlayers().size()<<" entities="<<session.entityState().entities().size()
+                        <<" visible="<<presenter.visibleChunks.size()<<" roster="<<session.roomRoster().size()<<std::endl;
                     require(session.remotePlayers().size() == (netherMode?0u:1u) && session.entityState().entities().size() == 2 &&
                             !presenter.visibleChunks.empty() && session.roomRoster().size() == 2,"joined scene is missing replicated players/entities/terrain/roster");
                     if(netherMode)require(session.activeDimension()==DimensionId::Nether&&session.inventory().slot(0).id==ItemId::NETHERITE_SWORD&&session.inventory().slot(0).damage==17&&session.inventory().slot(0).count==1&&session.playerState().statusEffects().level(StatusEffectType::FireResistance)>0,"native dimension inventory/effects missing");
                     if(pluginMode)require(Plugins::content().runtimeFault.empty(),"plugin callbacks failed during Vulkan presentation");
                     if(pluginMode)require(session.worldState().getBlock(1,1,5)==Plugins::resolveBlock("official_content:crystal_block"),"plugin terrain missing from joined Vulkan scene");
-                    const auto rgba = VulkanGiSmokeProbe::readCapture(renderer); require(rgba.size() == static_cast<size_t>(width)*height*4,"invalid Vulkan capture");
+                    const auto rgba = VulkanDiagnostics::readCapture(renderer); require(rgba.size() == static_cast<size_t>(width)*height*4,"invalid Vulkan capture");
                     std::ofstream output(root / "joined.ppm",std::ios::binary); output << "P6\n" << width << ' ' << height << "\n255\n";
                     for (size_t i = 0; i < rgba.size(); i += 4) output.write(reinterpret_cast<const char*>(rgba.data()+i),3);
                     require(bool(output),"capture write failed");
@@ -151,4 +168,6 @@ int main(int argc, char** argv) {
         } else throw std::runtime_error("unknown smoke role");
         return 0;
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

@@ -1,3 +1,5 @@
+#include "TestSupport.h"
+#include "PixelReadback.h"
 #include "plugins/PluginManager.h"
 #include "plugins/EnvironmentPresentation.h"
 #include "plugins/ContentMutation.h"
@@ -18,7 +20,7 @@
 #include "game/Command.h"
 #include "core/Utf8.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
-#include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
+#include "renderer/backend/vulkan/VulkanDiagnostics.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
 #include "ui/ExperienceHud.h"
@@ -37,6 +39,7 @@
 #include <chrono>
 #include <set>
 #include "NaturalTextureVulkanSmoke.h"
+#include "RedstoneVulkanSmoke.h"
 
 namespace {
 struct Access final : IContainerAccess,ITradeAccess {
@@ -57,7 +60,7 @@ struct Access final : IContainerAccess,ITradeAccess {
 };
 }
 
-int main(int argc,char** argv) {
+int main(int argc,char** argv) try {
     if (argc<2 || argc>5) { std::cerr<<"Usage: vulkan_ui_smoke assets [width height] [--capture]\n";return 2; }
     try {
         const bool heavenModel=argc==3&&std::string(argv[2])=="--heaven-model";
@@ -92,6 +95,9 @@ int main(int argc,char** argv) {
         {std::ofstream config(pluginRoot/"plugins.json");config<<"{\"official_content\":true,\"official_atmosphere\":true,\"capability_demo\":true,\"official_natural_textures\":"<<(natural?"true":"false")<<",\"official_heaven\":"<<(heavenOff?"false":"true")<<"}";}
         Plugins::PluginManager plugins({assets,pluginRoot});plugins.initialize();
         if(Plugins::validDimension(1)==heavenOff)throw std::runtime_error("Official provider enabled state mismatch");
+        if(heavenOff && (Plugins::availableBlock(BlockId::AETHER_GRASS) ||
+                        Plugins::availableItem(ItemId::STARSTEP_SCEPTER)))
+            throw std::runtime_error("Disabled Heaven provider left gameplay content available");
         Window window(width,height,"MinecraftC UI smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,assets);
         renderer.setVisualQuality(VisualQuality::Low);renderer.setEnhancedVisuals(false);
@@ -108,10 +114,10 @@ int main(int argc,char** argv) {
             model::ModelInstance posed;model::ModelHandle posedModel{};
             auto image=[&] {std::vector<uint8_t> pixels;for(int frame=0;frame<4;++frame){FrameData state;state.clearColor={.2f,.4f,.6f,1};renderer.beginFrame(state);
                 if(posedModel){model::ModelDraw model;model.model=posedModel;model.instance=&posed;renderer.modelRenderer().queue(model);renderer.flushModels(glm::mat4(1));}
-                renderer.finishScene(PostProcessState{});if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Plugin image readback unavailable");return pixels;};
-            Plugins::mutableContentState().extensions.renderPasses.clear();const auto baseline=image();Plugins::mutableContentState().extensions.renderPasses=passes;const auto custom=image();
+                renderer.finishScene(PostProcessState{});if(frame==3)VulkanDiagnostics::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanDiagnostics::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Plugin image readback unavailable");return pixels;};
+            Plugins::mutableContentState().extensions.renderPasses.clear();const auto baseline=image(), repeatedBaseline=image();Plugins::mutableContentState().extensions.renderPasses=passes;const auto custom=image();
             if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
-            if(custom==baseline)throw std::runtime_error("Custom SPIR-V post pass did not affect pixels");
+            PixelReadback::requireEffect(baseline,repeatedBaseline,custom,width,height,{0,0,width,height},"custom SPIR-V post pass");
             renderer.resize(width,height);image();renderer.suspendPresentation();renderer.resumePresentation();image();
             if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
             MC_RenderHandle scenePipeline=0;size_t owner=0;
@@ -127,20 +133,25 @@ int main(int argc,char** argv) {
             triangle.indices={0,1,2};model->primitives.push_back(std::move(triangle));
             model::Node node;node.skin=0;node.primitives={0};model->nodes.push_back(node);model->sceneRoots={0};model->skins.push_back({{0},{glm::mat4(1)}});
             posed.jointPalettes={{glm::mat4(1)}};posedModel=renderer.modelRenderer().upload(model);
-            const auto unshifted=image();posed.jointPalettes[0][0][3][0]=.5f;const auto shifted=image();
+            const auto unshifted=image(), repeatedPose=image();posed.jointPalettes[0][0][3][0]=.5f;const auto shifted=image();
             if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
-            if(!sawScene||unshifted==shifted)throw std::runtime_error("Custom scene redraw lost skeletal pose");
+            if(!sawScene)throw std::runtime_error("Custom scene redraw never received a scene");
+            PixelReadback::requireEffect(unshifted,repeatedPose,shifted,width,height,
+                {width/4,height/4,width,height*3/4},"custom skeletal pose");
             posedModel={};Plugins::mutableContentState().extensions.renderPasses=passes;
             std::cout<<"Plugin Vulkan posed scene redraw passed\n";
             std::cout<<"Plugin Vulkan shader/post pass, rebuild and resume passed\n";
         }
         if(capabilities) {
+            VulkanDiagnostics::setParticleTime(renderer, 1.0f);
             const auto dimension=heavenModel?1u:Plugins::resolveDimension("capability_demo:islands");
             bool clouds=true;auto environment=Plugins::applyEnvironment(DayNightCycle{}.evaluate(),dimension,clouds);
             if(environment.skyStyle!=RenderSkyStyle::Layered||(!heavenModel&&clouds)||
                (heavenModel&&!(environment.skyFlags&SkyNoVoxelClouds)))throw std::runtime_error("Capability sky profile missing");
             AssetStore store(assets);AudioSystem audio;audio.initialize(&store);
             Plugins::contextProvider()=[dimension]{return Plugins::ActorContext{0,dimension,MC_LOCAL};};audio.setMusicMode(AudioMusicMode::Overworld,dimension);
+            if(audio.musicMode()!=AudioMusicMode::Overworld || audio.musicDimension()!=dimension)
+                throw std::runtime_error("Plugin dimension did not select its optional audio mode");
             if(heavenModel){renderer.setVisualQuality(VisualQuality::Medium);renderer.setEnhancedVisuals(true);}
             HeldItemRenderer held;held.initialize(renderer,assets);
             const auto& type=Plugins::mutableContentState().extensions.particles.at("capability_demo:spark");
@@ -155,18 +166,23 @@ int main(int argc,char** argv) {
                 if(content>0&&(content&1))held.renderDropped({heavenModel?ItemId::STARSTEP_SCEPTER:Plugins::resolveItem("capability_demo:staff"),1,0},vp,{0,0,0},0,0,{1,0});
                 if(content>0&&(content&2))renderer.renderParticles(particles,vp,{1,0,0},{0,1,0},environment.particleIntensity>=0?environment.particleIntensity:1.f);
                 PostProcessState post;post.environment=environment;post.inverseViewProjection=glm::inverse(vp);post.cameraPosition=camera;
-                renderer.finishScene(post);if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanGiSmokeProbe::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Capability Vulkan readback missing");return pixels;};
-            captureScene(-1);const auto baseline=captureScene(0),modelImage=captureScene(1),particleImage=captureScene(2);if(baseline==modelImage)throw std::runtime_error("Plugin held model did not affect Vulkan pixels");if(baseline==particleImage)throw std::runtime_error("Plugin particles did not affect Vulkan pixels");
+                renderer.finishScene(post);if(frame==3)VulkanDiagnostics::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanDiagnostics::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Capability Vulkan readback missing");return pixels;};
+            captureScene(-1);const auto baseline=captureScene(0), repeatedBaseline=captureScene(0),modelImage=captureScene(1),particleImage=captureScene(2);
+            const PixelReadback::Region sceneRegion{width/10,height/10,width*9/10,height*9/10};
+            PixelReadback::requireEffect(baseline,repeatedBaseline,modelImage,width,height,sceneRegion,"plugin held model");
+            PixelReadback::requireEffect(baseline,repeatedBaseline,particleImage,width,height,sceneRegion,"plugin particles");
             if(heavenModel){const auto all=particles;for(int shape=1;shape<=3;++shape){particles.clear();for(const auto& p:all)if(p.kind==float(5+shape))particles.push_back(p);
-                if(captureScene(2)==baseline)throw std::runtime_error("Official ambient particle shape did not reach Vulkan pixels");}particles=all;}
+                PixelReadback::requireEffect(baseline,repeatedBaseline,captureScene(2),width,height,sceneRegion,"official ambient particle shape");}particles=all;}
+            const auto repeatedParticles=captureScene(2);
             for(auto& p:particles)p.color={1,0,0,1};
-            if(captureScene(2)==particleImage)throw std::runtime_error("Particle RGBA did not reach Vulkan fragments");
+            PixelReadback::requireEffect(particleImage,repeatedParticles,captureScene(2),width,height,sceneRegion,"particle RGBA");
             if(heavenModel) {
                 DayNightCycle cycle;cycle.setPhase(.125f);environment=Plugins::applyEnvironment(cycle.evaluate(),dimension,clouds);
                 const auto day=captureScene(-1);
-                const auto gradedModel=captureScene(1);
+                const auto gradedModel=captureScene(1), repeatedGrade=captureScene(1);
                 const auto grade=environment.gradeStrength;environment.gradeStrength=0;
-                if(captureScene(1)==gradedModel)throw std::runtime_error("Registered Heaven grade did not affect Vulkan pixels");
+                PixelReadback::requireEffect(gradedModel,repeatedGrade,captureScene(1),width,height,
+                    {0,0,width,height},"registered Heaven grade",16,0);
                 environment.gradeStrength=grade;cycle.setPhase(.75f);environment=Plugins::applyEnvironment(cycle.evaluate(),dimension,clouds);
                 const auto night=captureScene(-1);
                 const auto brightness=[](const auto& pixels){uint64_t sum=0;for(size_t i=0;i<pixels.size();i+=4)sum+=uint64_t(pixels[i])+pixels[i+1]+pixels[i+2];return double(sum);};
@@ -174,10 +190,65 @@ int main(int argc,char** argv) {
                 std::cout<<"Official Heaven day/night sky and registered color-grade Vulkan readback passed\n";
             }
             renderer.resize(width,height);captureScene(3);renderer.suspendPresentation();renderer.resumePresentation();captureScene(3);
-            held.reset();Plugins::contextProvider()={};std::cout<<"Plugin sky/cloud, held GLB, colored particles, WAV initialization and Vulkan rebuild/resume passed\n";
+            VulkanDiagnostics::setParticleTime(renderer, std::nullopt);
+            held.reset();Plugins::contextProvider()={};std::cout<<"Plugin sky/cloud, held GLB, colored particles, optional audio mode and Vulkan rebuild/resume passed\n";
         }
         UIRenderer ui;Localization localization;localization.load(assets);
         ui.setLocalization(localization);ui.initialize(renderer,renderer.getBlockAtlasTexture(),assets);
+        if(argc==3&&std::string(argv[2])=="--redstone") {redstoneVulkanSmoke(renderer,assets,width,height);return 0;}
+        if(argc==3&&std::string(argv[2])=="--enchanting") {
+            InventoryModel inventory; Access access; ContainerScreen screen(inventory);
+            HeldItemRenderer held;held.initialize(renderer,assets);
+            RenderEnvironment environment;const glm::vec3 camera{3,3,5};
+            const auto vp=glm::perspective(glm::radians(60.f),float(width)/height,.1f,30.f)*glm::lookAt(camera,glm::vec3(0,.5,0),glm::vec3(0,1,0));
+            ItemStack enchanted{ItemId::DIAMOND_SWORD,1,20};enchanted.components.enchantments.set(EnchantmentId::Sharpness,5);enchanted.components.enchantments.set(EnchantmentId::VanishingCurse,1);enchanted.components.setCustomName("Enchanted blade");
+            auto capture=[&](BlockEntityType kind,bool portrait,float animation) {
+                access.block={};access.block.type=kind;access.block.chest[0]=enchanted;access.block.chest[1]={ItemId::LAPIS_LAZULI,3};access.block.output=enchanted;
+                access.block.workCost=12;access.block.offerRequired={5,17,30};access.block.offerClue={0,3,6};access.block.offerClueLevel={1,3,4};
+                screen.open(access,{});
+                for(int frame=0;frame<4;++frame) {
+                    if(frame==3)VulkanDiagnostics::requestCapture(renderer);
+                    renderer.beginFrame();renderer.setEnvironment(environment,camera);
+                    held.renderDropped({ItemId::ANVIL,1},vp,{0,0,0},0,0,SmoothLightSample{1,0},BlockId::ANVIL);
+                    renderer.finishScene({});ui.advanceTime(animation);
+                    ui.beginUIFrame(width,height);screen.render(ui,portrait?320:width,height,10,10);
+                    ui.drawItemIcon(float(width-90),20,64,64,enchanted);ui.drawTooltip(float(width-330),130,enchanted);ui.endUIFrame();renderer.endFrame();
+                }
+                renderer.waitIdle();const auto image=VulkanDiagnostics::readCapture(renderer);
+                if(image.size()!=size_t(width*height*4))throw std::runtime_error("Workstation readback unavailable");
+                return image;
+            };
+            const auto table=capture(BlockEntityType::EnchantingTable,false,0),anvil=capture(BlockEntityType::Anvil,false,0),repeatedAnvil=capture(BlockEntityType::Anvil,false,0),grindstone=capture(BlockEntityType::Grindstone,false,0),portrait=capture(BlockEntityType::Anvil,true,0);
+            PixelReadback::requireEffect(anvil,repeatedAnvil,table,width,height,{0,0,width,height},"enchanting table layout");
+            PixelReadback::requireEffect(anvil,repeatedAnvil,grindstone,width,height,{0,0,width,height},"grindstone layout");
+            PixelReadback::requireEffect(anvil,repeatedAnvil,portrait,width,height,{0,0,width,height},"portrait workstation layout");
+            auto icon=[&](float dt) {
+                for(int frame=0;frame<4;++frame) {
+                    if(frame==3)VulkanDiagnostics::requestCapture(renderer);
+                    FrameData state;state.clearColor={0,0,0,1};renderer.beginFrame(state);
+                    ui.advanceTime(dt);ui.beginUIFrame(width,height);
+                    ui.drawItemIcon(16,16,64,64,enchanted);ui.endUIFrame();renderer.endFrame();
+                }
+                renderer.waitIdle();return VulkanDiagnostics::readCapture(renderer);
+            };
+            const auto still=icon(0),repeatedStill=icon(0),shimmer=icon(.2f);
+            PixelReadback::requireEffect(still,repeatedStill,shimmer,width,height,
+                PixelReadback::uiRegion(16,16,64,64,height),"animated equipment glint");
+            auto falling=[&](bool visible) {
+                for(int frame=0;frame<4;++frame) {
+                    if(frame==3)VulkanDiagnostics::requestCapture(renderer);
+                    renderer.beginFrame();renderer.setEnvironment(environment,camera);
+                    if(visible)held.renderDropped({ItemId::ANVIL,1},vp,{0,0,0},0,0,SmoothLightSample{1,0},BlockId::ANVIL);
+                    renderer.finishScene({});renderer.endFrame();
+                }
+                renderer.waitIdle();return VulkanDiagnostics::readCapture(renderer);
+            };
+            const auto empty=falling(false),repeatedEmpty=falling(false);
+            PixelReadback::requireEffect(empty,repeatedEmpty,falling(true),width,height,
+                {width/4,height/4,width*3/4,height*3/4},"falling anvil model");
+            std::ofstream out(std::filesystem::temp_directory_path()/"minecraftc-enchanting.ppm",std::ios::binary);out<<"P6\n"<<width<<' '<<height<<"\n255\n";for(size_t i=0;i<anvil.size();i+=4)out.write(reinterpret_cast<const char*>(anvil.data()+i),3);
+            held.reset();std::cout<<"Three workstations, portrait layout, falling-anvil model and animated equipment Vulkan readback passed\n";return 0;
+        }
         if(argc==3&&std::string(argv[2])=="--experience") {
             Experience xp;xp.addPoints(1420);
             RenderEnvironment environment;const glm::vec3 camera{0,1,3};
@@ -186,17 +257,21 @@ int main(int argc,char** argv) {
                 std::vector<ParticleRenderData> particles;
                 if(orbs)for(int i=0;i<5;++i)particles.push_back({{-.8f+i*.4f,.8f,0},float(ParticleKind::ExperienceOrb),float(i),0,.35f,0,glm::vec4(1)});
                 for(int frame=0;frame<4;++frame) {
-                    if(frame==3)VulkanGiSmokeProbe::requestCapture(renderer);
+                    if(frame==3)VulkanDiagnostics::requestCapture(renderer);
                     renderer.beginFrame();renderer.setEnvironment(environment,camera);
                     renderer.renderParticles(particles,vp,{1,0,0},{0,1,0},0); // Visible even with weather/ambience disabled.
                     ui.beginUIFrame(width,height);ui.drawRect(0,0,1,1,{0,0,0,1});if(hud)renderExperienceHud(ui,xp,width);ui.endUIFrame();
                     renderer.endFrame();
                 }
-                renderer.waitIdle();const auto result=VulkanGiSmokeProbe::readCapture(renderer);
+                renderer.waitIdle();const auto result=VulkanDiagnostics::readCapture(renderer);
                 if(result.size()!=size_t(width*height*4))throw std::runtime_error("Experience readback unavailable");return result;
             };
-            const auto blank=image(false,false),hud=image(true,false),combined=image(true,true);
-            if(blank==hud||hud==combined)throw std::runtime_error("Experience HUD or orbs did not reach Vulkan pixels");
+            const auto blank=image(false,false),repeatedBlank=image(false,false),hud=image(true,false),repeatedHud=image(true,false),orbs=image(false,true),combined=image(true,true);
+            const auto hudRegion=PixelReadback::uiRegion(0,0,width,height/3,height);
+            const PixelReadback::Region orbRegion{width/10,height/4,width*9/10,height*3/4};
+            PixelReadback::requireEffect(blank,repeatedBlank,hud,width,height,hudRegion,"experience HUD");
+            PixelReadback::requireEffect(blank,repeatedBlank,orbs,width,height,orbRegion,"experience orbs alone");
+            PixelReadback::requireEffect(hud,repeatedHud,combined,width,height,orbRegion,"experience orbs with HUD");
             std::ofstream out(std::filesystem::temp_directory_path()/"minecraftc-experience.ppm",std::ios::binary);
             out<<"P6\n"<<width<<' '<<height<<"\n255\n";for(size_t i=0;i<combined.size();i+=4)out.write(reinterpret_cast<const char*>(combined.data()+i),3);
 
@@ -232,19 +307,20 @@ int main(int argc,char** argv) {
         ui.endUIFrame();renderer.endFrame();renderer.waitIdle();
         std::cout<<"Plugin metadata/runtime CJK atlas coverage passed: "<<pluginCjk.size()<<" glyphs\n";
         const auto captureText=[&](const std::string& text) {
-            VulkanGiSmokeProbe::requestCapture(renderer);
+            VulkanDiagnostics::requestCapture(renderer);
             renderer.beginFrame();ui.beginUIFrame(width,height);
             ui.drawRect(0,0,static_cast<float>(width),static_cast<float>(height),{0,0,0,1});
             ui.renderText(text,20,40,3,{1,1,1});
             ui.endUIFrame();renderer.endFrame();renderer.waitIdle();
-            const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+            const auto pixels=VulkanDiagnostics::readCapture(renderer);
             if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Runtime glyph readback unavailable");
             return pixels;
         };
-        const auto blank=captureText("");
+        const auto blank=captureText(""),repeatedBlank=captureText("");
         for(const auto* text:{u8"龘靐齉",u8"鱻麤灥",u8"𠀀",u8"\U0010FFFF"}) {
             const auto image=captureText(text);
-            if(image==blank)throw std::runtime_error("Runtime glyph atlas update did not reach Vulkan pixels");
+            PixelReadback::requireEffect(blank,repeatedBlank,image,width,height,
+                PixelReadback::uiRegion(0,0,width/2,height/3,height),"runtime/fallback glyph");
         }
         std::cout<<"Runtime font append, fallback and Vulkan pixel readback passed\n";
         ClientSettings settings;
@@ -282,7 +358,7 @@ int main(int argc,char** argv) {
                 name=="create-default-zh_cn" || name=="create-advanced-zh_cn";
             size_t previousVertices=0,previousBatches=0;
             for (int frame=0;frame<frames;++frame) {
-                if((menuCapture || (capture && name=="trades") || name=="plugin-mismatch-warning" || name=="registered-travel-zh_cn") && frame==frames-1)VulkanGiSmokeProbe::requestCapture(renderer);
+                if((menuCapture || (capture && name=="trades") || name=="plugin-mismatch-warning" || name=="registered-travel-zh_cn") && frame==frames-1)VulkanDiagnostics::requestCapture(renderer);
                 renderer.beginFrame();ui.advanceTime(1.0f/60);
                 ui.beginUIFrame(width,height);render();ui.endUIFrame();renderer.endFrame();
                 const auto stats=ui.frameStats();
@@ -295,28 +371,28 @@ int main(int argc,char** argv) {
             renderer.waitIdle();
             std::cout<<"READY "<<name<<" vertices="<<previousVertices<<" batches="<<previousBatches<<std::endl;
             if(menuCapture) {
-                const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+                const auto pixels=VulkanDiagnostics::readCapture(renderer);
                 if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Menu capture size invalid");
                 std::ofstream out(std::filesystem::temp_directory_path()/(name+".ppm"),std::ios::binary);
                 out<<"P6\n"<<width<<' '<<height<<"\n255\n";
                 for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
             }
             if(capture && name=="trades") {
-                const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+                const auto pixels=VulkanDiagnostics::readCapture(renderer);
                 if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("trade capture size invalid");
                 std::ofstream out(std::filesystem::temp_directory_path()/"village-trades.ppm",std::ios::binary);
                 out<<"P6\n"<<width<<' '<<height<<"\n255\n";
                 for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
             }
             if(name=="plugin-mismatch-warning") {
-                const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+                const auto pixels=VulkanDiagnostics::readCapture(renderer);
                 if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Warning capture size invalid");
                 std::ofstream out(std::filesystem::temp_directory_path()/"plugin-mismatch-warning.ppm",std::ios::binary);
                 out<<"P6\n"<<width<<' '<<height<<"\n255\n";
                 for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
             }
             if(name=="registered-travel-zh_cn") {
-                const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+                const auto pixels=VulkanDiagnostics::readCapture(renderer);
                 if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Chinese travel capture size invalid");
                 std::ofstream out(std::filesystem::temp_directory_path()/"localized-travel.ppm",std::ios::binary);
                 out<<"P6\n"<<width<<' '<<height<<"\n255\n";
@@ -410,18 +486,23 @@ int main(int argc,char** argv) {
         const auto iconPasses=Plugins::mutableContentState().extensions.renderPasses;Plugins::mutableContentState().extensions.renderPasses.clear();
         auto iconImage=[&](const std::function<void()>& render) {
             for(int frame=0;frame<3;++frame) {
-                if(frame==2)VulkanGiSmokeProbe::requestCapture(renderer);
+                if(frame==2)VulkanDiagnostics::requestCapture(renderer);
                 FrameData state;state.clearColor={0,0,0,1};renderer.beginFrame(state);
-                ui.beginUIFrame(width,height);render();ui.endUIFrame();renderer.endFrame();
+                ui.beginUIFrame(width,height);ui.drawRect(0,0,float(width),float(height),{0,0,0,1});render();ui.endUIFrame();renderer.endFrame();
             }
-            renderer.waitIdle();auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+            renderer.waitIdle();auto pixels=VulkanDiagnostics::readCapture(renderer);
             if(pixels.size()!=static_cast<size_t>(width*height*4))throw std::runtime_error("Shape icon capture unavailable");
             return pixels;
         };
         auto shapeImage=[&](BlockId block){return iconImage([&]{ui.drawBlockIcon(16,16,64,64,block);});};
+        const auto blankIcon=iconImage([]{}), repeatedBlankIcon=iconImage([]{});
         const auto slabImage=shapeImage(Plugins::resolveBlock("block_shapes_data:slab"));
         const auto cubeImage=shapeImage(BlockId::STONE);
-        if(slabImage==cubeImage)throw std::runtime_error("Slab icon did not render partial geometry");
+        const auto iconRegion=PixelReadback::uiRegion(16,16,64,64,height);
+        const auto repeatedCube=shapeImage(BlockId::STONE);
+        PixelReadback::requireEffect(blankIcon,repeatedBlankIcon,cubeImage,width,height,iconRegion,"cube icon");
+        PixelReadback::requireEffect(blankIcon,repeatedBlankIcon,slabImage,width,height,iconRegion,"slab icon");
+        PixelReadback::requireEffect(cubeImage,repeatedCube,slabImage,width,height,iconRegion,"slab partial geometry");
         shapeImage(Plugins::resolveBlock("block_shapes_data:stair"));shapeImage(Plugins::resolveBlock("block_shapes_data:door"));
         shapeImage(Plugins::resolveBlock("block_shapes_data:button"));shapeImage(Plugins::resolveBlock("block_shapes_data:box"));
         const auto legacyItem=Plugins::resolveItem("legacy_icon:item");const auto legacyTile=Plugins::pluginItem(legacyItem)->tile;
@@ -430,7 +511,7 @@ int main(int argc,char** argv) {
             const auto block=Plugins::resolveBlock("package_demo:blue_brick");
             const auto brick=Plugins::resolveItem("package_demo:blue_brick"),crystal=Plugins::resolveItem("package_demo:crystal");
             const auto pixels=shapeImage(block);
-            if(pixels==cubeImage)throw std::runtime_error("Package material did not affect Vulkan pixels");
+            PixelReadback::requireEffect(cubeImage,repeatedCube,pixels,width,height,iconRegion,"package material");
             const auto blockItem=iconImage([&]{ui.drawItemIcon(16,16,64,64,{brick,1,0});});
             const auto tile=Plugins::pluginItem(brick)->tile;
             const auto material=iconImage([&]{ui.drawAtlasIcon(16,16,64,64,tile,glm::vec4(1));});
@@ -702,6 +783,8 @@ int main(int argc,char** argv) {
                     localization.text("message.gamerule_unavailable"));
             },3);
         }
-        std::cout<<"Modern UI Vulkan smoke passed\n";
+        std::cout<<(heavenOff?"Heaven disabled: native UI Vulkan readback passed\n":"Modern UI Vulkan smoke passed\n");
     } catch (const std::exception& error) { std::cerr<<"UI smoke failed: "<<error.what()<<'\n';return 1; }
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "core/NetworkSocket.h"
 #include "network/Connection.h"
@@ -16,7 +17,7 @@ namespace {
 void check(bool passed,const char* message) { if(!passed) { std::cerr<<message<<'\n'; std::exit(1); } }
 template<class F> void rejects(F function) { bool rejected=false; try { function(); } catch(const Lan::ProtocolError&) { rejected=true; } check(rejected,"Invalid message accepted"); }
 }
-int main() {
+int main() try {
     try {
     installHeavenFixture();
     using namespace Lan;
@@ -163,7 +164,30 @@ int main() {
     }
     check(restored.experience.level()==31,"v6 profile experience roundtrip");
     {
-        Bytes legacy(profileBytes.begin(),profileBytes.end()-20);legacy[4]=5;legacy[5]=0;
+        // v7 adds 69-byte default components to each of the 51 held/storage
+        // stacks and an enchanting seed after experience. Build genuine v5 bytes.
+        Bytes legacy = profileBytes;
+        size_t offset = 6;
+        auto u16 = [&] { const auto value=unsigned(legacy[offset])|(unsigned(legacy[offset+1])<<8);offset+=2;return value; };
+        auto u32 = [&] { uint32_t value=0;for(int i=0;i<4;++i)value|=uint32_t(legacy[offset++])<<(8*i);return value; };
+        auto text = [&] { const auto size=u16(); offset+=size; };
+        auto count=u16();for(unsigned i=0;i<count;++i){offset+=2;text();}
+        text();text();text();offset+=1;text();
+        count=u32();for(unsigned i=0;i<count;++i){text();offset+=1+24;const bool safe=legacy[offset++]!=0;if(safe)offset+=24;const bool bed=legacy[offset++]!=0;if(bed)offset+=12;}
+        if(legacy[offset++])offset+=12;
+        if(legacy[offset++])offset+=12;
+        offset+=4+1+4+4+4;const auto effects=legacy[offset++];offset+=effects*6;
+        std::vector<std::pair<size_t,size_t>> components;
+        for(int i=0;i<51;++i){offset+=5;const auto start=offset;offset+=68;const auto length=legacy[offset++];offset+=length;components.emplace_back(start,offset-start);}
+        auto legacy6=legacy;legacy6.resize(legacy6.size()-12-2*74);
+        for(auto it=components.rbegin();it!=components.rend();++it)legacy6.erase(legacy6.begin()+it->first,legacy6.begin()+it->first+it->second);
+        legacy6[4]=6;legacy6[5]=0;
+        uint64_t hash6=14695981039346656037ULL;for(auto byte:legacy6){hash6^=byte;hash6*=1099511628211ULL;}
+        Writer trailer6;trailer6.u64(hash6);legacy6.insert(legacy6.end(),trailer6.bytes.begin(),trailer6.bytes.end());
+        check(decodeProfile(legacy6).experience.level()==31,"v6 profile retains XP and defaults components");
+        legacy.resize(legacy.size()-24-2*74); // checksum, XP, seed and empty workstation inputs
+        for(auto it=components.rbegin();it!=components.rend();++it)legacy.erase(legacy.begin()+it->first,legacy.begin()+it->first+it->second);
+        legacy[4]=5;legacy[5]=0;
         uint64_t hash=14695981039346656037ULL;for(auto byte:legacy){hash^=byte;hash*=1099511628211ULL;}
         Writer trailer;trailer.u64(hash);legacy.insert(legacy.end(),trailer.bytes.begin(),trailer.bytes.end());
         const auto old=decodeProfile(legacy);check(old.experience.level()==0&&old.identity.id==profile.identity.id&&old.inventory.count(ItemId::DIAMOND)==12,"v5 profile preserves identity/items and defaults XP");
@@ -172,6 +196,15 @@ int main() {
         check(ProfileStore::localIdentity(file.parent_path()).id==profile.identity.id,"v5 local identity is never regenerated");
     }
     profileBytes[20]^=1;rejects([&]{decodeProfile(profileBytes);});
+    ItemStack named{ItemId::IRON_PICKAXE,1,13};
+    named.components.enchantments.set(EnchantmentId::Mending,1);
+    named.components.setCustomName("Network tool"); named.components.repairCost=7;
+    profile.inventory.slot(1)=named; profile.cursor=named; profile.crafting[0]=named;
+    profile.workstationInputs[0]=named; profile.enchantmentSeed=0x12345678;
+    const auto equipmentProfile=decodeProfile(encodeProfile(profile));
+    check(equipmentProfile.cursor==named && equipmentProfile.crafting[0]==named &&
+        equipmentProfile.workstationInputs[0]==named && equipmentProfile.enchantmentSeed==profile.enchantmentSeed &&
+        equipmentProfile.inventory.slot(1)==named,"Profile7 preserves all equipment components and held locations");
     profiles.save(profile);auto reloaded=profiles.load(profile.identity);check(reloaded && reloaded->inventory.count(ItemId::DIAMOND)==12,"Persistent player data missing");
     check(ProfileStore::localIdentity(profileDirectory/"client").id==profile.identity.id,"Local identity changed on restart");
     auto forged=profile.identity;forged.credential=randomToken();check(!profiles.accepts(forged),"Forged profile credential accepted");
@@ -180,4 +213,6 @@ int main() {
     std::filesystem::remove_all(profileDirectory);
     std::cout<<"LAN protocol, TCP, sessions and profile tests passed\n";
     } catch(const std::exception& error) {std::cerr<<"Network test exception: "<<error.what()<<'\n';return 1;}
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

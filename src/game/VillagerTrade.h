@@ -26,6 +26,7 @@ struct TradeOffer {
     ItemStack output;
     uint8_t maximumUses = 12;
     uint8_t experience = 0;
+    ItemStack secondInput{};
 };
 
 struct VillagerData {

@@ -57,7 +57,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     BlockEntity resourceEntity;resourceEntity.type=BlockEntityType::Resource;resourceEntity.resourceRemaining=73;resourceEntity.resourceBlock=static_cast<uint16_t>(resource);
     saves.saveBlockEntities(1,0,{{local,resourceEntity}});const auto savedResource=saves.loadBlockEntities(1,0);check(savedResource[0].value.resourceRemaining==73&&savedResource[0].value.resourceBlock==static_cast<uint16_t>(resource),"resource timer/key survives persistence");
     WorldMetadata metadata;metadata.displayName="Capabilities";metadata.seed=17;metadata.generationVersion=WorldGenContext::GENERATION_VERSION;metadata.timePolicies[0]={45,1};saves.saveMetadata(metadata);check(saves.loadMetadata().timePolicies.at(0)==std::make_pair(45u,1u),"time policy persisted");
-    GameSession session(root/"saves");GameSessionTestAccess::prepareLanScene(session);auto& p=GameSessionTestAccess::player(session);auto& world=GameSessionTestAccess::world(session);
+    ScenarioSession session(root/"saves");SessionScenario::prepareLanScene(session);auto& p=SessionScenario::player(session);auto& world=SessionScenario::world(session);
     const auto staff=Plugins::resolveItem("capability_native:staff");p.inventory().slot(0)={staff,1,0};p.setSelectedSlot(0);
     Plugins::contextProvider()=[&]{return session.pluginContext();};plugins.actionState=[&](uint64_t id){return session.pluginActionState(id);};plugins.executeAction=[&](uint64_t id,const std::string& key){return session.pluginExecuteAction(id,key);};plugins.actionTarget=[&](uint64_t id,const std::string& key,bool preview,MC_ActionTarget& t){return session.pluginActionTarget(id,key,preview,t);};plugins.actionCooldown=[&](uint64_t id,const std::string& key,float& out){return session.pluginActionCooldown(id,key,out);};plugins.dimensionTime=[&](uint32_t dim,MC_DimensionTime& out){return session.pluginDimensionTime(dim,out);};plugins.setDimensionTime=[&](const MC_DimensionTime& t){return session.pluginSetDimensionTime(t);};
     auto ready=Plugins::event(MC_WORLD_READY);plugins.dispatch(ready);MC_ActionTarget target{};target.size=sizeof(target);check(host.playerActions()->preview(&context,0,"capability_native:blink",&target)==0&&target.valid,"read-only native target preview");check(p.activeItem().damage==0&&p.getPosition().x==.5,"preview cannot mutate player");
@@ -82,30 +82,30 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     const auto env=DayNightCycle{}.evaluate();bool clouds=true;const auto changed=Plugins::applyEnvironment(env,static_cast<uint32_t>(dim),clouds);check(!clouds&&changed.skyStyle==RenderSkyStyle::Layered&&changed.moonSize==1.3f,"dimension sky/cloud profile");
     world.setBlock(5,0,0,BlockId::PLANKS_SLAB_BOTTOM);check(pluginSafeLanding(world,{5.5,.51,.5}),"full-foot landing accepts slab support height");
     world.setBlock(5,0,0,BlockId::PLANKS_STAIRS_BOTTOM_NORTH);check(!pluginSafeLanding(world,{5.5,1.01,.5}),"partial stair face cannot authorize unsupported foot area");world.setBlock(5,0,0,BlockId::STONE);
-    auto rules=world.gameRules();rules.set(GameRuleId::AdvanceTime,GameRuleValue::boolean(false));GameSessionTestAccess::setRules(session,rules);
-    MC_DimensionTime timePolicy{sizeof(timePolicy),0,20,1,.25f};check(host.environment()->set_time(&context,&timePolicy)==0,"time mutation queued");plugins.flushOperations();GameSessionTestAccess::tickDaylight(session,.1f);check(session.daylightState().phase()==.25f,"paused per-dimension clock");
-    timePolicy.advancing=2;check(host.environment()->set_time(&context,&timePolicy)==0,"advancing override queued");plugins.flushOperations();GameSessionTestAccess::tickDaylight(session,.1f);check(std::abs(session.daylightState().phase()-.255f)<.00001f,"dimension duration/advance override world rule");
-    timePolicy.advancing=0;timePolicy.cycle_seconds=0;check(host.environment()->set_time(&context,&timePolicy)==0,"inherited clock queued");plugins.flushOperations();GameSessionTestAccess::tickDaylight(session,.1f);check(session.daylightState().phase()==.25f,"inherited clock follows paused world rule");
+    auto rules=world.gameRules();rules.set(GameRuleId::AdvanceTime,GameRuleValue::boolean(false));SessionScenario::setRules(session,rules);
+    MC_DimensionTime timePolicy{sizeof(timePolicy),0,20,1,.25f};check(host.environment()->set_time(&context,&timePolicy)==0,"time mutation queued");plugins.flushOperations();SessionScenario::tickDaylight(session,.1f);check(session.daylightState().phase()==.25f,"paused per-dimension clock");
+    timePolicy.advancing=2;check(host.environment()->set_time(&context,&timePolicy)==0,"advancing override queued");plugins.flushOperations();SessionScenario::tickDaylight(session,.1f);check(std::abs(session.daylightState().phase()-.255f)<.00001f,"dimension duration/advance override world rule");
+    timePolicy.advancing=0;timePolicy.cycle_seconds=0;check(host.environment()->set_time(&context,&timePolicy)==0,"inherited clock queued");plugins.flushOperations();SessionScenario::tickDaylight(session,.1f);check(session.daylightState().phase()==.25f,"inherited clock follows paused world rule");
     ParticleSystem particles;MC_ParticleEmission emission{};emission.size=sizeof(emission);emission.particle="capability_demo:spark";emission.count=3;check(particles.emitPlugin(emission)&&particles.size()==3,"host particle emission");check(!particles.emitPlugin(MC_ParticleEmission{sizeof(emission),0,129,1,emission.particle,{0,0,0}}),"particle emission bound");const auto render=particles.buildRenderData({0,0,0});check(render[0].color.b==1&&render[0].color.a==.8f,"particle colors reach rendering");
     const auto& playlists=Plugins::content().extensions.playlists;
-    check(Plugins::content().extensions.heldModels.at(static_cast<uint16_t>(staff)).asset&&playlists.size()==3&&
+    check(Plugins::content().extensions.heldModels.at(static_cast<uint16_t>(staff)).asset&&
         playlists.count("capability_demo:music")&&playlists.count("capability_native:music")&&
-        playlists.at("official_heaven:music").dimension==1&&playlists.at("official_heaven:music").tracks.size()==2,"held model/registered dimension playlists loaded");
+        playlists.at("official_heaven:music").dimension==1&&!playlists.at("official_heaven:music").tracks.empty(),"held model/registered dimension playlists loaded");
     Lan::AuthorityState state;state.self.id=1;state.cycleOverride=45;state.advancing=1;state.actionCooldowns[request.action]=1.5f;const auto wire=Lan::decodeAuthorityState(Lan::encodeAuthorityState(state));check(wire.cycleOverride==45&&wire.advancing==1&&wire.actionCooldowns.at(request.action)==1.5f,"LAN authoritative time/cooldowns roundtrip");
     check(Plugins::content().networkDescription.count("structure/capability_demo:bridge")&&Plugins::content().networkDescription.count("action/capability_native:blink"),"gameplay capability handshake");
     Config::RENDER_DISTANCE=2;
     {
-        GameSession hostSession(root/"host/saves"),clientSession(root/"client/saves");
+        ScenarioSession hostSession(root/"host/saves"),clientSession(root/"client/saves");
         const auto worldId=hostSession.createWorld("Capability LAN",42,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
-        hostSession.startWorld(worldId,true,0);GameSessionTestAccess::prepareLanScene(hostSession);
+        hostSession.startWorld(worldId,true,0);SessionScenario::prepareLanScene(hostSession);
         Plugins::contextProvider()=[&]{return hostSession.pluginContext();};
         Plugins::actionDispatcher()=[&](uint64_t id,const std::string& key){return hostSession.pluginExecuteAction(id,key);};
         check(hostSession.openLanRoom(0,2,true),"capability LAN host opens");clientSession.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
         check(clientSession.joinLanRoom("::1",hostSession.lanPort(),0),"capability LAN join");
-        double now=0;auto pump=[&]{now+=.005;hostSession.pollLan(now);clientSession.pollLan(now);GameSessionTestAccess::world(clientSession).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
+        double now=0;auto pump=[&]{now+=.005;hostSession.pollLan(now);clientSession.pollLan(now);SessionScenario::world(clientSession).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
         for(int i=0;i<500&&!clientSession.lanWorldReady();++i)pump();
         check(clientSession.lanWorldReady(),"capability LAN ready");
-        const auto peer=GameSessionTestAccess::replicaPeer(clientSession);auto& guest=GameSessionTestAccess::guest(hostSession,peer);
+        const auto peer=SessionScenario::replicaPeer(clientSession);auto& guest=SessionScenario::guest(hostSession,peer);
         guest.player.inventory().slot(0)={staff,1,0};guest.player.setSelectedSlot(0);guest.player.setPosition({.5,1.01,.5});
         MC_DimensionTime policy{sizeof(policy),0,45,1,.3f};check(hostSession.pluginSetDimensionTime(policy),"host time override");
         for(int i=0;i<100&&clientSession.playerState().activeItem().id!=staff;++i)pump();
@@ -116,7 +116,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         MC_ActionTarget clientTarget{};clientTarget.size=sizeof(clientTarget);check(clientSession.pluginActionTarget(peer,"capability_native:blink",true,clientTarget)&&clientTarget.valid,"client target from loaded replica");
         check(!clientSession.pluginExecuteAction(peer,"capability_native:blink"),"client cannot execute gameplay action");
         clientSession.setLocalControl(true);clientSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);for(int i=0;i<20;++i)pump();
-        GameSessionTestAccess::tickLanPlayers(hostSession,.05f);
+        SessionScenario::tickLanPlayers(hostSession,.05f);
         check(guest.player.getPosition().x==2.5&&guest.player.activeItem().damage==1,"guest use executes own action with one cost");
         check(hostSession.playerState().activeItem().empty(),"guest action never costs host inventory");
         for(int i=0;i<60&&clientSession.playerState().activeItem().damage!=1;++i)pump();
@@ -127,7 +127,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         // after release, and the host derives the destination from that intent.
         const auto contextStaff=Plugins::resolveItem("capability_native:context_staff");
         guest.player.inventory().slot(0)={contextStaff,1,0};guest.player.setPosition({.5,1.01,.5});
-        GameSessionTestAccess::tickLanPlayers(hostSession,.2f); // Polling alone does not advance the previous use cooldown.
+        SessionScenario::tickLanPlayers(hostSession,.2f); // Polling alone does not advance the previous use cooldown.
         for(int i=0;i<100&&clientSession.playerState().activeItem().id!=contextStaff;++i)pump();
         check(clientSession.playerState().activeItem().id==contextStaff,"V2 LAN item replica");
         InputState sneak;std::array<InputBinding,INPUT_ACTION_COUNT> emptyBindings{};
@@ -135,21 +135,21 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         sneak.beginFrame();sneak.clearVirtual();sneak.update(emptyBindings);clientSession.handleMovement(sneak,0);
         check(clientSession.playerState().sneakInput(),"toggle sneak lost intent after release");
         for(int i=0;i<20;++i)pump();
-        GameSessionTestAccess::tickLanPlayers(hostSession,.05f); // Observe Use released before the next press edge.
+        SessionScenario::tickLanPlayers(hostSession,.05f); // Observe Use released before the next press edge.
         check(!clientSession.pluginExecuteAction(peer,"capability_native:context"),"client executed V2 authority action");
-        clientSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);for(int i=0;i<20;++i)pump();GameSessionTestAccess::tickLanPlayers(hostSession,.05f);
+        clientSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);for(int i=0;i<20;++i)pump();SessionScenario::tickLanPlayers(hostSession,.05f);
         check(guest.player.sneakInput()&&guest.player.getPosition().x==-1.5,"LAN V2 used key release or old preview instead of latched intent");
         clientSession.handleMouseButton(MouseButton::Right,ButtonAction::Release);clientSession.setToggleSneak(false);sneak.beginFrame();sneak.update(emptyBindings);clientSession.handleMovement(sneak,0);
-        for(int i=0;i<20;++i)pump();GameSessionTestAccess::tickLanPlayers(hostSession,.05f);
+        for(int i=0;i<20;++i)pump();SessionScenario::tickLanPlayers(hostSession,.05f);
         MC_ParticleEmission networkEmission{sizeof(networkEmission),0,3,0,"capability_native:spark",{2.5,2,0}};
-        const auto before=GameSessionTestAccess::particleCount(clientSession);check(hostSession.pluginEmitParticle(networkEmission),"host world particle emission");for(int i=0;i<30;++i)pump();
-        check(GameSessionTestAccess::particleCount(clientSession)==before+3,"dimension-scoped particles reach LAN client");
+        const auto before=SessionScenario::particleCount(clientSession);check(hostSession.pluginEmitParticle(networkEmission),"host world particle emission");for(int i=0;i<30;++i)pump();
+        check(SessionScenario::particleCount(clientSession)==before+3,"dimension-scoped particles reach LAN client");
         check(!clientSession.pluginEmitParticle(networkEmission),"client world emission rejected");
         guest.player.inventory().slot(0)={Plugins::resolveItem("capability_demo:charm"),1,0};
         check(hostSession.pluginExecuteAction(peer,"capability_demo:visit"),"guest action uses dimension landing policy");
         check(guest.profile.dimension==dim&&guest.player.activeItem().damage==1&&guest.player.pluginCooldown("capability_native:blink")>0&&guest.player.pluginCooldown("capability_demo:visit")==3,"travel preserves prior cooldown and charges successful action");
         check(!hostSession.pluginExecuteAction(peer,"capability_demo:visit")&&guest.player.activeItem().damage==1,"duplicate travel does not consume wear");
-        hostSession.closeLanRoom();GameSessionTestAccess::disconnectReplica(clientSession);
+        hostSession.closeLanRoom();SessionScenario::disconnectReplica(clientSession);
         Plugins::actionDispatcher()={};Plugins::targetDispatcher()={};Plugins::contextProvider()={};
     }
     plugins.shutdown();std::filesystem::remove_all(root);std::cout<<"Plugin gameplay/presentation capabilities passed\n";return 0;

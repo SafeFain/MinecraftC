@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "model/AnimationGraph.h"
 #include "model/AnimationMixer.h"
 
@@ -33,7 +34,7 @@ model::Channel translation(int node, glm::vec3 first, glm::vec3 second) {
 }
 }
 
-int main() {
+int main() try {
     model::ModelAsset asset;
     model::Node root; root.name = "root"; root.children = {1};
     model::Node arm; arm.name = "arm"; arm.parent = 0;
@@ -91,10 +92,9 @@ int main() {
     const auto revision=instance.revision;
     require(!reusable.evaluate(instance) && instance.revision==revision,"pose cache changed its revision");
 
-    const std::filesystem::path valid =
-        std::filesystem::temp_directory_path() / "minecraftc-animation-graph-valid.json";
-    const std::filesystem::path invalid =
-        std::filesystem::temp_directory_path() / "minecraftc-animation-graph-invalid.json";
+    TestSupport::TemporaryDirectory temporary;
+    const auto valid=temporary.path()/"valid.json";
+    const auto invalid=temporary.path()/"invalid.json";
     {
         std::ofstream out(valid);
         out << R"({"version":1,"layers":[{"name":"base","order":0,"blend":"override"}],
@@ -115,4 +115,6 @@ int main() {
     std::filesystem::remove(invalid);
 
     std::cout << "animation graph tests passed\n";
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

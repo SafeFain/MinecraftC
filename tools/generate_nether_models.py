@@ -18,6 +18,7 @@ DEFINITIONS = {
     "blaze": ("spider", (.6, 1.8, .6), (231, 165, 42)),
     "wither_skeleton": ("zombie", (.7, 2.4, .7), (47, 43, 48)),
     "magma_cube": ("pig", (.51, .51, .51), (105, 28, 13)),
+    "slime": ("pig", (.51, .51, .51), (108, 171, 74)),
     "piglin": ("zombie", (.6, 1.95, .6), (187, 125, 95)),
     "piglin_brute": ("zombie", (.6, 1.95, .6), (156, 99, 69)),
     "zombified_piglin": ("zombie", (.6, 1.95, .6), (119, 148, 91)),
@@ -49,9 +50,10 @@ def parts(name, base_parts):
     if name in ("hoglin", "zoglin"):
         result = [(part, (c[0] * 1.35, c[1] * 1.1, c[2]), (d[0] * 1.4, d[1] * 1.2, d[2])) for part, c, d in base_parts]
         return result + [("tusk_l", (-.32, .75, -.92), (.1, .35, .13)), ("tusk_r", (.32, .75, -.92), (.1, .35, .13))]
-    if name in ("magma_cube", "ghast_fireball", "blaze_fireball", "thrown_potion", "ender_pearl"):
+    if name in ("slime", "magma_cube", "ghast_fireball", "blaze_fireball", "thrown_potion", "ender_pearl"):
         size = DEFINITIONS[name][1]
         result = [("body", (0, size[1] / 2, 0), size), ("head", (0, size[1] * .6, -size[2] * .501), (size[0] * .8, size[1] * .25, .01))]
+        if name == "slime": result.append(("core", (0, .255, 0), (.33, .33, .33)))
         for leg, x, z in (("fl", -1, -1), ("fr", 1, -1), ("bl", -1, 1), ("br", 1, 1)):
             result.append(("leg_" + leg, (x * size[0] * .25, .01, z * size[2] * .25), (.01, .01, .01)))
         return result
@@ -68,6 +70,50 @@ def parts(name, base_parts):
     result = [(part, (c[0], c[1] * 1.08, c[2]), d) for part, c, d in base_parts]
     return result + [("snout", (0, 1.65, -.30), (.28, .18, .22)),
                      ("ear_l", (-.32, 1.8, 0), (.18, .22, .08)), ("ear_r", (.32, 1.8, 0), (.18, .22, .08))]
+
+
+def slime_gel(data):
+    """Split the rigidly skinned outer shell into its own transparent primitive."""
+    length = struct.unpack_from('<I', data, 12)[0]
+    document = json.loads(data[20:20+length])
+    binary = bytearray(data[28+length:28+length+document['buffers'][0]['byteLength']])
+    primitive = document['meshes'][0]['primitives'][0]
+    def values(index, components):
+        accessor = document['accessors'][index]
+        view = document['bufferViews'][accessor['bufferView']]
+        code = {5121:'B',5123:'H',5125:'I'}[accessor['componentType']]
+        size = struct.calcsize('<'+code)
+        start = view.get('byteOffset',0)+accessor.get('byteOffset',0)
+        stride = view.get('byteStride',size*components)
+        return [struct.unpack_from('<'+code*components,binary,start+i*stride) for i in range(accessor['count'])]
+    indices = [value[0] for value in values(primitive['indices'],1)]
+    joints = values(primitive['attributes']['JOINTS_0'],4)
+    body = next(i for i,node in enumerate(document['nodes']) if node.get('name')=='body')
+    body_joint = document['skins'][0]['joints'].index(body)
+    shell,core = [],[]
+    for i in range(0,len(indices),3):
+        triangle = indices[i:i+3]
+        (shell if joints[triangle[0]][0]==body_joint else core).extend(triangle)
+    material = copy.deepcopy(document['materials'][0])
+    material['name']='slime_gel';material['alphaMode']='BLEND'
+    material['pbrMetallicRoughness']['baseColorFactor']=[1,1,1,.45]
+    document['materials'].append(material)
+    primitives=[]
+    for group,material_index in ((core,0),(shell,len(document['materials'])-1)):
+        binary.extend(b'\0'*((-len(binary))%4));start=len(binary)
+        binary.extend(struct.pack('<'+'I'*len(group),*group))
+        view=len(document['bufferViews'])
+        document['bufferViews'].append({'buffer':0,'byteOffset':start,'byteLength':len(group)*4,'target':34963})
+        index=len(document['accessors'])
+        document['accessors'].append({'bufferView':view,'componentType':5125,'count':len(group),'type':'SCALAR'})
+        part=copy.deepcopy(primitive);part['indices']=index;part['material']=material_index;primitives.append(part)
+    document['meshes'][0]['primitives']=primitives
+    document['buffers'][0]['byteLength']=len(binary)
+    encoded=json.dumps(document,sort_keys=True,separators=(',',':')).encode()
+    encoded+=b' '*((-len(encoded))%4);binary.extend(b'\0'*((-len(binary))%4))
+    return (struct.pack('<4sII',b'glTF',2,28+len(encoded)+len(binary))+
+            struct.pack('<II',len(encoded),0x4E4F534A)+encoded+
+            struct.pack('<II',len(binary),0x004E4942)+binary)
 
 
 def skin(name, color):
@@ -112,6 +158,7 @@ def generate(output):
                 encoded += b" " * ((-len(encoded)) % 4)
                 binary = data[20 + length:]
                 data = struct.pack("<4sII", b"glTF", 2, 20 + len(encoded) + len(binary)) + struct.pack("<II", len(encoded), 0x4E4F534A) + encoded + binary
+            if name == 'slime': data = slime_gel(data)
             (output / (name + ".glb")).write_bytes(data)
             graph_path = output / (name + ".anim.json")
             models.write_action_graph(graph_path, base)

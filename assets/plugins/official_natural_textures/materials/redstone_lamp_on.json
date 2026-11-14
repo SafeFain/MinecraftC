@@ -1,0 +1,19 @@
+{
+  "key": "redstone_lamp_on",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2765961400,
+    "images": [
+      "textures/materials/redstone_lamp_on-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/redstone_lamp_on-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/redstone_lamp_on-0-properties.png"
+    ]
+  }
+}

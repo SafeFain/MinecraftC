@@ -1097,6 +1097,186 @@
     "warped_door_top": {
       "recipe": "base",
       "variants": 1
+    },
+    "lapis_ore": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "deepslate_lapis_ore": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "bookshelf": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "iron_block": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "enchanting_table": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "anvil": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "chipped_anvil": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "damaged_anvil": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "frosted_ice": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_on": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "lever": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_torch": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_torch_off": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_repeater": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_repeater_on": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_comparator": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_comparator_on": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "piston": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "piston_side": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "piston_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "sticky_piston_top": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "observer": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "observer_face": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "observer_back": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "observer_back_on": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_lamp": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_lamp_on": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_block": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_ore": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "deepslate_redstone_ore": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_1": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_2": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_3": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_4": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_5": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_6": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_7": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_8": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_9": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_10": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_11": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_12": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_13": {
+      "recipe": "base",
+      "variants": 1
+    },
+    "redstone_dust_14": {
+      "recipe": "base",
+      "variants": 1
     }
   },
   "examples": {

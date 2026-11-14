@@ -1,8 +1,8 @@
 # Voxel GI Vulkan regression smoke
 
-`vulkan_gi_smoke` is a display-dependent test. By default it is excluded from
-normal builds and CTest; enabling `MINECRAFTC_VULKAN_TESTS` includes it as
-`vulkan_gi_readback`. See [optional Vulkan validation](development.md). It renders Very High and Ultra using the actual production
+`vulkan_gi_smoke` is a display-dependent test registered by default on desktop as
+`vulkan_gi_readback`; `MINECRAFTC_VULKAN_TESTS=OFF` explicitly excludes GPU checks.
+See [Vulkan validation](development.md). It renders Very High and Ultra using the actual production
 GI shaders and 4× scene MSAA, and reads the rendered half-resolution GI/AO image. An additional compute probe
 uses the exact `voxel_gi_trace.glsl` production traversal/filtering functions.
 
@@ -47,9 +47,10 @@ opacity still uses the containing cell's conservative maximum. Direction light
 visibility uses existing sky light, not a new directional shadow ray. World
 block light remains scalar; no second bounce or radiance feedback is introduced.
 
-Vulkan calls and readback are confined to the backend's `VulkanGiSmokeProbe.h`.
-The probe is only used by this explicit test target; gameplay does not read back
-images or force full updates. The ordinary GI regression also checks disjoint
+Vulkan calls and readback live in the backend's `VulkanDiagnostics.cpp`.
+Drivers consume CPU capture/ray results and semantic history validity through
+`VulkanDiagnostics.h`; tests cannot include renderer implementation headers.
+Gameplay does not read back images or force full updates. The ordinary GI regression also checks disjoint
 multi-axis regions, 32/48/64 resolutions, packing order and wall-time history
 retention across 30/60/120 FPS and one/two/three history reuse intervals.
 

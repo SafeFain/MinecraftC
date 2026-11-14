@@ -1,4 +1,5 @@
 #include "app/GameSession.h"
+#include "network/PistonProtocol.h"
 #include "network/EntityProtocol.h"
 #include "debug/Log.h"
 #include "plugins/ContentQueries.h"
@@ -37,6 +38,7 @@ void GameSession::closeReplica() {
     replicaLodRevisions.clear();
     for (auto& runtime : simulations) if (runtime) runtime->world.clearReplicaLod();
     replicaEpoch = 0; replicaInput = {}; replicaLastInputSent = -1;
+    replicaBlockAssembler.clear();
     replicaChunks.clear(); replicaChunkBytes = 0; replicaRevisions.clear(); replicaRecovery.clear();
     lanEvents.clear();replicaExperiencePickup=replicaExperienceLevel=false;
     replicaRoster.clear(); replicaOthers.clear(); replicaFishing = {}; lanChat.clear(); hostChatTokens = 5; hostChatLast = lanNow;
@@ -115,7 +117,7 @@ void GameSession::pollReplica(double now) {
         for (auto& received : lanClient.poll(now)) {
             auto& message = received.message;
             if (received.chunks) {
-                if (message.type != Lan::MessageType::ChunkSnapshot && message.type != Lan::MessageType::ChunkDelta && message.type != Lan::MessageType::LodColumns)
+                if (message.type != Lan::MessageType::ChunkSnapshot && message.type != Lan::MessageType::ChunkDelta && message.type != Lan::MessageType::LodColumns && message.type != Lan::MessageType::BlockTransaction)
                     throw Lan::ProtocolError("Unexpected host bulk message");
                 if (replicaChunkBytes + message.payload.size() > Lan::MAX_QUEUED_BYTES || replicaChunks.size() >= Lan::MAX_MESSAGES_PER_POLL)
                     throw Lan::ProtocolError("Replica terrain queue is full");
@@ -170,6 +172,31 @@ void GameSession::pollReplica(double now) {
                 auto& revision = found->second; revision.pending = false;
                 if (update.revision < revision.required || update.revision <= revision.received) continue;
                 world().applyReplicaLod(update.key, update.revision, update.columns); revision.received = update.revision;
+            } else if(message.type==Lan::MessageType::BlockTransaction) {
+                Lan::Reader fragment(message.payload);if(fragment.u8()!=2 || fragment.u64()!=replicaEpoch)continue;
+                const auto assembled=replicaBlockAssembler.push(message.payload);if(!assembled)continue;
+                const auto& transaction=*assembled;
+                if(transaction.epoch!=replicaEpoch || transaction.dimension!=dimension)continue;
+                bool stale=false;
+                for(const auto& chunk:transaction.chunks) {
+                    const auto previous=replicaRevisions.find(chunk.address);
+                    if(previous!=replicaRevisions.end() && previous->second>chunk.revision)stale=true;
+                }
+                if(stale)continue;
+                // A transaction may include a companion just beyond the normal
+                // streaming radius. Reserve every target before publishing any.
+                for(const auto& chunk:transaction.chunks) {
+                    auto* target=world().getChunk(chunk.address.x,chunk.address.z);
+                    if(target->lifecycle.load()==Chunk::LifecycleState::Warm)target->lifecycle=Chunk::LifecycleState::Requested;
+                }
+                // Decode validated every chunk first. No mesh submission/render
+                // occurs between these publications on the main thread.
+                for(const auto& chunk:transaction.chunks) {
+                    if(!world().installReplicaSnapshot(chunk.address.x,chunk.address.z,chunk.blocks))throw Lan::ProtocolError("Failed atomic transaction snapshot");
+                    world().queueAtomicChunkMesh(chunk.address.x,chunk.address.z);
+                    replicaRevisions[chunk.address]=chunk.revision;replicaRecovery.erase(chunk.address);
+                }
+                world().installReplicaMotions(transaction.tick,transaction.motions);
             } else if (message.type == Lan::MessageType::ChunkSnapshot) {
                 const auto snapshot = Lan::decodeChunkSnapshot(message.payload);
                 if (snapshot.epoch != replicaEpoch || !inRange(snapshot.address)) continue;

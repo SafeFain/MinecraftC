@@ -1,113 +1,115 @@
 #include "game/VillagerTrade.h"
 #include "Config.h"
+#include "game/EnchantingRules.h"
 
 #include <algorithm>
 #include <cmath>
 
 namespace {
 
-constexpr TradeOffer offer(ItemId input, uint8_t inputCount, ItemId output,
+TradeOffer offer(ItemId input, uint8_t inputCount, ItemId output,
                            uint8_t outputCount, uint8_t experience) {
     return {{input, inputCount, 0}, {output, outputCount, 0}, 12, experience};
 }
 
-constexpr std::array<TradeOffer, 5> FARMER{{
+const std::array<TradeOffer, 5> FARMER{{
     offer(ItemId::WHEAT, 20, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 1, ItemId::BREAD, 6, 5),
     offer(ItemId::WHEAT_SEEDS, 16, ItemId::EMERALD, 1, 10),
     offer(ItemId::EMERALD, 3, ItemId::STEAK, 4, 15),
     offer(ItemId::EMERALD, 4, ItemId::GLISTERING_MELON, 3, 20),
 }};
-constexpr std::array<TradeOffer, 5> FLETCHER{{
+const std::array<TradeOffer, 5> FLETCHER{{
     offer(ItemId::STICK, 32, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 1, ItemId::ARROW, 16, 5),
     offer(ItemId::FLINT, 10, ItemId::EMERALD, 1, 10),
     offer(ItemId::EMERALD, 2, ItemId::BOW, 1, 15),
     offer(ItemId::STRING, 14, ItemId::EMERALD, 1, 20),
 }};
-constexpr std::array<TradeOffer, 5> SHEPHERD{{
+const std::array<TradeOffer, 5> SHEPHERD{{
     offer(ItemId::WHITE_WOOL, 18, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 2, ItemId::WHITE_WOOL, 3, 5),
     offer(ItemId::STRING, 12, ItemId::EMERALD, 1, 10),
     offer(ItemId::EMERALD, 3, ItemId::WHITE_BED, 1, 15),
     offer(ItemId::EMERALD, 4, ItemId::WHITE_WOOL, 16, 20),
 }};
-constexpr std::array<TradeOffer, 5> LEATHERWORKER{{
+const std::array<TradeOffer, 5> LEATHERWORKER{{
     offer(ItemId::LEATHER, 6, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 3, ItemId::LEATHER_BOOTS, 1, 5),
     offer(ItemId::EMERALD, 5, ItemId::LEATHER_LEGGINGS, 1, 10),
     offer(ItemId::EMERALD, 7, ItemId::LEATHER_CHESTPLATE, 1, 15),
     offer(ItemId::EMERALD, 6, ItemId::SADDLE, 1, 20),
 }};
-constexpr std::array<TradeOffer, 5> ARMORER{{
+const std::array<TradeOffer, 5> ARMORER{{
     offer(ItemId::COAL, 15, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 5, ItemId::IRON_HELMET, 1, 5),
     offer(ItemId::EMERALD, 9, ItemId::IRON_CHESTPLATE, 1, 10),
     offer(ItemId::EMERALD, 13, ItemId::DIAMOND_LEGGINGS, 1, 15),
     offer(ItemId::EMERALD, 17, ItemId::DIAMOND_CHESTPLATE, 1, 20),
 }};
-constexpr std::array<TradeOffer, 5> TOOLSMITH{{
+const std::array<TradeOffer, 5> TOOLSMITH{{
     offer(ItemId::COAL, 15, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 1, ItemId::STONE_PICKAXE, 1, 5),
     offer(ItemId::EMERALD, 4, ItemId::IRON_AXE, 1, 10),
     offer(ItemId::EMERALD, 6, ItemId::IRON_PICKAXE, 1, 15),
     offer(ItemId::EMERALD, 18, ItemId::DIAMOND_PICKAXE, 1, 20),
 }};
-constexpr std::array<TradeOffer, 5> WEAPONSMITH{{
+const std::array<TradeOffer, 5> WEAPONSMITH{{
     offer(ItemId::COAL, 15, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 3, ItemId::IRON_SWORD, 1, 5),
     offer(ItemId::EMERALD, 7, ItemId::IRON_AXE, 1, 10),
     offer(ItemId::EMERALD, 12, ItemId::DIAMOND_AXE, 1, 15),
     offer(ItemId::EMERALD, 15, ItemId::DIAMOND_SWORD, 1, 20),
 }};
-constexpr std::array<TradeOffer,5> FISHERMAN{{
+const std::array<TradeOffer,5> FISHERMAN{{
     offer(ItemId::RAW_COD, 12, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 1, ItemId::COOKED_COD, 6, 7),
     offer(ItemId::RAW_SALMON, 10, ItemId::EMERALD, 1, 12),
     offer(ItemId::EMERALD, 2, ItemId::COOKED_SALMON, 6, 17),
     offer(ItemId::EMERALD, 8, ItemId::FISHING_ROD, 1, 22),
 }};
-constexpr std::array<TradeOffer,5> LIBRARIAN{{
+const std::array<TradeOffer,5> LIBRARIAN{{
     offer(ItemId::REEDS, 24, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 1, ItemId::GLASS, 8, 7),
     offer(ItemId::FEATHER, 16, ItemId::EMERALD, 1, 12),
     offer(ItemId::EMERALD, 2, ItemId::TORCH, 1, 17),
     offer(ItemId::EMERALD, 3, ItemId::LECTERN, 1, 22),
 }};
-constexpr std::array<TradeOffer,5> CARTOGRAPHER{{
+const std::array<TradeOffer,5> CARTOGRAPHER{{
     offer(ItemId::GLASS, 16, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 2, ItemId::SANDSTONE, 12, 7),
     offer(ItemId::CLAY_BALL, 24, ItemId::EMERALD, 1, 12),
     offer(ItemId::EMERALD, 3, ItemId::BLUE_WOOL, 8, 17),
     offer(ItemId::EMERALD, 4, ItemId::CARTOGRAPHY_TABLE, 1, 22),
 }};
-constexpr std::array<TradeOffer,5> CLERIC{{
+const std::array<TradeOffer,5> CLERIC{{
     offer(ItemId::ROTTEN_FLESH, 32, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 1, ItemId::REDSTONE_DUST, 2, 7),
     offer(ItemId::GOLD_INGOT, 3, ItemId::EMERALD, 1, 12),
     offer(ItemId::EMERALD, 3, ItemId::RESONANT_CRYSTAL, 4, 17),
     offer(ItemId::EMERALD, 5, ItemId::BREWING_STAND, 1, 22),
 }};
-constexpr std::array<TradeOffer,5> BUTCHER{{
+const std::array<TradeOffer,5> BUTCHER{{
     offer(ItemId::RAW_CHICKEN, 14, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 1, ItemId::COOKED_CHICKEN, 5, 7),
     offer(ItemId::RAW_PORKCHOP, 10, ItemId::EMERALD, 1, 12),
     offer(ItemId::EMERALD, 2, ItemId::COOKED_PORKCHOP, 5, 17),
     offer(ItemId::EMERALD, 3, ItemId::STEAK, 6, 22),
 }};
-constexpr std::array<TradeOffer,5> MASON{{
+const std::array<TradeOffer,5> MASON{{
     offer(ItemId::CLAY_BALL, 10, ItemId::EMERALD, 1, 2),
     offer(ItemId::EMERALD, 1, ItemId::BRICK, 12, 7),
     offer(ItemId::STONE, 20, ItemId::EMERALD, 1, 12),
     offer(ItemId::EMERALD, 2, ItemId::STONE_BRICKS, 16, 17),
     offer(ItemId::EMERALD, 3, ItemId::POLISHED_GRANITE, 16, 22),
 }};
-constexpr std::array<TradeOffer, 5> EMPTY{};
+const std::array<TradeOffer, 5> EMPTY{};
 constexpr std::array<uint16_t, 4> LEVEL_THRESHOLDS{{10, 70, 150, 250}};
 
 } // namespace
 
 VillagerProfession professionForWorkstation(BlockId block) {
+    if (isGrindstone(block)) block = BlockId::GRINDSTONE;
     switch (block) {
         case BlockId::COMPOSTER: return VillagerProfession::Farmer;
         case BlockId::FLETCHING_TABLE: return VillagerProfession::Fletcher;
@@ -182,6 +184,7 @@ TradeResult executeVillagerTrade(VillagerData& villager, uint8_t offerIndex,
     InventoryModel candidate = inventory;
     if (!candidate.remove(selected.input.id, selected.input.count))
         return TradeResult::MissingInput;
+    if (!selected.secondInput.empty() && !candidate.remove(selected.secondInput.id, selected.secondInput.count)) return TradeResult::MissingInput;
     if (candidate.add(selected.output) != 0) return TradeResult::OutputFull;
     inventory = std::move(candidate);
     ++villager.uses[offerIndex];
@@ -216,6 +219,22 @@ bool restockVillager(VillagerData& villager, uint32_t day,
 TradeOffer villagerQuote(const VillagerData& v,uint8_t index) {
     if(index>=5)return {};
     auto offer=villagerOffers(v.profession)[index];
+    if (v.profession == VillagerProfession::Librarian) {
+        if (index == 0 || index == 2 || index == 4) {
+            uint64_t seed = uint64_t(v.offerSeed) ^ (uint64_t(index + 1) * 0x9e3779b97f4a7c15ULL);
+            std::vector<EnchantmentId> available;
+            for (size_t i = 0; i < ENCHANTMENTS.size(); ++i) if (ENCHANTMENTS[i].tradeable) available.push_back(static_cast<EnchantmentId>(i));
+            const auto id = available[EquipmentRules::random(seed) % available.size()];
+            const unsigned level = 1 + EquipmentRules::random(seed) % ENCHANTMENTS[static_cast<size_t>(id)].maximumLevel;
+            unsigned price = 2 + 3 * level + EquipmentRules::random(seed) % (5 + 10 * level);
+            if (ENCHANTMENTS[static_cast<size_t>(id)].treasure) price *= 2;
+            offer.input = {ItemId::EMERALD, static_cast<uint8_t>(std::min(price, 64u))};
+            offer.secondInput = {ItemId::BOOK, 1}; offer.output = {ItemId::ENCHANTED_BOOK, 1};
+            offer.output.components.storedEnchantments.set(id, static_cast<uint8_t>(level));
+        } else if (index == 1) { offer.input = {ItemId::EMERALD, 9}; offer.output = {ItemId::BOOKSHELF, 1}; }
+        else { offer.input = {ItemId::EMERALD, 1}; offer.output = {ItemId::BOOK, 3}; }
+    }
+    if (v.profession == VillagerProfession::Cleric && index == 1) { offer.input = {ItemId::EMERALD, 1}; offer.output = {ItemId::LAPIS_LAZULI, 1}; }
     if(offer.input.empty())return offer;
     const int percent=100-std::clamp<int>(v.reputation,-100,100)/4+
         std::min<int>(25,v.demand[index]);

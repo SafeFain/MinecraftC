@@ -738,6 +738,75 @@
     },
     "blackstone_stairs": {
       "all": "blackstone_bricks"
+    },
+    "lapis_ore": {
+      "all": "lapis_ore"
+    },
+    "deepslate_lapis_ore": {
+      "all": "deepslate_lapis_ore"
+    },
+    "bookshelf": {
+      "top": "oak_planks",
+      "bottom": "oak_planks",
+      "side": "bookshelf"
+    },
+    "iron_block": {
+      "all": "iron_block"
+    },
+    "enchanting_table": {
+      "all": "enchanting_table"
+    },
+    "anvil": {
+      "all": "anvil"
+    },
+    "chipped_anvil": {
+      "all": "chipped_anvil"
+    },
+    "damaged_anvil": {
+      "all": "damaged_anvil"
+    },
+    "frosted_ice": {
+      "all": "frosted_ice"
+    },
+    "redstone_dust": {
+      "all": "redstone_dust"
+    },
+    "lever": {
+      "all": "lever"
+    },
+    "redstone_torch": {
+      "all": "redstone_torch"
+    },
+    "redstone_repeater": {
+      "all": "redstone_repeater"
+    },
+    "redstone_comparator": {
+      "all": "redstone_comparator"
+    },
+    "piston": {
+      "top": "piston_top",
+      "bottom": "piston",
+      "side": "piston_side"
+    },
+    "sticky_piston": {
+      "top": "sticky_piston_top",
+      "bottom": "piston",
+      "side": "piston_side"
+    },
+    "observer": {
+      "all": "observer"
+    },
+    "redstone_lamp": {
+      "all": "redstone_lamp"
+    },
+    "redstone_block": {
+      "all": "redstone_block"
+    },
+    "redstone_ore": {
+      "all": "redstone_ore"
+    },
+    "deepslate_redstone_ore": {
+      "all": "deepslate_redstone_ore"
     }
   },
   "imports": [

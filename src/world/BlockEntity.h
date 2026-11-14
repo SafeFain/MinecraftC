@@ -9,7 +9,7 @@
 
 enum class BlockEntityType : uint8_t {
     Chest = 0, Furnace = 1, Button = 2, Resource = 3,
-    BrewingStand = 4, SmithingTable = 5, Spawner = 6
+    BrewingStand = 4, SmithingTable = 5, Spawner = 6, EnchantingTable = 7, Anvil = 8, Grindstone = 9, Redstone = 10
 };
 
 struct BlockEntity {
@@ -23,7 +23,15 @@ struct BlockEntity {
     uint16_t cookProgress = 0;
     uint16_t cookTotal = 200;
     std::map<std::string,uint64_t> furnaceExperience;
+    // Only session-owned workstation windows use this preview state.
+    uint32_t workCost = 0;
+    bool workTooExpensive = false;
+    uint8_t workFailure = 0;
+    std::array<uint8_t,3> offerFailure{};
+    std::array<uint8_t, 3> offerRequired{}, offerClue{}, offerClueLevel{};
+    std::optional<std::string> rename;
     uint16_t buttonRemaining = 0;
+    std::vector<uint8_t> circuitState;
     std::string lootKey, lootRevision, structureKey, structureRevision;
     uint64_t lootSeed=0;
     bool lootInitialized=false;

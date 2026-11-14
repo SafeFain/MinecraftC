@@ -1,5 +1,7 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "EntityAiTestRenderer.h"
+#include "LodMeshRecorder.h"
 #include "game/SaveStore.h"
 #include "threading/ThreadPool.h"
 #include "world/Chunk.h"
@@ -7,37 +9,14 @@
 #include "world/LodTerrainSystem.h"
 #include "world/WorldGenerator.h"
 
+#include <chrono>
+#include <future>
 #include <cstdlib>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
-struct LanLodTestAccess {
-    static bool staleReplacementRejected(LodTerrainSystem& system) {
-        const auto key = system.selectedTiles().front();
-        auto initial = std::make_unique<LodTerrainSystem::Tile>(); initial->key = key;
-        initial->resident = true; initial->mesh.gpuReady = true;
-        system.m_tiles[key] = std::move(initial);
-        LodTileData old; old.at(0,0) = {{{100,100,BlockId::GLASS}}, true};
-        auto oldMesh = buildLodTileMesh(old, 1 << key.level, 6);
-        system.m_completions.push_back({key, system.m_epoch, old, std::move(oldMesh), true, 0});
-        system.processCompleted(nullptr);
-        auto& tile = *system.m_tiles.at(key);
-        if (!tile.pendingMesh) return false;
-        auto corrected = old; corrected.at(0,0).spans.front().block = BlockId::DIAMOND_ORE;
-        system.applyReplicaColumns(key, 2, corrected);
-        if (tile.pendingMesh || !tile.mesh.gpuReady || !tile.dirty) return false;
-        // A worker that finishes after the correction must also be rejected.
-        system.m_completions.push_back({key, system.m_epoch, old, buildLodTileMesh(old, 1 << key.level, 6), true, 0});
-        EntityAiTestRenderer renderer; system.processCompleted(&renderer);
-        if (tile.pendingMesh || !tile.data.at(0,0).spans.empty()) return false;
-        system.m_completions.push_back({key, system.m_epoch, corrected, buildLodTileMesh(corrected, 1 << key.level, 6), true, tile.sourceRevision});
-        system.processCompleted(&renderer);
-        system.releaseGpuMeshes();
-        return tile.data.at(0,0).spans.size() == 1 && tile.data.at(0,0).spans.front().block == BlockId::DIAMOND_ORE;
-    }
-};
 
 namespace {
 void require(bool condition, const char* message) {
@@ -45,6 +24,75 @@ void require(bool condition, const char* message) {
         std::cerr << "FAILED: " << message << '\n';
         std::exit(1);
     }
+}
+
+// Observe the public upload boundary while real workers produce replacements.
+// No injected Tile/completion/epoch state participates in this regression.
+void testReplicaReplacementUploads(WorldGenerator& generator) {
+    class RecordingRenderer final : public EntityAiTestRenderer {
+    public:
+        bool staleGlass = false, correctedDiamond = false;
+        void uploadChunkMesh(ChunkMesh& mesh) override {
+            for (const auto& vertex : mesh.vertices) {
+                if (vertex.py < 210 || vertex.py > 211) continue;
+                const auto material=static_cast<uint16_t>(std::floor(vertex.tile));
+                staleGlass |= material == getAtlasTextureIndex(BlockTexture::Glass);
+                correctedDiamond |= material == getAtlasTextureIndex(BlockTexture::DiamondOre);
+            }
+            EntityAiTestRenderer::uploadChunkMesh(mesh);
+        }
+    } renderer;
+    ThreadPool pool(1);
+    TestSupport::TemporaryDirectory directory;
+    LodTerrainSystem system;
+    system.setTransientCacheRoot(directory.path());
+    system.reset(&generator);
+    system.configure({true,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+    system.setThreadPool(&pool);
+    system.update({.5,80,.5},2,{});
+    const auto deadline = std::chrono::steady_clock::now()+std::chrono::seconds(30);
+    while (!system.coverageReady() && std::chrono::steady_clock::now()<deadline) {
+        pool.waitIdle();system.processCompleted(&renderer);
+    }
+    require(system.coverageReady(), "replica replacement fixture did not reach renderable coverage");
+    pool.waitIdle();system.setThreadPool(nullptr);system.processCompleted(&renderer);
+    const auto key=system.selectedTiles().front();
+    const auto targetVisible=[&] {
+        const int size=LodTileData::SIDE<<key.level;
+        return std::any_of(system.submissions().begin(),system.submissions().end(),[&](const auto& draw) {
+            return draw.tileSize==size && draw.mesh && draw.mesh->gpuReady &&
+                std::abs(draw.model[3].x-(key.x*size-.5f))<.01f &&
+                std::abs(draw.model[3].z-(key.z*size-.5f))<.01f;
+        });
+    };
+    require(targetVisible(),"replacement fixture must start with a visible target tile");
+    LodTileData old;old.at(0,0)={{{210,210,BlockId::GLASS}},true};
+    auto corrected=old;corrected.at(0,0).spans.front().block=BlockId::DIAMOND_ORE;
+    // A replacement completed without a renderer must not reach upload after a correction.
+    system.applyReplicaColumns(key,1,old);
+    system.setThreadPool(&pool);system.update({.5,80,.5},2,{});pool.waitIdle();
+    system.setThreadPool(nullptr);system.processCompleted(nullptr);
+    system.applyReplicaColumns(key,2,corrected);system.processCompleted(&renderer);
+    require(!renderer.staleGlass && targetVisible(),
+            "superseded pending geometry was uploaded or punched a visible hole");
+    // Hold the sole worker: replacement inputs have been captured by enqueue,
+    // but the correction arrives before that worker can publish its completion.
+    std::promise<void> entered,release;
+    const auto gate=release.get_future().share();
+    pool.enqueuePriority([&entered,gate] {entered.set_value();gate.wait();});
+    entered.get_future().wait();
+    system.applyReplicaColumns(key,3,old);
+    system.setThreadPool(&pool);system.update({.5,80,.5},2,{});
+    system.applyReplicaColumns(key,4,corrected);release.set_value();pool.waitIdle();
+    system.setThreadPool(nullptr);system.processCompleted(&renderer);
+    require(!renderer.staleGlass,"superseded in-flight geometry crossed the upload boundary");
+    system.setThreadPool(&pool);system.update({.5,80,.5},2,{});pool.waitIdle();
+    system.setThreadPool(nullptr);system.processCompleted(&renderer);
+    require(renderer.correctedDiamond && !renderer.staleGlass,
+            "latest authoritative columns did not replace stale rendered geometry");
+    system.applyReplicaColumns(key,3,old);system.processCompleted(&renderer);
+    require(!renderer.staleGlass,"older authoritative revision replaced corrected geometry");
+    system.releaseGpuMeshes();
 }
 
 bool sameTile(const LodTileData& a, const LodTileData& b) {
@@ -124,9 +172,14 @@ void testNativeLod() {
     }
 }
 
-int main() {
+int main(int argc,char** argv) try {
     installHeavenFixture();
     WorldGenerator normal(123456789ULL, WorldType::Normal, DimensionId::Overworld);
+    if(argc==2 && std::string(argv[1])=="--replica-replacement-tests") {
+        testReplicaReplacementUploads(normal);
+        std::cout<<"LOD authoritative replacement upload tests passed\n";return 0;
+    }
+    require(argc==1,"unknown LOD test scenario");
     testNativeLod();
     const LodTileKey negative{-3, 2, 2};
     const LodTileData first = buildApproximateLodTile(normal, negative);
@@ -338,19 +391,22 @@ int main() {
 
     std::vector<uint16_t> allBlocks(Config::CHUNK_VOLUME, 0);
     // Keep air gaps while distributing IDs across columns: the registry can
-    // exceed half the world height, so one two-block-spaced column is insufficient.
+    // exceed half the world height or one row, so use both horizontal axes.
     constexpr int idsPerColumn = Config::WORLD_HEIGHT / 2;
+    constexpr int columnsPerRow = (Config::CHUNK_SIZE_X - 2) / 2;
     const int blockCount = static_cast<int>(BlockId::COUNT) - 1;
     for (int raw = 1; raw <= blockCount; ++raw) {
-        const int x = 2 + 2 * ((raw - 1) / idsPerColumn);
+        const int column = (raw - 1) / idsPerColumn;
+        const int x = 2 + 2 * (column % columnsPerRow);
+        const int z = 2 + 2 * (column / columnsPerRow);
         const int y = Config::WORLD_MIN_Y + 2 * ((raw - 1) % idsPerColumn);
-        require(x < Config::CHUNK_SIZE_X && y < Config::WORLD_MAX_Y,
+        require(x < Config::CHUNK_SIZE_X && z < Config::CHUNK_SIZE_Z && y < Config::WORLD_MAX_Y,
                 "all-block LOD fixture stays within chunk bounds");
-        allBlocks[blockIndex(x, y, 8)] = static_cast<uint16_t>(raw);
+        allBlocks[blockIndex(x, y, z)] = static_cast<uint16_t>(raw);
     }
     const LodTileData allBlockTile = extractExactLodChunk(allBlocks);
     for (int column = 0; column * idsPerColumn < blockCount; ++column) {
-        const auto& spans = allBlockTile.at(2 + 2 * column, 8).spans;
+        const auto& spans = allBlockTile.at(2 + 2 * (column % columnsPerRow), 2 + 2 * (column / columnsPerRow)).spans;
         require(spans.size() == static_cast<size_t>(
                     std::min(idsPerColumn, blockCount - column * idsPerColumn)),
                 "exact LOD did not retain every non-air BlockId");
@@ -363,7 +419,7 @@ int main() {
     LodTileData decodedAllBlocks;
     require(decodeLodTilePayload(allBlockPayload, decodedAllBlocks) &&
             sameTile(allBlockTile, decodedAllBlocks) &&
-            decodedAllBlocks.at(2, 8).spans.size() > 24,
+            decodedAllBlocks.at(2, 2).spans.size() > 24,
             "r5 LOD payload does not round-trip columns beyond 24 runs");
     const ChunkMesh allBlockMesh = buildLodTileMesh(decodedAllBlocks, 1, 24);
     require(allBlockMesh.opaqueIndexCount > 0 &&
@@ -569,14 +625,23 @@ int main() {
     require(meshMinimumY(stackedMesh) == 0.0f,
             "vertical span budget removes a lower floating island");
 
-    require(lodHorizontalQuality(LodPrecision::Low) == 64 &&
-            lodHorizontalQuality(LodPrecision::Ultra) == 144 &&
-            lodVerticalSpanLimit(LodPrecision::Medium) >= 5,
-            "precision presets map to fixed horizontal and vertical quality");
-    require(lodWorkBudget(LodAggressiveness::PowerSaver).maxInFlight == 1 &&
-            lodWorkBudget(LodAggressiveness::Extreme).maxInFlight == 8 &&
-            lodWorkBudget(LodAggressiveness::Balanced).completionMs == 1.5,
-            "aggressiveness presets map to bounded work budgets");
+    int previousQuality=0,previousSpans=0;
+    for(const auto precision:{LodPrecision::Low,LodPrecision::Medium,LodPrecision::High,LodPrecision::Ultra}) {
+        require(lodHorizontalQuality(precision)>=previousQuality &&
+                lodVerticalSpanLimit(precision)>=previousSpans && lodVerticalSpanLimit(precision)>0,
+                "increasing precision must retain horizontal and vertical detail");
+        previousQuality=lodHorizontalQuality(precision);previousSpans=lodVerticalSpanLimit(precision);
+    }
+    LodWorkBudget previousBudget{0,0,0,0};
+    for(const auto preset:{LodAggressiveness::PowerSaver,LodAggressiveness::Balanced,LodAggressiveness::Fast,LodAggressiveness::Extreme}) {
+        const auto budget=lodWorkBudget(preset);
+        require(budget.maxInFlight>0 && budget.maxInFlight>=previousBudget.maxInFlight &&
+                budget.completionMs>0 && budget.completionMs>=previousBudget.completionMs &&
+                budget.uploadsPerFrame>0 && budget.uploadsPerFrame>=previousBudget.uploadsPerFrame &&
+                budget.uploadBytesPerFrame>0 && budget.uploadBytesPerFrame>=previousBudget.uploadBytesPerFrame,
+                "aggressiveness presets must retain bounded positive work and upload budgets");
+        previousBudget=budget;
+    }
 
     LodTerrainSystem selection;
     selection.reset(&normal);
@@ -682,8 +747,6 @@ int main() {
     {
         LodTerrainSystem replica; replica.reset(&normal);
         replica.configure({true,16,LodAggressiveness::PowerSaver,LodPrecision::Low}); replica.update({.5,80,.5},2,{});
-        require(LanLodTestAccess::staleReplacementRejected(replica),
-                "superseded pending and in-flight LOD replacements never cross the upload boundary");
         const auto key = replica.selectedTiles().front(); LodTileData column; column.at(0,0).exact = true;
         replica.applyReplicaColumns(key,3,column); replica.update({100000.5,80,-100000.5},2,{});
         require(!replica.isTileSelected(key), "moving interests retire the old corrected tile");
@@ -708,18 +771,17 @@ int main() {
                 "asynchronous LOD completion publishes bounded CPU data");
     }
     bool cacheFound = false;
-    const auto tileDirectory = root / "lod" / "r5" / "d_0" / "tiles";
-    for (const auto& entry : std::filesystem::directory_iterator(tileDirectory)) {
-        cacheFound = entry.is_regular_file();
-        if (cacheFound) {
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+        if (entry.is_regular_file()) {
+            cacheFound=true;
             std::ofstream corrupt(entry.path(), std::ios::binary | std::ios::trunc);
             corrupt << "bad";
-            break;
         }
     }
     require(cacheFound, "LOD tiles persist in the per-world derived cache");
     {
         ThreadPool pool(1);
+        LodMeshRecorder renderer;
         LodTerrainSystem recovered;
         recovered.setThreadPool(&pool);
         recovered.setSaveStore(&store);
@@ -728,9 +790,20 @@ int main() {
                              LodPrecision::Low});
         recovered.update({0.5, 80.0, 0.5}, 8, {});
         pool.waitIdle();
-        recovered.processCompleted(nullptr);
+        recovered.processCompleted(&renderer);
         require(recovered.residentCpuBytes() > 0,
                 "corrupt LOD cache data is ignored and regenerated");
+        require(!recovered.submissions().empty(),"corrupt cache recovery did not publish drawable terrain");
+        for(const auto& draw:recovered.submissions()) {
+            uint8_t level=0;while((LodTileData::SIDE<<level)<draw.tileSize)++level;
+            const LodTileKey key{int32_t(std::llround((double(draw.model[3].x)+.5)/draw.tileSize)),
+                                 int32_t(std::llround((double(draw.model[3].z)+.5)/draw.tileSize)),level};
+            const auto data=buildApproximateLodTile(normal,key);
+            const auto edges=sampleApproximateLodNeighborEdges(normal,key);
+            const auto expected=buildLodTileMesh(data,1<<level,lodVerticalSpanLimit(LodPrecision::Low),nullptr,&edges,true,true);
+            const auto* actual=renderer.geometry(draw);
+            require(actual&&LodMeshRecorder::sameGeometry(*actual,expected),"corrupt cache recovery changed rendered terrain");
+        }
     }
 
     const auto heavenRoot = root / "heaven";
@@ -896,4 +969,6 @@ int main() {
 
     std::cout << "LOD terrain tests passed\n";
     return 0;
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

@@ -28,6 +28,7 @@
 #include "world/LodTerrainSystem.h"
 #include "world/RegionGenerationData.h"
 #include "world/BlockEntity.h"
+#include "world/RedstoneWorldState.h"
 #include "world/BlockLightLogic.h"
 #include "game/Weather.h"
 
@@ -64,10 +65,19 @@ public:
         m_lod.setSaveStore(store);
     }
     void persistChunkAt(const glm::ivec3& position) {
+        while(redstoneTickPending())tickInteractiveBlocks([](const auto&){return false;},{});
+        flushDeferredBlockEdits();
         const int cx=worldToChunkX(position.x),cz=worldToChunkZ(position.z);
         m_chunks.withUnique([&](ChunkStore&){m_persistence.saveOverrides(cx,cz);m_persistence.saveBlockEntities(cx,cz);});
     }
     bool flushModifiedChunks(size_t maxFiles = std::numeric_limits<size_t>::max()) {
+        const bool draining=redstoneTickPending() || hasPendingRedstoneEdits();
+        if(redstoneTickPending()) {
+            tickInteractiveBlocks([](const auto&){return false;},{});
+            if(redstoneTickPending())return false;
+        }
+        flushDeferredBlockEdits();
+        if(draining)m_persistence.beginModifiedChunkAutosave();
         return m_persistence.flushModifiedChunks(maxFiles);
     }
     void beginModifiedChunkAutosave() { m_persistence.beginModifiedChunkAutosave(); }
@@ -104,10 +114,14 @@ public:
         return tickFluids(tick, FluidTickBudget{maximumUpdates}).updated;
     }
     std::vector<glm::ivec3> takeTntIgnitions() {
-        return m_simulation.takeTntIgnitions();
+        auto result=m_simulation.takeTntIgnitions();
+        result.insert(result.end(),m_redstone.ignitions.begin(),m_redstone.ignitions.end());
+        m_redstone.ignitions.clear();return result;
     }
     BlockEntity* getBlockEntity(const glm::ivec3& position) {
-        return m_persistence.getBlockEntity(position);
+        auto* result=m_persistence.getBlockEntity(position);
+        if(result)notifyContainerChanged(position);
+        return result;
     }
     const BlockEntity* getBlockEntity(const glm::ivec3& position) const {
         return m_persistence.getBlockEntity(position);
@@ -147,6 +161,23 @@ public:
 
     // Sets a block and marks affected chunks dirty
     void setBlock(int worldX, int worldY, int worldZ, BlockId id);
+    void touchRedstoneOre(const glm::ivec3& position);
+    bool placeRedstone(const glm::ivec3& position, BlockId block);
+    bool interactRedstone(const glm::ivec3& position);
+    const std::vector<Redstone::PistonMotion>& pistonMotions() const {return redstoneTickPending()?m_redstone.motionView:m_redstone.motions;}
+    std::vector<Redstone::PistonSweep> takePistonSweeps() {auto result=std::move(m_redstone.sweeps);m_redstone.sweeps.clear();return result;}
+    bool pistonReserved(const glm::ivec3&) const;
+    std::vector<BlockCollisionBox> collisionBoxesAt(const glm::ivec3&) const;
+    bool redstoneTickPending() const {return m_redstone.phase!=RedstoneWorldState::Phase::Ready;}
+    void queueAtomicChunkMesh(int cx,int cz) {m_redstone.atomicMeshes.emplace(cx,cz);}
+    void flushDeferredBlockEdits();
+    bool hasPendingRedstoneEdits() const {return !m_redstone.externalEdits.empty();}
+    void notifyContainerChanged(const glm::ivec3& position) {m_redstone.containerSignals.erase(Redstone::position(position));}
+    std::vector<std::set<std::pair<int,int>>> takeBlockTransactions() {auto result=std::move(m_redstone.transactions);m_redstone.transactions.clear();return result;}
+    void installReplicaMotions(uint64_t tick,std::vector<Redstone::PistonMotion> motions) {
+        if(m_replicaMode && tick>=m_redstone.replicaMotionTick){m_redstone.replicaMotionTick=tick;m_redstone.motions=std::move(motions);}
+    }
+    uint8_t redstoneReceived(const glm::ivec3& position, bool wire, bool& known) const;
     bool placeDoor(const glm::ivec3& bottom, DoorState state);
     bool setDoorOpen(const glm::ivec3& position, bool open, bool villager = false);
     bool interactDoor(const glm::ivec3& position);
@@ -154,11 +185,16 @@ public:
     bool activateButton(const glm::ivec3& position);
     void activateButtonsAtArrow(const glm::dvec3& position);
     void tickInteractiveBlocks(const std::function<bool(const glm::ivec3&)>& arrowPresent);
+    // False retains the same logical circuit tick for the next bounded call;
+    // continuations do not consume button time. Both budgets must be positive.
+    bool tickInteractiveBlocks(const std::function<bool(const glm::ivec3&)>& arrowPresent, RedstoneWorkBudget budget);
     bool supportsFace(const glm::ivec3& position, FaceDir outward) const;
     std::vector<std::pair<glm::ivec3,ItemStack>> takeSupportDrops() {
         auto result=std::move(m_supportDrops); m_supportDrops.clear(); return result;
     }
-    struct BlockInteractionSound { glm::ivec3 position; bool metal, opening, button; };
+    std::vector<glm::ivec3> takeFallingAnvils() { auto result = std::move(m_fallingAnvils); m_fallingAnvils.clear(); return result; }
+    struct BlockInteractionSound { glm::ivec3 position; bool metal, opening, button; uint8_t workstation = 255; };
+    void recordWorkstationSound(glm::ivec3 position, uint8_t kind) { m_interactionSounds.push_back({position,false,false,false,kind}); }
     std::vector<BlockInteractionSound> takeInteractionSounds() {
         auto result=std::move(m_interactionSounds); m_interactionSounds.clear(); return result;
     }
@@ -230,7 +266,7 @@ public:
     // Enqueue mesh builds for dirty chunks (async via thread pool)
     void enqueueMeshBuilds(
         int maxInFlight = Config::CHUNK_MESH_TASKS_IN_FLIGHT) {
-        m_meshes.enqueueMeshBuilds(maxInFlight);
+        if(!redstoneTickPending())m_meshes.enqueueMeshBuilds(maxInFlight);
     }
 
     // Check for completed async mesh builds and upload them to GPU.
@@ -238,7 +274,13 @@ public:
     void processCompletedMeshes(IGameRenderer* renderer, int maxUploads = 4,
                                 size_t maxUploadBytes =
                                     Config::MESH_UPLOAD_BYTES_PER_FRAME) {
-        m_meshes.processCompletedMeshes(renderer, maxUploads, maxUploadBytes);
+        if(!redstoneTickPending()) {
+            m_meshes.processCompletedMeshes(renderer, maxUploads, maxUploadBytes);
+            if(renderer && !m_redstone.atomicMeshes.empty()) {
+                m_meshes.buildAtomicMeshes(renderer,m_redstone.atomicMeshes);
+                m_redstone.atomicMeshes.clear();
+            }
+        }
     }
 
     // Synchronous build (for first frame or when thread pool unavailable)
@@ -321,16 +363,33 @@ public:
     }
 
 private:
+    RedstoneWorldState m_redstone;
+    void retireRedstoneChunkUnlocked(int,int,bool);
+    void registerRedstone(const glm::ivec3&,BlockId,bool notifyObservers,const std::vector<uint8_t>* saved=nullptr);
+    void redstoneChanged(const glm::ivec3&,BlockId previous,BlockId current);
+    bool tickRedstone(RedstoneWorkBudget budget);
+    bool tickPistons(size_t& work);
+    bool startPiston(Redstone::Position,bool);
+    void applyBlockTransaction(const std::map<Redstone::Position,BlockId>&);
+    void finishBlockChange(const glm::ivec3&,BlockId,BlockId,bool,uint64_t revision=0);
+    bool chunkPinned(int,int) const override;
+    bool m_blockTransaction=false,m_pistonCommit=false,m_runningInteractive=false;
+    struct PendingBlockChange {glm::ivec3 position;BlockId previous,current;bool record;uint64_t revision;};
+    std::vector<PendingBlockChange> m_pendingBlockChanges;
+    uint8_t redstoneOutput(const glm::ivec3&,Redstone::Face,bool wire,bool& known) const;
+    uint8_t redstoneConducted(const glm::ivec3&,bool strongOnly,bool& known) const;
+    void publishRedstone(Redstone::Position, const Redstone::State&);
+    void notifyRedstoneObservers(Redstone::Position);
     bool m_replicaMode = false;
     std::function<void(int, int, uint64_t, uint32_t, BlockId, bool)> m_blockMutationCallback;
     GameRuleSet m_gameRules;
-    friend struct LanLodTestAccess;
     friend class ChunkMeshPipeline;
     friend class FluidScheduler;
     bool m_portalValidationActive=false;
     bool m_pairMutation = false;
     std::set<std::tuple<int,int,int>> m_pendingDoorPower;
     std::vector<std::pair<glm::ivec3,ItemStack>> m_supportDrops;
+    std::vector<glm::ivec3> m_fallingAnvils;
     std::vector<BlockInteractionSound> m_interactionSounds;
     void refreshDoorPower(const glm::ivec3& position);
     void updateButtonPower(const glm::ivec3& position, const ButtonState& state);

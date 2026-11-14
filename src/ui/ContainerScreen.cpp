@@ -16,6 +16,7 @@
 
 bool ContainerScreen::open(IContainerAccess& access, const glm::ivec3& position) {
     m_gamepadFocus=false;m_focusIndex=0;m_slotFeedback={};
+    m_naming = false; m_name.setText("");
     m_access = &access;
     m_position = position;
     if (commandsEnabled()) m_commands->openInventoryWindow(InventoryWindowKind::Container, position);
@@ -54,6 +55,12 @@ void ContainerScreen::layout(int width, int height) {
         for (int i = 0; i < 27; ++i)
             m_containerRects[i] = {x0 + (i % 9) * (slot + gap),
                 y0 + (2 - i / 9) * (slot + gap), slot, slot};
+    } else if (isWorkstation(entity->type)) {
+        m_containerRects[0] = {40, invY + 285, slot, slot};
+        m_containerRects[1] = {120, invY + 285, slot, slot};
+        m_containerRects[2] = {360, invY + 285, slot, slot};
+        for (unsigned i = 0; i < 3; ++i) m_offerRects[i] = fit.transform(Rect{190, invY + 350 - i * 42.f, 246, 36});
+        m_nameRect = fit.transform(Rect{32, invY + 350, 396, 32});
     } else if(entity->type==BlockEntityType::BrewingStand) {
         for(int i=0;i<3;++i)m_containerRects[i]={100.f+i*80.f,invY+235,slot,slot};
         m_containerRects[3]={180,invY+335,slot,slot};m_containerRects[4]={300,invY+335,slot,slot};
@@ -126,14 +133,36 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
     UiTheme::rect(ui,m_panelRect.x+16*scale,m_panelRect.y+242*scale,
                   m_panelRect.w-32*scale,1,UiTheme::BORDER);
     const std::string title=ui.localization().text(
-        entity->type==BlockEntityType::Chest?"container.chest":entity->type==BlockEntityType::BrewingStand?"container.brewing":entity->type==BlockEntityType::SmithingTable?"container.smithing":"container.furnace");
+        entity->type==BlockEntityType::EnchantingTable?"container.enchanting":entity->type==BlockEntityType::Anvil?"container.anvil":entity->type==BlockEntityType::Grindstone?"container.grindstone":entity->type==BlockEntityType::Chest?"container.chest":entity->type==BlockEntityType::BrewingStand?"container.brewing":entity->type==BlockEntityType::SmithingTable?"container.smithing":"container.furnace");
     UiTheme::textWithShadow(ui,title,m_panelRect.x+16*scale,m_panelRect.y+432*scale,
         UiTheme::fittedScale(ui,title,2*scale,m_panelRect.w-32*scale),UiTheme::TEXT);
     for (size_t i=0;i<m_inventoryRects.size();++i)
         drawSlot(i,m_inventoryRects[i],m_inventory.slot(i),contains(m_inventoryRects[i],mx,my));
     for(int i=0;i<containerStackCount(entity->type);++i)
         drawSlot(36+i,m_containerRects[i],*containerStack(*entity,i),contains(m_containerRects[i],mx,my));
-    if(entity->type==BlockEntityType::BrewingStand) {
+    if (entity->type == BlockEntityType::EnchantingTable) {
+        for (unsigned i = 0; i < 3; ++i) {
+            const auto& r = m_offerRects[i];
+            UiTheme::slot(ui, r.x, r.y, r.w, r.h, contains(r,mx,my) ? UiTheme::WidgetState::Hover : UiTheme::WidgetState::Normal);
+            std::string label = "-";
+            if (entity->offerRequired[i] && entity->offerClue[i] < ENCHANTMENTS.size()) {
+                const auto key = std::string(ENCHANTMENTS[entity->offerClue[i]].key);
+                label = ui.localization().text("enchantment." + key.substr(key.find(':') + 1)) + " " + std::to_string(entity->offerClueLevel[i]) + "   " + std::to_string(entity->offerRequired[i]);
+            }
+            if (entity->offerFailure[i]) label += " (" + ui.localization().text("enchanting.failure."+std::to_string(entity->offerFailure[i])) + ")";
+            UiTheme::textWithShadow(ui,label,r.x+6*scale,r.y+20*scale,UiTheme::fittedScale(ui,label,scale,r.w-12*scale),entity->offerFailure[i] ? glm::vec3(1,.5f,.5f) : UiTheme::TEXT);
+            if (entity->offerRequired[i]) {
+                const auto fee = ui.localization().text("enchanting.cost") + " " + std::to_string(i+1) + "  " + ui.localization().text("item.434") + " " + std::to_string(i+1);
+                UiTheme::textWithShadow(ui,fee,r.x+6*scale,r.y+5*scale,UiTheme::fittedScale(ui,fee,.7f*scale,r.w-12*scale),UiTheme::TEXT_DIM);
+            }
+        }
+    } else if (entity->type == BlockEntityType::Anvil) {
+        UiTheme::slot(ui,m_nameRect.x,m_nameRect.y,m_nameRect.w,m_nameRect.h,m_naming ? UiTheme::WidgetState::Selected : UiTheme::WidgetState::Normal);
+        const auto name = m_naming ? m_name.text() + "_" : entity->rename.value_or(entity->chest[0].components.customName());
+        UiTheme::textWithShadow(ui,name,m_nameRect.x+8*scale,m_nameRect.y+10*scale,scale,UiTheme::TEXT);
+        const auto label = ui.localization().text(entity->workFailure ? "enchanting.failure."+std::to_string(entity->workFailure) : entity->workTooExpensive ? "enchanting.too_expensive" : "enchanting.cost") + (entity->workTooExpensive ? "" : " " + std::to_string(entity->workCost));
+        UiTheme::textWithShadow(ui,label,m_panelRect.x+190*scale,m_panelRect.y+280*scale,scale,entity->workTooExpensive ? glm::vec3(1,.3f,.3f) : glm::vec3(.4f,1,.4f));
+    } else if(entity->type==BlockEntityType::BrewingStand) {
         UiTheme::progressBar(ui,m_containerRects[3].x,m_containerRects[3].y-30*scale,44*scale,10*scale,
             entity->cookProgress/400.f,UiTheme::ACCENT);
         UiTheme::textWithShadow(ui,std::to_string(entity->burnRemaining),m_containerRects[4].x,m_containerRects[4].y-20*scale,scale,UiTheme::TEXT);
@@ -175,6 +204,16 @@ void ContainerScreen::render(UIRenderer& ui, int width, int height, int mx, int 
 }
 
 void ContainerScreen::click(int button, int x, int y) {
+    const auto* station = m_access ? m_access->blockEntityAt(m_position) : nullptr;
+    if (station && commandsEnabled()) {
+        if (station->type == BlockEntityType::EnchantingTable) for (unsigned i = 0; i < 3; ++i) if (contains(m_offerRects[i],x,y)) {
+            InventoryAction action; action.operation = InventoryOperation::Enchant; action.argument = static_cast<uint16_t>(i); m_commands->submitInventoryAction(std::move(action)); return;
+        }
+        if (station->type == BlockEntityType::Anvil && contains(m_nameRect,x,y)) {
+            m_name.setText(station->rename.value_or(station->chest[0].components.customName())); m_naming = true; return;
+        }
+    }
+    m_naming = false;
     if (command(InventoryOperation::Click, hoveredStack(x, y), 0, button == MouseButton::Right)) return;
     BlockEntity* entity = m_access ? m_access->blockEntityAt(m_position) : nullptr;
     if (!entity) return;
@@ -232,6 +271,8 @@ std::vector<ContainerScreen::Rect> ContainerScreen::focusRects() const {
     const BlockEntity* entity=m_access?m_access->blockEntityAt(m_position):nullptr;
     const int count=entity?(containerStackCount(entity->type)):0;
     for(int i=0;i<count;++i)rects.push_back(m_containerRects[static_cast<size_t>(i)]);
+    if (entity && entity->type == BlockEntityType::EnchantingTable) for (const auto& rect : m_offerRects) rects.push_back(rect);
+    if (entity && entity->type == BlockEntityType::Anvil) rects.push_back(m_nameRect);
     return rects;
 }
 
@@ -321,6 +362,7 @@ ItemStack ContainerScreen::dropHovered(bool entireStack) {
 }
 
 void ContainerScreen::close(const std::function<void(ItemStack)>& drop) {
+    m_naming = false;
     if (commandsEnabled()) { m_commands->closeInventoryWindow(); m_cursor.clear(); m_access = nullptr; onPointerCancel(); return; }
     if (!m_cursor.empty()) {
         const uint32_t remaining=m_inventory.add(m_cursor);
@@ -355,4 +397,31 @@ void ContainerScreen::gesture(InventoryOperation operation, const std::vector<It
     InventoryAction action; action.operation = operation; action.alternate = alternate;
     for (auto* target : targets) if (const auto slot = logicalSlot(target)) action.targets.push_back(*slot);
     m_commands->submitInventoryAction(std::move(action)); syncCommands();
+}
+
+void ContainerScreen::onText(std::string_view text) {
+    if (!m_naming || !commandsEnabled()) return;
+    auto candidate = m_name;
+    if (!candidate.insert(text) || !ItemComponents::validName(candidate.text())) return;
+    m_name = std::move(candidate);
+    InventoryAction action; action.operation = InventoryOperation::Rename; action.text = m_name.text();
+    m_commands->submitInventoryAction(std::move(action));
+}
+bool ContainerScreen::onKey(int key, int mods) {
+    if (!m_naming) return false;
+    const bool selecting = (mods & KeyModifier::Shift) != 0;
+    bool changed = false;
+    if (key == Key::Enter || key == Key::Escape) { m_naming = false; return true; }
+    if (key == Key::Backspace) changed = m_name.backspace();
+    else if (key == Key::Delete) changed = m_name.eraseForward();
+    else if (key == Key::Left) m_name.moveLeft(selecting);
+    else if (key == Key::Right) m_name.moveRight(selecting);
+    else if (key == Key::Home) m_name.moveHome(selecting);
+    else if (key == Key::End) m_name.moveEnd(selecting);
+    else if ((mods & KeyModifier::Control) && key == Key::A) m_name.selectAll();
+    else if ((mods & KeyModifier::Control) && key == Key::C) m_name.copySelection();
+    else if ((mods & KeyModifier::Control) && key == Key::X) changed = m_name.cutSelection();
+    else if ((mods & KeyModifier::Control) && key == Key::V) { auto candidate = m_name; if (candidate.pasteClipboard() && ItemComponents::validName(candidate.text())) { m_name = std::move(candidate); changed = true; } }
+    if (changed && commandsEnabled()) { InventoryAction action; action.operation = InventoryOperation::Rename; action.text = m_name.text(); m_commands->submitInventoryAction(std::move(action)); }
+    return true;
 }

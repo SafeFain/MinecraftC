@@ -318,7 +318,7 @@ The [gameplay and presentation extensions](plugin-capabilities.md) add behavior,
 actions/previews, time/environment, particles, held models and playlists.
 
 CPU tests include `plugin_loader_content_events_and_persistence` and
-`plugin_entity_worldgen_extensions` and `plugin_block_shapes_registration_and_runtime`. Configure `MINECRAFTC_VULKAN_TESTS=ON` to include
+`plugin_entity_worldgen_extensions` and `plugin_block_shapes_registration_and_runtime`. Desktop builds default to `MINECRAFTC_VULKAN_TESTS=ON`, including
 `plugin_vulkan_extensions_readback`, GI and model/fog readback tests. GPU checks use a
 real Vulkan device (software Vulkan is supported) and a display/Xvfb, skip with code
 77 only when a display cannot be supplied, and reject installed validation-layer

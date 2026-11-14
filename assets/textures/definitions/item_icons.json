@@ -53,7 +53,10 @@
     "potion": {},
     "splash_potion": {},
     "empty_bottle": {},
-    "smithing_template": {}
+    "smithing_template": {},
+    "paper": {},
+    "book": {},
+    "enchanted_book": {}
   },
   "handle_palette": [
     [
@@ -1580,6 +1583,94 @@
         246,
         177,
         56
+      ]
+    ],
+    "parchment": [
+      [
+        124,
+        102,
+        74
+      ],
+      [
+        188,
+        166,
+        124
+      ],
+      [
+        247,
+        232,
+        191
+      ],
+      [
+        217,
+        198,
+        154
+      ]
+    ],
+    "binding": [
+      [
+        76,
+        45,
+        32
+      ],
+      [
+        110,
+        63,
+        40
+      ],
+      [
+        157,
+        86,
+        46
+      ],
+      [
+        242,
+        220,
+        166
+      ]
+    ],
+    "lapis": [
+      [
+        22,
+        38,
+        96
+      ],
+      [
+        33,
+        55,
+        145
+      ],
+      [
+        49,
+        87,
+        200
+      ],
+      [
+        114,
+        163,
+        250
+      ]
+    ],
+    "slime": [
+      [
+        39,
+        79,
+        27
+      ],
+      [
+        65,
+        120,
+        42
+      ],
+      [
+        107,
+        172,
+        70
+      ],
+      [
+        174,
+        220,
+        129
       ]
     ]
   },
@@ -3347,6 +3438,112 @@
       "generator": "item_sprite",
       "template": "spawn_egg",
       "material": "enderman_egg"
+    },
+    "lapis_ore": {
+      "generator": "block_item_icon",
+      "block": "lapis_ore"
+    },
+    "deepslate_lapis_ore": {
+      "generator": "block_item_icon",
+      "block": "deepslate_lapis_ore"
+    },
+    "bookshelf": {
+      "generator": "block_item_icon",
+      "block": "bookshelf"
+    },
+    "iron_block": {
+      "generator": "block_item_icon",
+      "block": "iron_block"
+    },
+    "enchanting_table": {
+      "generator": "block_item_icon",
+      "block": "enchanting_table"
+    },
+    "anvil": {
+      "generator": "block_item_icon",
+      "block": "anvil"
+    },
+    "chipped_anvil": {
+      "generator": "block_item_icon",
+      "block": "chipped_anvil"
+    },
+    "damaged_anvil": {
+      "generator": "block_item_icon",
+      "block": "damaged_anvil"
+    },
+    "paper": {
+      "generator": "item_sprite",
+      "template": "paper",
+      "material": "parchment"
+    },
+    "book": {
+      "generator": "item_sprite",
+      "template": "book",
+      "material": "binding"
+    },
+    "enchanted_book": {
+      "generator": "item_sprite",
+      "template": "enchanted_book",
+      "material": "binding"
+    },
+    "lapis_lazuli": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "lapis"
+    },
+    "lever": {
+      "generator": "block_item_icon",
+      "block": "lever"
+    },
+    "redstone_torch": {
+      "generator": "block_item_icon",
+      "block": "redstone_torch"
+    },
+    "redstone_repeater": {
+      "generator": "block_item_icon",
+      "block": "redstone_repeater"
+    },
+    "redstone_comparator": {
+      "generator": "block_item_icon",
+      "block": "redstone_comparator"
+    },
+    "piston": {
+      "generator": "block_item_icon",
+      "block": "piston"
+    },
+    "sticky_piston": {
+      "generator": "block_item_icon",
+      "block": "sticky_piston"
+    },
+    "observer": {
+      "generator": "block_item_icon",
+      "block": "observer"
+    },
+    "redstone_lamp": {
+      "generator": "block_item_icon",
+      "block": "redstone_lamp"
+    },
+    "redstone_block": {
+      "generator": "block_item_icon",
+      "block": "redstone_block"
+    },
+    "redstone_ore": {
+      "generator": "block_item_icon",
+      "block": "redstone_ore"
+    },
+    "deepslate_redstone_ore": {
+      "generator": "block_item_icon",
+      "block": "deepslate_redstone_ore"
+    },
+    "slime_ball": {
+      "generator": "item_sprite",
+      "template": "gem",
+      "material": "slime"
+    },
+    "slime_spawn_egg": {
+      "generator": "item_sprite",
+      "template": "spawn_egg",
+      "material": "slime"
     }
   },
   "documentation": {
@@ -4014,7 +4211,19 @@
       "skyroot_door",
       "skyroot_button",
       "iron_door",
-      "stone_button"
+      "stone_button",
+      "lapis_lazuli",
+      "paper",
+      "book",
+      "enchanted_book",
+      "lapis_ore",
+      "deepslate_lapis_ore",
+      "bookshelf",
+      "iron_block",
+      "enchanting_table",
+      "anvil",
+      "chipped_anvil",
+      "damaged_anvil"
     ]
   }
 }

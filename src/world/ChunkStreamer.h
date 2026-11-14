@@ -31,6 +31,7 @@ class WorldGenerator;
 class IChunkStreamingWorld {
 public:
     virtual ~IChunkStreamingWorld() = default;
+    virtual bool chunkPinned(int,int) const {return false;}
     virtual void retireChunkUnlocked(Chunk& chunk, bool keepWarm) = 0;
     virtual void installLoadedChunkDataUnlocked(
         int cx, int cz, const std::vector<BlockOverride>& overrides,

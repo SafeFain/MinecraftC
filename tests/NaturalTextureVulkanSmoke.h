@@ -40,10 +40,10 @@ inline int naturalTextureVulkanSmoke(Window& window,VulkanRenderer& renderer,
             PostProcessState post;post.environment=env;post.inverseViewProjection=glm::inverse(vp);post.cameraPosition=camera;renderer.finishScene(post);
             if(flags&8){ui.beginUIFrame(width,height);ui.drawRect(16,16,float(width-32),110,{.08f,.09f,.10f,.94f});
                 for(size_t i=0;i<items.size();++i)ui.drawItemIcon(24+float(i%18)*49,36,42,42,{items[i],1,0});ui.endUIFrame();}
-            if(frame==4)VulkanGiSmokeProbe::requestCapture(renderer);
+            if(frame==4)VulkanDiagnostics::requestCapture(renderer);
             renderer.endFrame();window.finishEventFrame();
         }
-        renderer.waitIdle();auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+        renderer.waitIdle();auto pixels=VulkanDiagnostics::readCapture(renderer);
         if(pixels.size()!=size_t(width)*height*4)throw std::runtime_error("Natural scene readback missing");
         return pixels;
     };
@@ -54,13 +54,20 @@ inline int naturalTextureVulkanSmoke(Window& window,VulkanRenderer& renderer,
     if(terrain==render(21,.125f,false))throw std::runtime_error("Natural held tool was not drawn");
     auto save=[&](const std::string& name,const std::vector<uint8_t>& pixels){
         std::ofstream out(std::filesystem::temp_directory_path()/((natural?"natural-":"default-")+name+".ppm"),std::ios::binary);
+        out.exceptions(std::ios::failbit|std::ios::badbit);
         out<<"P6\n"<<width<<' '<<height<<"\n255\n";
         for(size_t i=0;i<pixels.size();i+=4)out.write(reinterpret_cast<const char*>(pixels.data()+i),3);
     };
+    // Isolate each consumer so a terrain override cannot hide missing UI/item
+    // overrides. The runner compares these against an independent default run.
+    save("background",empty);
+    for(const auto& sample:std::array<std::pair<const char*,int>,5>{{
+        {"opaque",1},{"translucent",16},{"dropped",2},{"held",4},{"ui",8}}})
+        save(sample.first,render(sample.second,.125f,false));
     const auto day=render(31,.125f,false),night=render(31,.75f,false);
     if(day==night)throw std::runtime_error("Natural scene day/night identical");
     save("day",day);save("night",night);save("far",render(31,.125f,true));
     renderer.resize(width,height);renderer.suspendPresentation();renderer.resumePresentation();render(31,.125f,false);
     renderer.releaseChunkMesh(mesh);held.reset();
-    std::cout<<"Natural textures Vulkan terrain/layers, cutout/fluid, UI, held/dropped and day/night readback passed\n";return 0;
+    std::cout<<(natural?"Natural":"Default")<<" textures Vulkan terrain/layers, cutout/fluid, UI, held/dropped and day/night readback passed\n";return 0;
 }

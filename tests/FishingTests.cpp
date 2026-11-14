@@ -59,7 +59,7 @@ int main() {
         FishingSystem::loot(true,.84f,.60f).id==ItemId::RAW_SALMON,"fish weights");
     const ItemId junk[]={ItemId::STICK,ItemId::STRING,ItemId::BONE,ItemId::ROTTEN_FLESH};
     for(int i=0;i<4;++i) require(FishingSystem::loot(true,.85f,i*.25f).id==junk[i],"junk table");
-    const ItemId treasure[]={ItemId::BOW,ItemId::FISHING_ROD,ItemId::EMERALD};
+    const ItemId treasure[]={ItemId::BOW,ItemId::FISHING_ROD,ItemId::BOOK};
     for(int i=0;i<3;++i) require(FishingSystem::loot(true,.95f,(i+.01f)/3).id==treasure[i],"treasure table");
     require(FishingSystem::loot(false,.89f,0).id==ItemId::RAW_COD &&
         FishingSystem::loot(false,1,1).id==ItemId::ROTTEN_FLESH,"closed water weights and endpoint bounds");

@@ -14,12 +14,14 @@
 #include "game/InventoryModel.h"
 #include "game/SurvivalStats.h"
 #include "game/Experience.h"
+#include "game/EquipmentRules.h"
 #include "core/Input.h"
 #include "player/PlayerPhysics.h"
 #include "player/PlayerVisual.h"
 #include "entity/ProjectileLogic.h"
 #include "game/CombatRules.h"
 
+namespace Redstone {struct PistonSweep;}
 class World;
 class EntityManager;
 struct PotionDefinition;
@@ -47,6 +49,7 @@ public:
 
     // ── Update ──────────────────────────────────────────────────────
     void update(float dt);
+    void pushPiston(const Redstone::PistonSweep&);
 
     // ── State ───────────────────────────────────────────────────────
     glm::dvec3 getEyePosition() const;
@@ -115,16 +118,19 @@ public:
     Experience& experience() { return m_experience; }
     const Experience& experience() const { return m_experience; }
     void collectExperience(uint32_t points) {
+        points = EquipmentRules::repairWithExperience(m_inventory, static_cast<size_t>(m_selectedSlot), points, m_equipmentRandom);
         const auto before = m_experience.level();
         m_experience.addPoints(static_cast<int32_t>(std::min<uint32_t>(points, INT32_MAX)));
         ++m_experiencePickups;
         if (m_experience.level()/5 > before/5) ++m_experienceLevelSounds;
     }
+    uint32_t enchantmentSeed = 1;
+    uint64_t m_equipmentRandom = 0x6a09e667f3bcc909ULL;
     uint64_t experiencePickups() const { return m_experiencePickups; }
     uint64_t experienceLevelSounds() const { return m_experienceLevelSounds; }
     DamageOutcome takeDamage(float amount, bool bypassArmor = false);
     DamageOutcome takeDamage(const DamageSourceInfo& source);
-    void ignite(float seconds) { if(!m_effects.level(StatusEffectType::FireResistance))m_burningSeconds = std::max(m_burningSeconds, seconds); }
+    void ignite(float seconds) { if(!m_effects.level(StatusEffectType::FireResistance)){ unsigned protection = 0; for (const auto& armor : m_inventory.armor()) protection += armor.enchantment(EnchantmentId::FireProtection); m_burningSeconds = std::max(m_burningSeconds, seconds * std::max(0.f,1.f-.15f*protection)); } }
     StatusEffects& statusEffects() {return m_effects;}
     const StatusEffects& statusEffects() const {return m_effects;}
     void applyPotion(const PotionDefinition&,float intensity=1.f);
@@ -196,7 +202,7 @@ public:
     void setActionUseCooldown(float seconds){m_actionCooldown=std::max(m_actionCooldown,seconds);}
     ItemStack activeItem() const;
     float pluginCooldown(const std::string& key) const {const auto it=m_pluginCooldowns.find(key);return it==m_pluginCooldowns.end()?0:it->second;}
-    void completePluginAction(const std::string& key,float cooldown,uint32_t wear){if(m_gameMode==GameMode::Survival&&wear){auto& s=m_inventory.slot(static_cast<size_t>(m_selectedSlot));const auto maximum=getItemProps(s.id).maxDurability;if(uint32_t(s.damage)+wear>=maximum)s.clear();else s.damage=static_cast<uint16_t>(s.damage+wear);}m_pluginCooldowns[key]=cooldown;startSwing();}
+    void completePluginAction(const std::string& key,float cooldown,uint32_t wear){if(m_gameMode==GameMode::Survival&&wear){auto& s=m_inventory.slot(static_cast<size_t>(m_selectedSlot));EquipmentRules::damage(s,wear,m_equipmentRandom);}m_pluginCooldowns[key]=cooldown;startSwing();}
     const std::map<std::string,float>& pluginCooldowns() const {return m_pluginCooldowns;}
     void setPluginCooldowns(std::map<std::string,float> values){m_pluginCooldowns=std::move(values);}
     void clearPluginCooldowns(){m_pluginCooldowns.clear();}

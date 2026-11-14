@@ -1,0 +1,19 @@
+{
+  "key": "piston_side",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2665660940,
+    "images": [
+      "textures/materials/piston_side-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/piston_side-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/piston_side-0-properties.png"
+    ]
+  }
+}

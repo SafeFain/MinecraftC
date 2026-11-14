@@ -2,6 +2,7 @@
 
 #include "game/Item.h"
 #include <functional>
+#include <algorithm>
 #include <optional>
 #include <vector>
 #include <glm/glm.hpp>
@@ -35,6 +36,7 @@ public:
     explicit FishingSystem(Random random = {});
     void reset(uint64_t seed);
     void cancel();
+    void setEnchantments(uint8_t luck, uint8_t lure) { m_luck = std::min<uint8_t>(luck,3); m_lure = std::min<uint8_t>(lure,3); }
     void use(const glm::dvec3& eye, const glm::vec3& forward,
              const glm::vec3& inheritedVelocity, const FishingEnvironment& environment);
     void update(float dt, const glm::dvec3& owner, const FishingEnvironment& environment);
@@ -44,6 +46,7 @@ public:
     static ItemStack loot(bool open, float category, float selection);
 private:
     FishingView m_view;
+    uint8_t m_luck = 0, m_lure = 0;
     Random m_random;
     uint64_t m_randomState = 1;
     glm::vec3 m_velocity{0.0f};

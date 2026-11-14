@@ -16,9 +16,10 @@ enum class EntityType : uint16_t {
 #define NETHER_ENTITY_ENUM(type,egg,key,label,h,x,y,z,s,d,monster,fire) type,
     MC_NETHER_MOBS(NETHER_ENTITY_ENUM)
 #undef NETHER_ENTITY_ENUM
-    GhastFireball, BlazeFireball, ThrownPotion, EnderPearl, ExperienceOrb
+    GhastFireball, BlazeFireball, ThrownPotion, EnderPearl, ExperienceOrb, Slime
 };
 static_assert(static_cast<uint16_t>(EntityType::IronGolem)==13 && static_cast<uint16_t>(EntityType::Ghast)==14 && static_cast<uint16_t>(EntityType::EnderPearl)==28,"Append-only entity identities");
+inline bool jumpingCube(EntityType type) {return type==EntityType::MagmaCube || type==EntityType::Slime;}
 inline bool nativeNetherMob(EntityType type) {return type>=EntityType::Ghast && type<=EntityType::Enderman;}
 inline bool nativeProjectile(EntityType type) {return type>=EntityType::GhastFireball && type<=EntityType::EnderPearl;}
 inline bool nativeFireImmune(EntityType type) {
@@ -73,6 +74,7 @@ inline EntityType entityTypeForSpawnEgg(SpawnEggMob mob) {
 #define NETHER_EGG_TYPE(type,egg,key,label,h,x,y,z,s,d,monster,fire) case SpawnEggMob::type:return EntityType::type;
         MC_NETHER_MOBS(NETHER_EGG_TYPE)
 #undef NETHER_EGG_TYPE
+        case SpawnEggMob::Slime:return EntityType::Slime;
         case SpawnEggMob::Cow: return EntityType::Cow;
         case SpawnEggMob::Pig: return EntityType::Pig;
         case SpawnEggMob::Sheep: return EntityType::Sheep;

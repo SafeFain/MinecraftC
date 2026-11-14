@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "app/GameSession.h"
 #include "EntityAiScenarios.h"
@@ -27,232 +28,7 @@
 #include <sstream>
 #include <thread>
 
-struct LanLodTestAccess {
-    static void observeExact(LodTerrainSystem& system,Chunk& chunk) {system.observeExactChunks({&chunk});}
-    static void requestOnlyTile(LodTerrainSystem& system,const LodTileKey& key) {
-        system.m_desired.clear();system.m_desired.push_back({key,0,256,0});system.enqueueRequests();
-    }
-    static bool residentExactMatches(const LodTerrainSystem& system,const LodTileKey& key,const std::vector<uint16_t>& blocks) {
-        const auto found=system.m_tiles.find(key);
-        return found!=system.m_tiles.end()&&found->second->resident&&
-            encodeLodTilePayload(found->second->data)==encodeLodTilePayload(extractExactLodChunk(blocks));
-    }
-    static bool residentApproximationsMatch(const LodTerrainSystem& system,const WorldGenerator& generator) {
-        for(const auto& entry:system.m_tiles) {
-            if(!entry.second->resident)continue;
-            const auto expected=buildApproximateLodTile(generator,entry.first);
-            if(encodeLodTilePayload(expected)!=encodeLodTilePayload(entry.second->data))return false;
-        }
-        return true;
-    }
-    static uint64_t revision(const World& world, const LodTileKey& key) {
-        const auto found = world.m_lod.m_replicaColumns.find(key);
-        return found == world.m_lod.m_replicaColumns.end() ? 0 : found->second.revision;
-    }
-    static BlockId block(const World& world, const LodTileKey& key, int x, int y, int z) {
-        const auto found = world.m_lod.m_replicaColumns.find(key);
-        if (found != world.m_lod.m_replicaColumns.end()) for (const auto& span : found->second.data.at(x,z).spans)
-            if (y >= span.bottom && y <= span.top) return span.block;
-        return BlockId::AIR;
-    }
-};
-struct GameSessionTestAccess {
-    static World& netherFlat(GameSession& s,DimensionId d) {
-        auto& runtime=s.ensureDimension(d);runtime.world.setThreadPool(nullptr);runtime.entities.setNaturalSpawningEnabled(false);
-        for(int z=-2;z<=2;++z)for(int x=-2;x<=2;++x) {
-            auto* c=runtime.world.getChunk(x,z);
-            for(int bz=0;bz<16;++bz)for(int bx=0;bx<16;++bx)for(int y=64;y<74;++y)c->setBlock(bx,y,bz,y==64?BlockId::OBSIDIAN:BlockId::AIR);
-            c->generated=true;c->lifecycle=Chunk::LifecycleState::Renderable;
-        }
-        runtime.world.setAdditionalStreamingInterests({{0,0,2}});runtime.world.update({.5,65.01,.5},0);return runtime.world;
-    }
-    static void restoreNetherWorkers(GameSession& s) { s.ensureDimension(DimensionId::Nether).world.setThreadPool(&s.threadPool); }
-    static void netherReady(GameSession& s){s.terrainGenerated=true;s.playerDead=false;}
-    static bool tickPortals(GameSession& s,float dt){return s.updateNetherPortals(dt,{});}
-    static void portalRule(GameSession& s,bool enabled){s.worldMetadata.gameRules.set(GameRuleId::AllowEnteringNetherUsingPortals,GameRuleValue::boolean(enabled));}
-    static std::optional<glm::dvec3> portalLanding(GameSession& s,DimensionId d,glm::dvec3 p){return s.netherPortalLanding(d,p);}
-    static bool anchorUse(GameSession& s,glm::ivec3 p){return s.useRespawnAnchor(0,p);}
-    static void restTime(GameSession& s,bool night){if(night)s.dayNightCycle().setNight();else s.dayNightCycle().setDay();}
-    static void anchorSpawn(GameSession& s,glm::ivec3 p){s.worldMetadata.dimensions[2].anchorSpawn=p;}
-    static bool invalidAnchor(GameSession& s,glm::ivec3 p) {
-        const auto previous=s.worldMetadata.dimensions[2].anchorSpawn;
-        s.pendingRespawn=true;s.worldMetadata.dimensions[2].anchorSpawn=p;
-        const auto result=s.consumeAnchorRespawn(p);
-        s.pendingRespawn=false;s.worldMetadata.dimensions[2].anchorSpawn=previous;s.updateLanInterests();
-        return result.status==GameSession::AnchorRespawnStatus::Invalid;
-    }
-    static LanPlayerRuntime& anchorGuest(GameSession& s,glm::ivec3 p) {
-        Lan::PlayerProfile profile;profile.dimension=DimensionId::Overworld;profile.netherAnchor=p;
-        auto guest=std::make_unique<LanPlayerRuntime>(s.world(),s.entities(),profile);
-        guest->player.setRoomPlayerId(7);guest->dead=true;
-        s.guests[7]=std::move(guest);return *s.guests.at(7);
-    }
-    static bool respawnGuest(GameSession& s,LanPlayerRuntime& guest){return s.travelLanPlayer(guest,DimensionId::Overworld,true);}
-
-    static void prepareActionScene(GameSession& session,DimensionId dimension,uint64_t seed){
-        session.worldMetadata.seed=seed;auto& runtime=session.ensureDimension(dimension);
-        runtime.world.setThreadPool(nullptr);session.dimension=dimension;
-        session.player.bindWorld(runtime.world,&runtime.entities);session.player.configureRules(GameMode::Survival,Difficulty::Normal);
-        runtime.entities.setNaturalSpawningEnabled(false);session.terrainGenerated=true;
-    }
-    static void dimensionBed(GameSession& session,uint32_t id,std::optional<glm::ivec3> bed) { session.worldMetadata.dimensions[id].bedSpawn=bed; }
-    static void dimensionPosition(GameSession& session,uint32_t id,glm::dvec3 p) { auto& state=session.worldMetadata.dimensions[id];state.playerPosition=p;state.positioned=true; }
-    static void prepareLanScene(GameSession& session) {
-        flatRuleScene(session);
-        session.worldMetadata.gameMode = GameMode::Survival;
-        session.terrainGenerated = true;
-    }
-    static LanPlayerRuntime& guest(GameSession& session, uint64_t id) { return *session.guests.at(id); }
-    static void tickLanPlayers(GameSession& session, float dt) { session.updateLanPlayers(dt); }
-    static bool beginGuestSleep(GameSession& session, uint64_t id, glm::ivec3 bed) { return session.beginLanSleep(id, bed); }
-    static bool skipLanNight(GameSession& session, DimensionId dimension) { return session.trySkipLanNight(dimension); }
-    static void tickLanSleep(GameSession& session, float dt) { session.updateLanSleep(dt); }
-    static void travelLan(GameSession& session, LanPlayerRuntime& guest, DimensionId dim) { session.travelLanPlayer(guest, dim); }
-    static void waitLanWorkers(GameSession& session) { session.threadPool.waitIdle(); }
-    static std::filesystem::path lanLodRoot(const GameSession& session) { return session.replicaLodRoot; }
-    static void saveColdLodEdit(GameSession& session, int x, int z, int y, BlockId block, int lx = 0, int lz = 0) {
-        session.saveStore->saveChunkOverrides(x, z, {{static_cast<uint32_t>((y - Config::WORLD_MIN_Y) * 256 + lx + lz * 16), block}});
-    }
-    static void emitLanEvent(GameSession& session, Lan::GameEvent event) { session.broadcastGameEvent(event); }
-    static size_t lodJobs(const GameSession& session) { return session.lodJobs.size(); }
-    static void setTerrainReady(GameSession& session, bool ready) { session.terrainGenerated = ready; }
-    static std::string replicaLoadingDiagnostic(const GameSession& session) {
-        std::ostringstream text;
-        const auto progress = session.loadingSnapshot();
-        text << "connection=" << session.lanError() << " phase=" << static_cast<int>(progress.phase)
-             << " chunks=" << progress.progress.completed << '/' << progress.progress.total
-             << " revisions=" << session.replicaRevisions.size() << " queue=" << session.replicaChunks.size()
-             << " workersIdle=" << session.threadPool.idle();
-        for (const auto* chunk : session.worldState().getActiveChunks())
-            text << " [" << chunk->cx << ',' << chunk->cz << " gen=" << chunk->generated << " light=" << chunk->lightingInitialized
-                 << " gpu=" << chunk->getMesh().gpuReady << " life=" << static_cast<int>(chunk->lifecycle.load()) << ']';
-        return text.str();
-    }
-    static bool rejectsOldLodSubscription(GameSession& session, uint64_t peer, const LodTileKey& key) {
-        session.threadPool.waitIdle();
-        auto& guest = *session.guests.at(peer);
-        // Old workers may be complete, but not yet consumed when cancellation arrives.
-        Lan::LodUpdate request; request.key = key; request.epoch = guest.chunkEpoch; request.dimension = guest.profile.dimension;
-        request.revision = std::numeric_limits<uint64_t>::max(); session.requestLanLod(guest, request);
-        request.revision = 0; session.requestLanLod(guest, request);
-        const auto original = guest.lodSubscriptions.at(key);
-        std::promise<Lan::Bytes> completed; auto result = completed.get_future(); completed.set_value({0});
-        session.lodJobs.push_back({peer, request.epoch, original.revision, original.generation, request.dimension, key, std::move(result)});
-        request.revision = std::numeric_limits<uint64_t>::max(); session.requestLanLod(guest, request);
-        request.revision = 0; session.requestLanLod(guest, request);
-        auto& replacement = guest.lodSubscriptions.at(key); replacement.queued = true;
-        session.sendLanLod();
-        const bool rejected = replacement.generation != original.generation && replacement.queued;
-        replacement.queued = false;
-        return rejected;
-    }
-    static World& pluginDimension(GameSession& session,DimensionId id){
-        auto& runtime=session.ensureDimension(id);runtime.world.setThreadPool(nullptr);
-        for(int x=-1;x<=1;++x)for(int z=-1;z<=1;++z){auto* chunk=runtime.world.getChunk(x,z);chunk->generated=true;chunk->lifecycle=Chunk::LifecycleState::Renderable;}
-        return runtime.world;
-    }
-    static void pluginHostLoading(GameSession& session,bool loading){session.terrainGenerated=!loading;}
-    static void pluginRemoveGuest(GameSession& session,uint64_t id){session.removeLanPlayer(id);}
-    static void disconnectReplica(GameSession& session){session.closeReplica();session.terrainGenerated=false;}
-    static void tickDaylight(GameSession& session,float dt){session.updateDaylight(dt,true);}
-    static size_t particleCount(const GameSession& session){return session.particles.size();}
-    static uint64_t replicaPeer(GameSession& session) { return session.lanClient.peerId(); }
-    static void applyLanAction(GameSession& session, LanPlayerRuntime& guest, const Lan::GameAction& action) { session.applyLanAction(guest, action); }
-    static void syncReplicaActionSequence(GameSession& client, uint64_t sequence) { client.replicaActionSequence = sequence; }
-    static void corruptReplicaRevision(GameSession& session) { session.replicaRevisions[{DimensionId::Overworld, 0, 0}] = 1; }
-
-
-    static void fishingPond(GameSession& session, GameMode mode) {
-        session.world().update({8.5,65,1.5},1);
-        Chunk* chunk=session.world().getChunk(0,0);
-        chunk->generated=true;
-        chunk->lifecycle=Chunk::LifecycleState::Renderable;
-        for(int z=0;z<16;++z)for(int x=0;x<16;++x) {
-            chunk->setBlock(x,62,z,BlockId::STONE);
-            chunk->setBlock(x,63,z,BlockId::WATER);
-            chunk->setBlock(x,64,z,BlockId::WATER);
-        }
-        session.player.setPosition({8.5,65,1.5});
-        session.player.configureRules(mode,Difficulty::Peaceful);
-        session.player.inventory().slot(0)={ItemId::FISHING_ROD,1,63};
-        session.player.setSelectedSlot(0);
-        session.fishing=FishingSystem([]{return 0.0f;});
-    }
-    static void tickFishing(GameSession& session,float dt) {
-        session.validateFishingRod();
-        session.fishing.update(dt,session.player.getEyePosition(),session.fishingEnvironment());
-        session.collectFishingEvents();
-    }
-    static void retireFishingPond(GameSession& session) {
-        session.world().getChunk(0,0)->lifecycle=Chunk::LifecycleState::Warm;
-    }
-    static void tickFishingDrops(GameSession& session,float dt) {
-        session.entities().update(session.player,dt,true,true,true,true,false,false,0);
-    }
-    static World& world(GameSession& session) { return session.world(); }
-    static Player& player(GameSession& session) { return session.player; }
-    static EntityManager& entities(GameSession& session) { return session.entities(); }
-    static void flatRuleScene(GameSession& session) {
-        session.world().setThreadPool(nullptr);
-        for (int cx=-1;cx<=1;++cx) for (int cz=-1;cz<=1;++cz) {
-            Chunk* chunk=session.world().getChunk(cx,cz);
-            for(int x=0;x<16;++x)for(int z=0;z<16;++z)chunk->setBlock(x,0,z,BlockId::STONE);
-            chunk->generated=true;chunk->lifecycle=Chunk::LifecycleState::Renderable;
-        }
-        session.world().update({.5,1.01,.5},0);
-        session.worldMetadata.worldSpawn={0,0,0};
-        session.player.configureRules(GameMode::Survival,Difficulty::Normal);
-        session.player.setPosition({.5,1.01,.5});
-        session.entities().setNaturalSpawningEnabled(false);
-    }
-    static void setRules(GameSession& session, const GameRuleSet& rules) { session.worldMetadata.gameRules=rules; session.world().setGameRules(rules); }
-    static void tickWeather(GameSession& session) { session.weather().tick(session.worldMetadata.gameRules.boolean(GameRuleId::AdvanceWeather)); }
-    static void sleepChoice(GameSession& session, GameSession::Feedback feedback) {
-        session.sleepState=GameSession::SleepVisualState::Choosing;
-        session.chooseSleepAction(GameSession::SleepAction::SleepUntilMorning,0,feedback);
-    }
-    static void die(GameSession& session) { session.beginPlayerDeath(); }
-    static void processCompletedGenerations(GameSession& session) {
-        session.world().processCompletedGenerations();
-    }
-    static bool backgroundWorkIdle(const GameSession& session) {
-        return session.threadPool.idle();
-    }
-    static bool terrainReady(const GameSession& session) {
-        return session.terrainGenerated;
-    }
-    static bool newWorldLoading(const GameSession& session) {
-        return session.loadingNewWorld;
-    }
-    static bool hasDimensionStore(const GameSession& session) {
-        return session.simulation().store != nullptr;
-    }
-    static void markTerrainReady(GameSession& session) {
-        session.terrainGenerated = true;
-    }
-    static void setPlayerPosition(GameSession& session, const glm::dvec3& position) {
-        session.player.setPosition(position);
-    }
-    static void safeSpawn(GameSession& session) { session.safeSpawn(); }
-    static void beginAutosave(GameSession& session,
-                              const std::function<void()>& onError) {
-        session.beginAutosave(onError);
-    }
-    static void processAutosave(GameSession& session,
-                                const std::function<void()>& onError) {
-        session.processAutosave(onError);
-    }
-    static void setCheats(GameSession& session, bool enabled) {
-        session.worldMetadata.cheatsEnabled = enabled;
-    }
-    static void setDay(GameSession& session) { session.dayNightCycle().setDay(); }
-    static void setNight(GameSession& session) { session.dayNightCycle().setNight(); }
-    static void setHeavenSafePosition(GameSession& session,
-                                      const glm::ivec3& position) {
-        session.worldMetadata.heaven.safePosition = position;
-        session.worldMetadata.heaven.hasSafePosition = true;
-    }
-};
+#include "SessionScenario.h"
 
 namespace {
 void require(bool condition, const char* message) {
@@ -274,9 +50,10 @@ GameSession::CommandResult runCommand(GameSession& session,
 // Background generation tasks hold raw world pointers and must finish before
 // the session is destroyed; drain them the same way the loading gate does.
 void drainGeneration(GameSession& session) {
-    for (int i = 0; i < 4000; ++i) {
-        GameSessionTestAccess::processCompletedGenerations(session);
-        if (GameSessionTestAccess::backgroundWorkIdle(session)) return;
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(20);
+    while(std::chrono::steady_clock::now()<deadline) {
+        SessionScenario::processCompletedGenerations(session);
+        if (SessionScenario::backgroundWorkIdle(session)) return;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     require(false, "generation drains before session teardown");
@@ -315,14 +92,34 @@ std::string Localization::format(
 #include "HeavenP1Integration.h"
 
 #include "ExperienceIntegration.h"
+#include "EnchantmentIntegration.h"
+#include "RedstoneEntityIntegration.h"
 
-int main(int argc, char** argv) {
+#include "RedstoneLanIntegration.h"
+
+int main(int argc, char** argv) try {
+    if(argc==3 && std::string(argv[1])=="--redstone-mob-tests") {
+        installHeavenFixture();return RedstoneEntityIntegration::run(argv[2]);
+    }
+    if(argc==3&&std::string(argv[1])=="--enchantment-tests") { try { return EnchantmentIntegration::run(argv[2]); } catch(const std::exception& error) { std::cerr<<"Equipment progression exception: "<<error.what()<<'\n'; return 1; } }
     if(argc==3&&std::string(argv[1])=="--experience-tests") {
         try{return ExperienceIntegration::run(argv[2]);}
         catch(const std::exception& error){std::cerr<<"Experience test exception: "<<error.what()<<'\n';return 1;}
     }
     if(argc==3 && (std::string(argv[1])=="--nether-mob-tests"||std::string(argv[1])=="--nether-mob-tests-no-plugins")) {
-        try {if(std::string(argv[1])=="--nether-mob-tests")installHeavenFixture();return NetherMobIntegration::run(argv[2]);}
+        try {
+            const bool withoutPlugins = std::string(argv[1])=="--nether-mob-tests-no-plugins";
+            const auto checkNoPlugins = [] {
+                if(!Plugins::content().requirements.empty() ||
+                   !Plugins::content().blocks.empty() || !Plugins::content().items.empty() ||
+                   Plugins::validDimension(static_cast<uint32_t>(DimensionId::Heaven)))
+                    throw std::runtime_error("native Nether test unexpectedly depends on loaded plugin content");
+            };
+            if(withoutPlugins)checkNoPlugins();else installHeavenFixture();
+            const int result = NetherMobIntegration::run(argv[2]);
+            if(withoutPlugins)checkNoPlugins();
+            return result;
+        }
         catch(const std::exception& error){std::cerr<<"Nether integration exception: "<<error.what()<<'\n';return 1;}
     }
     if(argc==2&&std::string(argv[1])=="--nether-session-tests") {
@@ -370,6 +167,7 @@ int main(int argc, char** argv) {
         try{return PluginLanIntegration::run(argv[2],argv[3],argv[4]);}
         catch(const std::exception& error){std::cerr<<"Plugin LAN regression failed: "<<error.what()<<'\n';return 1;}
     }
+    if(argc==2 && std::string(argv[1])=="--redstone-lan-tests")return RedstoneLanIntegration::run();
     if (argc > 2 && std::string(argv[1]) == "--lan-replica-tests")
         return LanReplicaIntegration::run(argv[2]);
     if (argc > 1 && std::string(argv[1]) == "--lan-authority-tests")
@@ -399,8 +197,8 @@ int main(int argc, char** argv) {
     {
         const int distance=Config::RENDER_DISTANCE;
         Config::RENDER_DISTANCE=0;
-        GameSession fishingSession(root/"fishing");
-        GameSessionTestAccess::fishingPond(fishingSession,GameMode::Survival);
+        ScenarioSession fishingSession(root/"fishing");
+        SessionScenario::fishingPond(fishingSession,GameMode::Survival);
         for(size_t i=1;i<InventoryModel::STORAGE_SIZE;++i)
             fishingSession.inventory().slot(i)={ItemId::STONE,64,0};
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
@@ -408,7 +206,7 @@ int main(int argc, char** argv) {
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Release);
         require(fishingSession.fishingState().active(),"Use release does not reel");
         for(int i=0;i<1000 && fishingSession.fishingState().phase!=FishingPhase::Bite;++i)
-            GameSessionTestAccess::tickFishing(fishingSession,.01f);
+            SessionScenario::tickFishing(fishingSession,.01f);
         require(fishingSession.fishingState().phase==FishingPhase::Bite,"session pond reaches bite");
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
         require(!fishingSession.fishingState().active() && fishingSession.inventory().slot(0).empty(),
@@ -418,37 +216,37 @@ int main(int argc, char** argv) {
             fishingSession.inventory().count(ItemId::RAW_COD)==0,
             "full inventory keeps catch as normal world drop");
         require(ExperienceIntegration::orbPoints(fishingSession.entityState())==1,"successful fishing produces XP without needing inventory space");
-        for(int i=0;i<150;++i)GameSessionTestAccess::tickFishingDrops(fishingSession,.01f);
+        for(int i=0;i<150;++i)SessionScenario::tickFishingDrops(fishingSession,.01f);
         require(fishingSession.inventory().count(ItemId::RAW_COD)==1,
             "reeled catch follows ordinary entity physics and inventory pickup");
-        GameSessionTestAccess::fishingPond(fishingSession,GameMode::Creative);
+        SessionScenario::fishingPond(fishingSession,GameMode::Creative);
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
         for(int i=0;i<1000 && fishingSession.fishingState().phase!=FishingPhase::Bite;++i)
-            GameSessionTestAccess::tickFishing(fishingSession,.01f);
+            SessionScenario::tickFishing(fishingSession,.01f);
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
         require(fishingSession.inventory().slot(0).damage==63,"creative reel has no rod wear");
-        GameSessionTestAccess::tickFishing(fishingSession,.3f);
+        SessionScenario::tickFishing(fishingSession,.3f);
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
         fishingSession.setSelectedSlot(1);
         require(!fishingSession.fishingState().active(),"hotbar switch cancels fishing immediately");
         fishingSession.setSelectedSlot(0);
-        GameSessionTestAccess::tickFishing(fishingSession,.3f);
+        SessionScenario::tickFishing(fishingSession,.3f);
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
         fishingSession.dropSelectedItem(0,true);
         require(!fishingSession.fishingState().active(),"dropping rod cancels fishing immediately");
-        GameSessionTestAccess::fishingPond(fishingSession,GameMode::Survival);
+        SessionScenario::fishingPond(fishingSession,GameMode::Survival);
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
-        GameSessionTestAccess::retireFishingPond(fishingSession);
-        GameSessionTestAccess::tickFishing(fishingSession,.01f);
+        SessionScenario::retireFishingPond(fishingSession);
+        SessionScenario::tickFishing(fishingSession,.01f);
         require(!fishingSession.fishingState().active() &&
                 !fishingSession.worldState().getLoadedBlock(8,64,8).has_value(),
             "retired warm chunks cannot keep fishing active");
         require(!fishingSession.worldState().getLoadedBlock(-1,64,-1).has_value() &&
                 !fishingSession.worldState().getLoadedBlock(8,320,8).has_value(),
             "loaded-block query distinguishes missing negative chunks and build limits");
-        GameSessionTestAccess::fishingPond(fishingSession,GameMode::Survival);
+        SessionScenario::fishingPond(fishingSession,GameMode::Survival);
         fishingSession.handleMouseButton(MouseButton::Right,ButtonAction::Press);
-        GameSessionTestAccess::die(fishingSession);
+        SessionScenario::die(fishingSession);
         require(!fishingSession.fishingState().active(),"death removes bobber");
         fishingSession.leaveWorld();
         require(!fishingSession.fishingState().active(),"leaving world clears transient fishing");
@@ -478,7 +276,7 @@ int main(int argc, char** argv) {
     }
 
     {
-        GameSession session(root / "saves");
+        ScenarioSession session(root / "saves");
         const std::string id = session.createWorld(
             "Flow Test", 42, GameMode::Survival, Difficulty::Normal, true);
         require(!id.empty(), "world creation returns an id");
@@ -489,7 +287,7 @@ int main(int argc, char** argv) {
         const GameMode mode = session.startWorld(id, true, clock.now());
         require(mode == GameMode::Survival,
                 "new world starts in survival mode");
-        require(GameSessionTestAccess::newWorldLoading(session) && !GameSessionTestAccess::terrainReady(session),
+        require(SessionScenario::newWorldLoading(session) && !SessionScenario::terrainReady(session),
                 "new world enters the loading state");
         require(session.metadata().seed == 42,
                 "metadata carries the requested seed");
@@ -508,12 +306,12 @@ int main(int argc, char** argv) {
         require(!result.gameModeChanged, "help does not change the mode");
 
         session.inventory().clear();
-        GameSessionTestAccess::setCheats(session, false);
+        SessionScenario::setCheats(session, false);
         result = runCommand(session, localization, "/give stone_bricks 64");
         require(session.inventory().count(ItemId::STONE_BRICKS) == 0 &&
                 result.messages[0] == "message.cheats_disabled",
                 "give respects the world cheats setting");
-        GameSessionTestAccess::setCheats(session, true);
+        SessionScenario::setCheats(session, true);
         result = runCommand(session, localization, "/give stone_bricks 64");
         require(session.inventory().count(ItemId::STONE_BRICKS) == 64,
                 "give adds the requested stack to real inventory");
@@ -564,11 +362,11 @@ int main(int argc, char** argv) {
         session.updateDaylight(0.1f, true);
         require(std::abs(session.daylightState().phase() - phase - 0.1f / 1200.0f) < 0.000001f,
                 "default world cycle advances in seconds");
-        GameSessionTestAccess::setCheats(session, false);
+        SessionScenario::setCheats(session, false);
         result = runCommand(session, localization, "/gamerule DayNightDuration 180");
         require(session.metadata().dayNightDurationSeconds == 1200 &&
                 result.messages[0] == "message.cheats_disabled", "duration requires cheats");
-        GameSessionTestAccess::setCheats(session, true);
+        SessionScenario::setCheats(session, true);
         const float beforeRule = session.daylightState().phase();
         result = runCommand(session, localization, "/gamerule DayNightDuration 180");
         require(session.metadata().dayNightDurationSeconds == 180 &&
@@ -611,25 +409,25 @@ int main(int argc, char** argv) {
                 "short teleport reports an expected-argument error");
 
         // Safe spawn on untouched terrain falls back to a platform.
-        GameSessionTestAccess::setPlayerPosition(session, {100000.0, 64.0, 100000.0});
-        GameSessionTestAccess::safeSpawn(session);
+        SessionScenario::setPlayerPosition(session, {100000.0, 64.0, 100000.0});
+        SessionScenario::safeSpawn(session);
         require(session.playerState().getPosition().y ==
                     Config::SEA_LEVEL + 1.01f,
                 "safe spawn creates a platform without ground");
 
         // Autosave begin/process round trips without error.
         bool autosaveError = false;
-        GameSessionTestAccess::beginAutosave(session,
+        SessionScenario::beginAutosave(session,
             [&autosaveError] { autosaveError = true; });
         require(!autosaveError, "autosave begins without error");
-        GameSessionTestAccess::processAutosave(session,
+        SessionScenario::processAutosave(session,
             [&autosaveError] { autosaveError = true; });
         require(!autosaveError, "autosave processes without error");
 
-        GameSessionTestAccess::player(session).experience().addPoints(1537);
+        SessionScenario::player(session).experience().addPoints(1537);
         // Explicit save persists session metadata.
         bool saveError = false;
-        GameSessionTestAccess::markTerrainReady(session);
+        SessionScenario::markTerrainReady(session);
         session.saveNow([&saveError] { saveError = true; });
         require(!saveError, "save completes without error");
         require(session.metadata().playerPosition ==
@@ -656,13 +454,13 @@ int main(int argc, char** argv) {
         currentMetadata.inventory.slot(8) = {ItemId::CAVE_GLOWSHROOM,23,0};
         currentMetadata.heaven.worldTicks = 6789;
         currentStore.saveMetadata(currentMetadata);
-        for (uint32_t version : {14u,15u,16u,17u,18u,19u,20u,WorldGenContext::GENERATION_VERSION+1u}) {
+        for (uint32_t version : {14u,15u,16u,17u,18u,19u,20u,21u,22u,WorldGenContext::GENERATION_VERSION+1u}) {
             auto incompatible = currentMetadata;
             incompatible.generationVersion = version;
             currentStore.saveMetadata(incompatible);
             std::ifstream beforeFile(currentStore.worldDirectory()/"level.bin",std::ios::binary);
             const std::string before((std::istreambuf_iterator<char>(beforeFile)),{});
-            GameSession refused(root / "saves");
+            ScenarioSession refused(root / "saves");
             bool rejected = false;
             try { refused.startWorld(currentCatalog.list().front().id,false,clock.now()); }
             catch (const std::runtime_error&) { rejected = true; }
@@ -676,7 +474,7 @@ int main(int argc, char** argv) {
         }
         currentStore.saveMetadata(currentMetadata);
         // Reopening the world restores its mode and saved position.
-        GameSession reopened(root / "saves");
+        ScenarioSession reopened(root / "saves");
         const auto worlds = reopened.listWorlds();
         require(worlds.size() == 1, "reopened catalog lists the world");
         const GameMode mode =
@@ -686,7 +484,7 @@ int main(int argc, char** argv) {
         require(reopened.playerState().experience().level()==31&&reopened.playerState().experience().points()==30,"session save/reopen restores host experience");
         require(reopened.metadata().dayNightDurationSeconds == 180,
                 "world duration survives save and reopen");
-        require(!GameSessionTestAccess::newWorldLoading(reopened),
+        require(!SessionScenario::newWorldLoading(reopened),
                 "existing world loads without the new-world flag");
         const glm::dvec3 position = reopened.playerState().getPosition();
         require(position.x == 100000.0 && position.z == 100000.0 &&
@@ -697,7 +495,7 @@ int main(int argc, char** argv) {
                 reopened.metadata().heaven.worldTicks == 6789,
                 "v16 restores new items and independent Heaven state");
         drainGeneration(reopened);
-        GameSessionTestAccess::markTerrainReady(reopened);
+        SessionScenario::markTerrainReady(reopened);
         bool saveError = false;
         reopened.saveNow([&] { saveError = true; });
         require(!saveError && currentStore.loadMetadata().generationVersion == WorldGenContext::GENERATION_VERSION &&
@@ -711,7 +509,7 @@ int main(int argc, char** argv) {
     }
 
     {
-        GameSession flat(root / "flat-saves");
+        ScenarioSession flat(root / "flat-saves");
         const std::string id = flat.createWorld(
             "Flat Test", 123, GameMode::Creative, Difficulty::Normal,
             false, WorldType::Superflat);
@@ -726,7 +524,7 @@ int main(int argc, char** argv) {
     }
 
     {
-        GameSession dimensions(root / "dimension-saves");
+        ScenarioSession dimensions(root / "dimension-saves");
         const std::string id = dimensions.createWorld(
             "Dimension Test", 999, GameMode::Creative, Difficulty::Normal,
             true);
@@ -734,16 +532,16 @@ int main(int argc, char** argv) {
         require(dimensions.metadata().dayNightDurationSeconds == 1200,
                 "independent world retains default duration");
         runCommand(dimensions, localization, "/gamerule DayNightDuration 73");
-        GameSessionTestAccess::markTerrainReady(dimensions);
-        GameSessionTestAccess::setNight(dimensions);
-        World* retainedOverworld = &GameSessionTestAccess::world(dimensions);
+        SessionScenario::markTerrainReady(dimensions);
+        SessionScenario::setNight(dimensions);
+        World* retainedOverworld = &SessionScenario::world(dimensions);
         retainedOverworld->setBlock(0, 200, 0, BlockId::DIAMOND_ORE);
-        GameSessionTestAccess::entities(dimensions).spawnItem({.5, 202, .5}, {ItemId::DIAMOND, 1, 0});
+        SessionScenario::entities(dimensions).spawnItem({.5, 202, .5}, {ItemId::DIAMOND, 1, 0});
         const uint64_t retainedItem = dimensions.entityState().entities().back().id;
         require(dimensions.switchDimension(DimensionId::Heaven, clock.now()),
                 "session switches into heaven");
         require(dimensions.activeDimension() == DimensionId::Heaven &&
-                    dimensions.worldState().isHeaven() && GameSessionTestAccess::hasDimensionStore(dimensions),
+                    dimensions.worldState().isHeaven() && SessionScenario::hasDimensionStore(dimensions),
                 "heaven switch installs its generator and data store");
         require(&dimensions.worldState() != retainedOverworld &&
                     retainedOverworld->getBlock(0, 200, 0) == BlockId::DIAMOND_ORE,
@@ -765,14 +563,16 @@ int main(int argc, char** argv) {
                     locateResult.messages[0] ==
                         "message.locate_structure_not_found",
                 "Heaven locate rejects an overworld-only structure");
-        GameSessionTestAccess::markTerrainReady(dimensions);
-        GameSessionTestAccess::setDay(dimensions);
-        auto& heavenWorld=GameSessionTestAccess::world(dimensions);
+        SessionScenario::markTerrainReady(dimensions);
+        SessionScenario::setDay(dimensions);
+        auto& heavenWorld=SessionScenario::world(dimensions);
         heavenWorld.update({8.5,128.01,-3.5});heavenWorld.enqueueGeneration();heavenWorld.waitForInitialGeneration(1500);heavenWorld.processCompletedGenerations(false);
         heavenWorld.setBlock(8,127,-4,BlockId::STONE);
         heavenWorld.setBlock(8,128,-4,BlockId::AIR);heavenWorld.setBlock(8,129,-4,BlockId::AIR);
-        GameSessionTestAccess::setHeavenSafePosition(dimensions, {8, 128, -4});
-        GameSessionTestAccess::setPlayerPosition(dimensions,
+        const auto groundedHeaven=SessionScenario::setHeavenSafePosition(dimensions, {8, 128, -4});
+        require(groundedHeaven.x==8.5&&groundedHeaven.z==-3.5&&pluginSafeLanding(heavenWorld,groundedHeaven),
+                "Heaven fixture records an actual supported position");
+        SessionScenario::setPlayerPosition(dimensions,
             {24.5, static_cast<double>(Config::WORLD_MIN_Y - 3), 24.5});
         require(dimensions.handleVoidFall(clock.now(), {}),
                 "heaven void fall switches back to overworld");
@@ -783,12 +583,12 @@ int main(int argc, char** argv) {
                     dimensions.entityState().entityById(retainedItem) != nullptr,
                 "return travel retains original world and live entity IDs");
         require(dimensions.metadata().heaven.playerPosition ==
-                    glm::dvec3(8.5, 128.01, -3.5),
+                    groundedHeaven,
                 "void return preserves the last grounded heaven position");
         require(dimensions.switchDimension(DimensionId::Heaven, clock.now()),
                 "session can return to heaven after a void fall");
         require(dimensions.playerState().getPosition() ==
-                    glm::dvec3(8.5, 128.01, -3.5),
+                    groundedHeaven,
                 "heaven re-entry does not restore the void position");
         dimensions.leaveWorld();
         drainGeneration(dimensions);
@@ -821,4 +621,6 @@ int main(int argc, char** argv) {
 
     std::filesystem::remove_all(root);
     std::cout << "Game session flow tests passed\n";
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

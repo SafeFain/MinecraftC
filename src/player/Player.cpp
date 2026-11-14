@@ -5,6 +5,7 @@
 #include "player/Player.h"
 #include "world/NetherPortal.h"
 #include "world/World.h"
+#include "world/RedstoneBlocks.h"
 #include "world/Block.h"
 #include "player/PlayerPhysics.h"
 #include "Config.h"
@@ -115,13 +116,10 @@ DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
         outcome.blocked = true;
         auto& shield = m_inventory.offhand();
         const uint16_t wear = CombatRules::shieldDurabilityDamage(source.amount);
-        if (wear > 0 && shield.damage + wear >= getItemProps(shield.id).maxDurability) {
-            shield.clear();
+        if (EquipmentRules::damage(shield, wear, m_equipmentRandom)) {
             m_blocking = false;
             m_shieldUseTicks = 0.0f;
             outcome.shieldBroken = true;
-        } else {
-            shield.damage = static_cast<uint16_t>(shield.damage + wear);
         }
         if (m_defenseCallback) m_defenseCallback(outcome);
         return outcome;
@@ -139,6 +137,13 @@ DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
         }
         reduced = CombatRules::armorDamage(reduced, armor, toughness);
     }
+    if (source.cause != DamageCause::Void && source.cause != DamageCause::Starvation) {
+        const auto specific = source.cause == DamageCause::Fire ? EnchantmentId::FireProtection :
+            source.cause == DamageCause::Explosion ? EnchantmentId::BlastProtection :
+            source.cause == DamageCause::Projectile ? EnchantmentId::ProjectileProtection :
+            source.cause == DamageCause::Fall ? EnchantmentId::FeatherFalling : EnchantmentId::Protection;
+        reduced *= 1.f - .04f * EquipmentRules::protection(m_inventory, specific, true, specific == EnchantmentId::FeatherFalling ? 3 : 2);
+    }
     const float accepted = PlayerPhysics::damageAfterImmunity(
         m_hurtImmunity, reduced, Config::PLAYER_HURT_IMMUNITY_SECONDS);
     if (accepted <= 0.0f) return outcome;
@@ -149,16 +154,25 @@ DamageOutcome Player::takeDamageImpl(const DamageSourceInfo& source) {
             if (armor.empty()) continue;
             const uint16_t maximum = getItemProps(armor.id).maxDurability;
             if (maximum == 0) continue;
-            if (armor.damage + wear >= maximum) armor.clear();
-            else armor.damage = static_cast<uint16_t>(armor.damage + wear);
+            EquipmentRules::damage(armor, wear, m_equipmentRandom);
         }
     }
     outcome.appliedDamage = accepted;
+    if (source.retaliate && source.cause != DamageCause::Thorns) {
+        for (auto& armor : m_inventory.armor()) {
+            const auto level = armor.enchantment(EnchantmentId::Thorns);
+            if (level && EquipmentRules::random(m_equipmentRandom) % 100 < 15u * level) {
+                source.retaliate(1.f + EquipmentRules::random(m_equipmentRandom) % 4);
+                EquipmentRules::damage(armor,2,m_equipmentRandom);
+            }
+        }
+    }
     m_survivalStats.damage(accepted);
     if (source.causesExhaustion && m_authority) m_survivalStats.addExhaustion(0.1f);
     float resistance=0;
     for(const auto& stack:m_inventory.armor())if(!stack.empty()&&stack.id>=ItemId::NETHERITE_HELMET&&stack.id<=ItemId::NETHERITE_BOOTS)resistance+=.1f;
-    m_velocity += source.impulse*(1.f-resistance);
+    unsigned blastProtection = 0; if (source.cause == DamageCause::Explosion) for (const auto& armor : m_inventory.armor()) blastProtection += armor.enchantment(EnchantmentId::BlastProtection);
+    m_velocity += source.impulse*(1.f-resistance)*std::max(0.f,1.f-.15f*blastProtection);
     if (m_damageCallback) m_damageCallback(accepted);
     return outcome;
 }
@@ -237,15 +251,19 @@ void Player::handleMovement(const InputState& input, float dt) {
 
     float speed = m_isSprinting ? Config::SPRINT_SPEED : Config::PLAYER_SPEED;
     const auto below=m_world->getBlock(static_cast<int>(std::floor(m_position.x)),static_cast<int>(std::floor(m_position.y-.1)),static_cast<int>(std::floor(m_position.z)));
-    if(below==BlockId::SOUL_SAND)speed*=.4f;
+    const auto soul = m_inventory.armor()[3].enchantment(EnchantmentId::SoulSpeed);
+    if ((below == BlockId::SOUL_SAND || below == BlockId::SOUL_SOIL) && soul) speed *= 1.405f + .105f * (soul - 1);
+    else if(below==BlockId::SOUL_SAND)speed*=.4f;
+    speed *= std::max(0.f,1.f-.15f*m_effects.level(StatusEffectType::Slowness));
     const bool inWater = touchingWater && !m_flying;
 
     const bool movingSlowly = m_pose == PlayerPhysics::Pose::Crouching ||
                               m_pose == PlayerPhysics::Pose::Crawling;
-    const glm::vec2 shaped = PlayerPhysics::javaMovementInput({
+    glm::vec2 shaped = PlayerPhysics::javaMovementInput({
         input.value(InputAction::MoveLeft) - input.value(InputAction::MoveRight),
         input.value(InputAction::MoveForward) - input.value(InputAction::MoveBackward)},
         movingSlowly);
+    if (movingSlowly) shaped *= (Config::SNEAK_INPUT_FACTOR + .15f * m_inventory.armor()[2].enchantment(EnchantmentId::SwiftSneak)) / Config::SNEAK_INPUT_FACTOR;
     glm::vec3 moveDir(0.0f);
     glm::vec3 planarForward(m_forward.x, 0.0f, m_forward.z);
     if (glm::length(planarForward) > 0.0f)
@@ -284,8 +302,10 @@ void Player::handleMovement(const InputState& input, float dt) {
         if (inWater) {
             if (hLen > 1.0f) horizontal /= hLen;
             const float ticks = std::max(0.0f, dt * 20.0f);
-            m_velocity.x += horizontal.x * Config::WATER_ACCELERATION_PER_TICK * ticks;
-            m_velocity.z += horizontal.z * Config::WATER_ACCELERATION_PER_TICK * ticks;
+            const float depth = std::min(3.f, float(m_inventory.armor()[3].enchantment(EnchantmentId::DepthStrider))) * (m_onGround ? 1.f : .5f) / 3.f;
+            const float waterAcceleration = Config::WATER_ACCELERATION_PER_TICK + (.1f - Config::WATER_ACCELERATION_PER_TICK) * depth;
+            m_velocity.x += horizontal.x * waterAcceleration * ticks;
+            m_velocity.z += horizontal.z * waterAcceleration * ticks;
             if (m_swimming) {
                 const float convergence = m_forward.y < -0.2f ? 0.085f : 0.06f;
                 const float blend = 1.0f - std::pow(1.0f - convergence, ticks);
@@ -296,7 +316,7 @@ void Player::handleMovement(const InputState& input, float dt) {
             if (m_sneakInput)
                 m_velocity.y -= Config::WATER_CONTROL_ACCELERATION_PER_TICK * ticks;
             const float drag = std::pow(m_isSprinting
-                ? Config::WATER_SPRINT_DRAG : Config::WATER_DRAG, ticks);
+                ? Config::WATER_SPRINT_DRAG : Config::WATER_DRAG + (.54600006f - Config::WATER_DRAG) * depth, ticks);
             m_velocity.x *= drag;
             m_velocity.z *= drag;
             m_velocity.y *= std::pow(Config::WATER_VERTICAL_DRAG, ticks);
@@ -415,7 +435,7 @@ void Player::handleMouseButton(int button, ButtonAction action) {
             result = m_entities->attackRay(
                 getEyePosition(), m_forward,
                 {m_gameMode == GameMode::Survival ? 3.0f : Config::REACH_DISTANCE,
-                 damage, critical, sweeping, strong && m_isSprinting}, m_roomPlayerId,m_persistentIdentity);
+                 damage, critical, sweeping, strong && m_isSprinting, stack, strength}, m_roomPlayerId,m_persistentIdentity);
         }
         if (result.foundTarget) {
             m_attackTicks = 0.0f;
@@ -431,10 +451,7 @@ void Player::handleMouseButton(int button, ButtonAction action) {
                     auto& mutableStack = m_inventory.slot(
                         static_cast<size_t>(m_selectedSlot));
                     const uint16_t wear = properties.tool == ToolKind::Sword ? 1 : 2;
-                    if (mutableStack.damage + wear >= properties.maxDurability)
-                        mutableStack.clear();
-                    else mutableStack.damage = static_cast<uint16_t>(
-                        mutableStack.damage + wear);
+                    EquipmentRules::damage(mutableStack, wear, m_equipmentRandom);
                 }
             }
             if (m_combatCallback) {
@@ -493,6 +510,7 @@ void Player::updateSleeping(float dt) {
 }
 
 void Player::update(float dt) {
+    if(m_authority && m_gameMode!=GameMode::Spectator)m_world->touchRedstoneOre({int(std::floor(m_position.x)),int(std::floor(m_position.y-.01)),int(std::floor(m_position.z))});
     for(auto it=m_pluginCooldowns.begin();it!=m_pluginCooldowns.end();){it->second=std::max(0.0f,it->second-dt);if(it->second==0)it=m_pluginCooldowns.erase(it);else ++it;}
     if (m_sleeping) {
         updateSleeping(dt);
@@ -563,7 +581,7 @@ std::optional<ProjectileLaunch> Player::bowLaunchPreview() const {
         getEyePosition() + glm::dvec3(m_forward) * 0.45,
         projectileLaunchVelocity(
             m_forward, bowLaunchSpeed(strength), inherited),
-        bowLaunchDamage(strength)};
+        bowLaunchDamage(strength) * (activeItem().enchantment(EnchantmentId::Power) ? 1.25f + .25f * activeItem().enchantment(EnchantmentId::Power) : 1.f)};
 }
 
 void Player::beginBowCharge() {
@@ -579,14 +597,15 @@ void Player::releaseBow() {
     const auto launch = bowLaunchPreview();
     cancelBowCharge();
     if (!launch) return;
-    if (m_gameMode == GameMode::Survival &&
+    const bool infinite = activeItem().enchantment(EnchantmentId::Infinity) != 0;
+    if (m_gameMode == GameMode::Survival && !infinite &&
         !m_inventory.remove(ItemId::ARROW, 1)) return;
 
     m_entities->spawnArrow(
-        launch->origin, launch->velocity, launch->damage, true, m_roomPlayerId);
+        launch->origin, launch->velocity, launch->damage, true, m_roomPlayerId, activeItem(), m_gameMode == GameMode::Survival && !infinite, m_persistentIdentity.empty() ? "local" : m_persistentIdentity);
     if (m_gameMode == GameMode::Survival) {
         auto& bow = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
-        if (++bow.damage >= getItemProps(bow.id).maxDurability) bow.clear();
+        EquipmentRules::damage(bow, 1, m_equipmentRandom);
     }
     startSwing();
     m_actionCooldown = 0.15f;
@@ -745,16 +764,8 @@ bool Player::checkCollision(double px, double py, double pz, float height) const
     for (int bx = minX; bx <= maxX; ++bx) {
         for (int by = minY; by <= maxY; ++by) {
             for (int bz = minZ; bz <= maxZ; ++bz) {
-                BlockId id = m_world->getBlock(bx, by, bz);
-                if (id == BlockId::AIR) continue;
-
-                const BlockProperties& props = getBlockProps(id);
-                if (!props.solid) continue;
-
-                // AABB vs AABB
-                const BlockCollisionBoxes boxes = blockCollisionBoxes(id);
-                for (uint8_t i = 0; i < boxes.count; ++i) {
-                    const BlockCollisionBox& box = boxes.boxes[i];
+                // Includes moving piston shapes at authoritative tick progress.
+                for(const auto& box:m_world->collisionBoxesAt({bx,by,bz})) {
                     if (px - halfW < bx + box.max.x &&
                         px + halfW > bx + box.min.x &&
                         py < by + box.max.y &&
@@ -917,6 +928,23 @@ void Player::updateEnvironment(uint32_t ticks) {
         static_cast<int>(std::floor(m_position.x)),
         static_cast<int>(std::floor(m_position.y)),
         static_cast<int>(std::floor(m_position.z)));
+    const auto frost = m_inventory.armor()[3].enchantment(EnchantmentId::FrostWalker);
+    if (frost && m_onGround) {
+        const int radius = 2 + frost;
+        const int y = int(std::floor(m_position.y - .01));
+        for (int z = feet.z-radius; z <= feet.z+radius; ++z) for (int x = feet.x-radius; x <= feet.x+radius; ++x) {
+            const double dx = x+.5-m_position.x, dz = z+.5-m_position.z;
+            if (dx*dx+dz*dz > radius*radius) continue;
+            if (m_world->getLoadedBlock(x,y,z) == BlockId::WATER && m_world->getLoadedBlock(x,y+1,z) == BlockId::AIR && !collidesWithPlayer({x,y,z},BlockId::FROSTED_ICE)) {
+                m_world->setBlock(x,y,z,BlockId::FROSTED_ICE);
+                m_world->scheduleResource({x,y,z},BlockId::WATER,60+EquipmentRules::random(m_equipmentRandom)%61);
+            }
+        }
+    }
+    const auto soul = m_inventory.armor()[3].enchantment(EnchantmentId::SoulSpeed);
+    const auto standing = m_world->getLoadedBlock(feet.x,feet.y-1,feet.z);
+    if (soul && m_onGround && standing && (*standing == BlockId::SOUL_SAND || *standing == BlockId::SOUL_SOIL) && glm::length(m_visualHorizontalVelocity) > .01f && EquipmentRules::random(m_equipmentRandom)%100 < 4)
+        EquipmentRules::damage(m_inventory.armor()[3],1,m_equipmentRandom);
     const BlockId eyeBlock = m_world->getBlock(eye.x, eye.y, eye.z);
     const BlockId feetBlock = m_world->getBlock(feet.x, feet.y, feet.z);
     float contact=0;
@@ -941,7 +969,9 @@ void Player::updateEnvironment(uint32_t ticks) {
         }
     }
     if (isWater(eyeBlock)) {
-        m_airTicks -= static_cast<int>(ticks);
+        const auto respiration = m_inventory.armor()[0].enchantment(EnchantmentId::Respiration);
+        for (int i = 0; i < static_cast<int>(ticks); ++i)
+            if (!respiration || EquipmentRules::random(m_equipmentRandom) % (respiration + 1) == 0) --m_airTicks;
         if (m_airTicks <= 0) {
             m_environmentDamageTicks += ticks;
             if (m_environmentDamageTicks >= 20) {
@@ -997,8 +1027,9 @@ void Player::updateHighlight() {
 }
 
 bool Player::breakBlock() {
+    if(m_world->redstoneTickPending())return false;
     const auto hit=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
-    if(!hit)return false;
+    if(!hit || m_world->pistonReserved(hit->blockPos))return false;
     auto e=pluginEvent(MC_BREAK_PRE);e.x=hit->blockPos.x;e.y=hit->blockPos.y;e.z=hit->blockPos.z;
     e.block=static_cast<uint16_t>(m_world->getBlock(e.x,e.y,e.z));e.item=static_cast<uint16_t>(activeItem().id);
     if(!Plugins::dispatch(e))return false;
@@ -1048,8 +1079,7 @@ bool Player::breakBlockImpl() {
             }
             if (!tool.empty() && getItemProps(tool.id).maxDurability > 0) {
                 auto& mutableTool = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
-                if (++mutableTool.damage >= getItemProps(mutableTool.id).maxDurability)
-                    mutableTool.clear();
+                EquipmentRules::damage(mutableTool, 1, m_equipmentRandom);
             }
             if (m_authority) m_survivalStats.addExhaustion(0.005f);
         }
@@ -1062,6 +1092,7 @@ bool Player::breakBlockImpl() {
 }
 
 void Player::updateMining(float dt) {
+    if(m_world->redstoneTickPending())return;
     if (!m_mining || m_gameMode != GameMode::Survival) return;
     m_miningSwingSeconds += dt;
     if (m_miningSwingSeconds >= 0.30f) {
@@ -1075,6 +1106,8 @@ void Player::updateMining(float dt) {
         m_miningRequired = 0.0f;
         return;
     }
+    if(m_world->pistonReserved(hit->blockPos)){m_miningProgress=0;return;}
+    if(m_authority)m_world->touchRedstoneOre(hit->blockPos);
     if (!m_miningTarget || *m_miningTarget != hit->blockPos) {
         m_miningTarget = hit->blockPos;
         m_miningProgress = 0.0f;
@@ -1084,7 +1117,7 @@ void Player::updateMining(float dt) {
         hit->blockPos.x, hit->blockPos.y, hit->blockPos.z);
     const float required = miningSeconds(
         block, m_inventory.slot(static_cast<size_t>(m_selectedSlot)),
-        isInWater(), !m_onGround);
+        isInWater() && !m_inventory.armor()[0].enchantment(EnchantmentId::AquaAffinity), !m_onGround);
     m_miningRequired = required;
     if (required < 0.0f) {
         m_miningProgress = 0.0f;
@@ -1102,7 +1135,7 @@ void Player::updateMining(float dt) {
 bool Player::tryUseInteractiveBlock() {
     if(!m_mouseLocked || m_gameMode==GameMode::Spectator || m_sneakInput || m_actionCooldown>0) return false;
     const auto hit=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
-    if(!hit || !(m_world->interactDoor(hit->blockPos) || m_world->activateButton(hit->blockPos)))return false;
+    if(!hit || !(m_world->interactRedstone(hit->blockPos) || m_world->interactDoor(hit->blockPos) || m_world->activateButton(hit->blockPos)))return false;
     startSwing();m_actionCooldown=.15f;return true;
 }
 
@@ -1110,7 +1143,7 @@ bool Player::placeBlock() {
     if(m_entities && m_entities->useNativeMob(*this,m_roomPlayerId))return true;
     if(!m_sneakInput) {
         const auto target=m_world->raycast(getEyePosition(),m_forward,Config::REACH_DISTANCE);
-        if(target && (m_world->interactDoor(target->blockPos) || m_world->activateButton(target->blockPos))) return true;
+        if(target && (m_world->interactRedstone(target->blockPos) || m_world->interactDoor(target->blockPos) || m_world->activateButton(target->blockPos))) return true;
     }
     const auto block=getItemProps(activeItem().id).placedBlock;
     if(!block)return placeBlockImpl();
@@ -1226,7 +1259,7 @@ bool Player::placeBlockImpl() {
         }
         if (used && m_gameMode == GameMode::Survival) {
             auto& stack = m_inventory.slot(static_cast<size_t>(m_selectedSlot));
-            if (++stack.damage >= getItemProps(stack.id).maxDurability) stack.clear();
+            EquipmentRules::damage(stack, 1, m_equipmentRandom);
         }
         return used;
     }
@@ -1238,9 +1271,7 @@ bool Player::placeBlockImpl() {
     if(canTillBlock(selectedStack.id,targetedBlock,hit->faceNormal.y)){
         m_world->setBlock(hit->blockPos.x,hit->blockPos.y,hit->blockPos.z,
                          BlockId::FARMLAND);
-        if(m_gameMode==GameMode::Survival&&
-           ++selectedStack.damage>=activeProperties.maxDurability)
-            selectedStack.clear();
+        if(m_gameMode==GameMode::Survival) EquipmentRules::damage(selectedStack,1,m_equipmentRandom);
         return true;
     }
     if (m_gameMode == GameMode::Creative && placed == BlockId::AIR) return false;
@@ -1273,6 +1304,16 @@ bool Player::placeBlockImpl() {
          !supportsNaturalDecoration(placed, m_world->getBlock(
              placePos.x, placePos.y - 1, placePos.z)))) return false;
 
+    if (isAnvil(placed)) {
+        const unsigned direction = static_cast<unsigned>(bedDirectionFromHorizontal({m_forward.x, m_forward.z}));
+        placed = static_cast<BlockId>(static_cast<uint16_t>((direction & 1) ? BlockId::ANVIL_EAST : BlockId::ANVIL) + anvilDamage(placed));
+    }
+    if (isGrindstone(placed)) {
+        const unsigned direction = static_cast<unsigned>(bedDirectionFromHorizontal({m_forward.x, m_forward.z}));
+        const unsigned mount = hit->faceNormal.y > 0 ? 0 : hit->faceNormal.y < 0 ? 2 : 1;
+        const unsigned facing = mount == 1 ? static_cast<unsigned>(bedDirectionFromHorizontal({float(hit->faceNormal.x), float(hit->faceNormal.z)})) : direction;
+        placed = grindstoneBlock(mount * 4 + facing);
+    }
     DoorState door; ButtonState buttonState;
     if(decodeDoor(placed,door)) {
         if(hit->faceNormal.y<=0) return false;
@@ -1298,6 +1339,17 @@ bool Player::placeBlockImpl() {
            collidesWithPlayer(placePos+glm::ivec3(0,1,0),doorBlock(door)) ||
            !m_world->placeDoor(placePos,door)) return false;
         if(m_gameMode==GameMode::Survival && --selectedStack.count==0) selectedStack.clear();
+        return true;
+    }
+    if(auto state=Redstone::blockState(placed)) {
+        const auto flat=std::abs(m_forward.x)>std::abs(m_forward.z)?(m_forward.x>0?Redstone::Face::East:Redstone::Face::West):(m_forward.z>0?Redstone::Face::South:Redstone::Face::North);
+        if(state->kind==Redstone::Kind::Lever || state->kind==Redstone::Kind::Torch) {
+            for(uint8_t face=0;face<6;++face)if(Redstone::vector(Redstone::offset(static_cast<Redstone::Face>(face)))==hit->faceNormal)state->facing=static_cast<Redstone::Face>(face);
+            if(state->kind==Redstone::Kind::Torch && state->facing==Redstone::Face::Down)return false;
+        } else if(state->kind==Redstone::Kind::Repeater || state->kind==Redstone::Kind::Comparator)state->facing=flat;
+        else if(state->kind==Redstone::Kind::Piston || state->kind==Redstone::Kind::Observer)state->facing=std::abs(m_forward.y)>.7f?(m_forward.y>0?Redstone::Face::Up:Redstone::Face::Down):Redstone::opposite(flat);
+        if(!m_world->placeRedstone(placePos,Redstone::block(*state)))return false;
+        if(m_gameMode==GameMode::Survival && --selectedStack.count==0)selectedStack.clear();
         return true;
     }
     if(decodeButton(placed,buttonState)) {
@@ -1461,4 +1513,11 @@ void Player::tickStatusEffects(float dt) {
         m_effects.tick([&](float amount){m_survivalStats.heal(amount);},[&](float amount){takeDamage(amount,true);});
         m_effectRemainder-=1;
     }
+}
+
+void Player::pushPiston(const Redstone::PistonSweep& sweep) {
+    if(isSpectator())return;
+    const auto delta=Redstone::sweptPush(sweep,m_position,{Config::PLAYER_WIDTH,currentHeight(),Config::PLAYER_WIDTH});
+    const auto destination=m_position+delta;
+    if(glm::dot(delta,delta)>0 && !checkCollision(destination.x,destination.y,destination.z,currentHeight()))setPosition(destination);
 }

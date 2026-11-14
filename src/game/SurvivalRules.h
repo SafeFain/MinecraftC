@@ -25,6 +25,7 @@ struct CraftingRecipe {
     bool allowMirror = true;
     bool allowPlankVariants = true;
     uint32_t sortOrder=UINT32_MAX;
+    bool shapeless = false;
 };
 
 struct SmeltingRecipe {

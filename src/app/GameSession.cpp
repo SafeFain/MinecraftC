@@ -1,6 +1,7 @@
 #include "plugins/ContentQueries.h"
 #include "plugins/Runtime.h"
 #include "app/GameSession.h"
+#include "game/EnchantingRules.h"
 #include "game/DimensionRules.h"
 #include "game/EntityTransferJournal.h"
 
@@ -22,15 +23,35 @@
 #include <stdexcept>
 #include <chrono>
 
-GameSession::GameSession(const std::filesystem::path& savesDirectory)
-    : simulations([]{std::vector<std::unique_ptr<DimensionSimulation>> v(2);v[0]=std::make_unique<DimensionSimulation>();return v;}()),
-      player(world()), dataDirectory(savesDirectory.parent_path()), worldCatalog(savesDirectory) {
+GameSession::GameSession(const std::filesystem::path& savesDirectory,GameSessionServices dependencies)
+    : services(std::move(dependencies)),
+      ownedThreadPool(services.workers?nullptr:std::make_unique<ThreadPool>()),
+      threadPool(services.workers?*services.workers:*ownedThreadPool),
+      simulations([this]{std::vector<std::unique_ptr<DimensionSimulation>> v(2);
+          v[0]=services.dimension?services.dimension(DimensionId::Overworld):std::make_unique<DimensionSimulation>();
+          if(!v[0])throw std::runtime_error("Dimension factory returned no simulation");
+          return v;}()),
+      player(world()),
+      ownedLanHost(services.host?nullptr:std::make_unique<Lan::Host>()),
+      lanHost(services.host?*services.host:*ownedLanHost),
+      ownedLanClient(services.client?nullptr:std::make_unique<Lan::Client>()),
+      lanClient(services.client?*services.client:*ownedLanClient),
+      dataDirectory(savesDirectory.parent_path()),
+      fishing(services.fishingRandom),worldCatalog(savesDirectory) {
     world().setThreadPool(&threadPool);
     simulations[0]->presenter = std::make_unique<EntityPresenter>();
     simulations[0]->entities.setPresentation(simulations[0]->presenter.get());
     player.setEntityManager(&entities());
     bindLanFeedback(player, 0);
 }
+
+GameSession::~GameSession() {
+    lanHost.admit={};lanHost.close();lanClient.close();
+    // External services obey the same lifetime barrier as owned workers.
+    threadPool.waitIdle();
+}
+
+void GameSession::prepareDimension(DimensionId target) { (void)ensureDimension(target); }
 
 GameSession::LoadingSnapshot GameSession::loadingSnapshot() const {
     if (pendingRespawn && simulations.size() > 2 && simulations[2]) {
@@ -222,12 +243,16 @@ void GameSession::collectFishingEvents() {
         if (event.wear && player.isSurvival() && fishingSlot >= 0) {
             auto& rod = player.inventory().slot(static_cast<size_t>(fishingSlot));
             if (rod.id == ItemId::FISHING_ROD) {
-                rod.damage = static_cast<uint16_t>(rod.damage + event.wear);
-                if (rod.damage >= getItemProps(rod.id).maxDurability) rod.clear();
+                EquipmentRules::damage(rod,event.wear,player.m_equipmentRandom);
             }
         }
         fishingFeedback.push_back(event);
     }
+}
+void GameSession::updateFishing(float dt) {
+    validateFishingRod();
+    fishing.update(dt,player.getEyePosition(),fishingEnvironment());
+    collectFishingEvents();
 }
 void GameSession::handleMouseButton(int button, ButtonAction action, bool pluginUseApproved) {
     if (lanJoining) {
@@ -249,6 +274,7 @@ void GameSession::handleMouseButton(int button, ButtonAction action, bool plugin
             fishing.update(0,player.getEyePosition(),fishingEnvironment());
             fishingSlot = player.selectedSlot();
             fishingRodDamage = player.activeItem().damage;
+            fishing.setEnchantments(player.activeItem().enchantment(EnchantmentId::LuckOfTheSea), player.activeItem().enchantment(EnchantmentId::Lure));
             fishing.use(player.getEyePosition(),player.getForward(),player.velocity(),fishingEnvironment());
             player.animateItemUse();
             collectFishingEvents();
@@ -266,6 +292,7 @@ std::optional<uint64_t> GameSession::useVillagerRay(float reach) {
 }
 BlockEntity* GameSession::blockEntityAt(const glm::ivec3& position) {
     if (lanJoining) return replicaWindow.container && replicaWindow.position == position ? &*replicaWindow.container : nullptr;
+    if (hostWindow.workstation && hostWindowView.kind == InventoryWindowKind::Container && hostWindowView.position == position) return &*hostWindow.workstation;
     return world().getBlockEntity(position);
 }
 const Entity* GameSession::tradeEntity(uint64_t entityId) const {
@@ -288,11 +315,11 @@ void GameSession::executeTrade(uint64_t entityId, uint8_t offerIndex,
         queueReplicaAction(std::move(action));
     } else (void)entities().tradeWith(entityId, offerIndex, inventory);
 }
-void GameSession::giveCreativeItem(ItemId item, int hotbarSlot) {
+void GameSession::giveCreativeItem(ItemId item, int hotbarSlot, EnchantmentId enchantment) {
     if (usesInventoryCommands()) {
         if (hotbarSlot < 0 || hotbarSlot >= 9) return;
         InventoryAction action; action.operation = InventoryOperation::CreativeGrant; action.slot.index = static_cast<uint8_t>(hotbarSlot);
-        action.argument = static_cast<uint16_t>(item); submitInventoryAction(action); return;
+        action.argument = static_cast<uint16_t>(item); if (item == ItemId::ENCHANTED_BOOK && validEnchantment(enchantment)) action.text = std::string(ENCHANTMENTS[static_cast<size_t>(enchantment)].key); submitInventoryAction(action); return;
     }
     if (hotbarSlot < 0 ||
         hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE)) return;
@@ -382,7 +409,8 @@ DimensionSimulation& GameSession::ensureDimension(DimensionId target) {
     const auto index=static_cast<size_t>(target);if(simulations.size()<=index)simulations.resize(index+1);
     auto& runtime = simulations.at(index);
     if (!runtime) {
-        runtime = std::make_unique<DimensionSimulation>();
+        runtime = services.dimension?services.dimension(target):std::make_unique<DimensionSimulation>();
+        if(!runtime)throw std::runtime_error("Dimension factory returned no simulation");
         runtime->world.setThreadPool(&threadPool);
         runtime->world.configureLod(lodSettings);
         runtime->presenter = std::make_unique<EntityPresenter>();
@@ -433,8 +461,20 @@ void GameSession::flushDimensions(bool synchronous) {
         runtime->entities.beginChunkEntityAutosave();
         runtime->world.beginModifiedChunkAutosave();
         if (synchronous) {
+            const bool finishingTick=runtime->world.redstoneTickPending();
+            while(runtime->world.redstoneTickPending())runtime->world.tickInteractiveBlocks([&](const glm::ivec3& p){return runtime->entities.arrowTouchesButton(p);},{});
+            if(finishingTick)runtime->tickRemainder=std::max(0.f,runtime->tickRemainder-1.f);
+            runtime->world.flushDeferredBlockEdits();
+            for(const auto& sweep:runtime->world.takePistonSweeps()) {
+                runtime->entities.pushPiston(sweep);
+                if(&runtime->world==&world())player.pushPiston(sweep);
+                for(auto& guest:guests)if(simulations[static_cast<size_t>(guest.second->profile.dimension)].get()==runtime.get())guest.second->player.pushPiston(sweep);
+            }
+            for(const auto& drop:runtime->world.takeSupportDrops())runtime->entities.spawnItem(glm::dvec3(drop.first)+glm::dvec3(.5),drop.second);
+            for(const auto& p:runtime->world.takeTntIgnitions())runtime->entities.primeTnt(p,4,false);
             runtime->entities.flushChunkEntities(std::numeric_limits<size_t>::max(), true);
-            runtime->world.flushModifiedChunks();
+            runtime->world.beginModifiedChunkAutosave();
+            while(!runtime->world.flushModifiedChunks()){}
         }
     }
 }
@@ -476,6 +516,7 @@ void GameSession::leaveWorld() {
         // and block edits before detaching its store.
         if (saveStore) {
             flushDimensions(true);
+            saveActiveDimensionState();updateSaveMetadata();
             saveStore->saveMetadata(worldMetadata);
         }
     }
@@ -510,11 +551,14 @@ GameMode GameSession::startWorld(
     const GameMode mode = worldMetadata.gameMode;
     player.configureRules(mode, worldMetadata.difficulty);
     player.inventory() = worldMetadata.inventory;
+    std::array<ItemStack,9> craftingHeld{}; for (size_t i = 0; i < 9; ++i) craftingHeld[i] = worldMetadata.heldItems[i+1];
+    hostWindow.restoreHeld(worldMetadata.heldItems[0],craftingHeld);
+    for (size_t i = 0; i < 2; ++i) hostWindow.recoveredWorkstationInputs[i] = worldMetadata.heldItems[i+10];
     player.survivalStats().set(
         worldMetadata.health, worldMetadata.hunger,
         worldMetadata.saturation, worldMetadata.exhaustion,
         worldMetadata.foodTickTimer);
-    player.experience()=worldMetadata.experience;
+    player.experience()=worldMetadata.experience; player.enchantmentSeed=worldMetadata.enchantmentSeed;
     observedExperiencePickups=player.experiencePickups();observedExperienceLevelSounds=player.experienceLevelSounds();
     player.statusEffects().restore(worldMetadata.effects);
     LOG_INFO("Loading world with seed " << worldMetadata.seed);
@@ -544,7 +588,7 @@ GameMode GameSession::startWorld(
     return mode;
 }
 
-void GameSession::safeSpawn() {
+void GameSession::recoverPlayerSpawn() {
     const int px = static_cast<int>(std::floor(player.getPosition().x));
     const int pz = static_cast<int>(std::floor(player.getPosition().z));
     for (int wy = Config::WORLD_MAX_Y - 1; wy >= Config::WORLD_MIN_Y; --wy) {
@@ -590,7 +634,7 @@ bool GameSession::advanceLoading(
             generation.completed == generation.total && (hostingLan() || threadPool.idle())) {
             if (loadingNewWorld) {
                 world().persistGeneratedChunks();
-                safeSpawn();
+                recoverPlayerSpawn();
                 const auto position = player.getPosition();
                 worldMetadata.playerPosition = position;
                 worldMetadata.worldSpawn = glm::ivec3(
@@ -706,9 +750,7 @@ void GameSession::updatePlaying(
             weather().rainGradient() * (rainExposure ? 0.72f : 0.06f));
     if (!playerDead && (terrainGenerated || !hostingLan())) player.update(dt);
     if (!Plugins::content().runtimeFault.empty()) return;
-    validateFishingRod();
-    fishing.update(dt,player.getEyePosition(),fishingEnvironment());
-    collectFishingEvents();
+    updateFishing(dt);
     for (const auto& event : fishingFeedback) {
         Lan::GameEvent remote; remote.kind = Lan::EventKind::Fishing; remote.dimension = dimension; remote.position = event.position; remote.flags = static_cast<uint8_t>(event.kind);
         broadcastGameEvent(remote);
@@ -764,7 +806,7 @@ void GameSession::updatePlaying(
         if (!views.empty()) simulateDimension(static_cast<DimensionId>(index), views, dt,
             index == static_cast<size_t>(dimension) ? feedback : Feedback{}, fluidUpdatesRemaining, fluidDeadline);
     }
-    if(updateNetherPortals(dt,feedback))return;
+    if(updatePortals(dt,feedback))return;
     for (auto& entry : guests) {
         auto& guest = *entry.second;
         if (!guest.dead && guest.player.isSurvival() && guest.player.survivalStats().dead()) {
@@ -794,6 +836,7 @@ void GameSession::updatePlaying(
         for (const auto& sound : runtime.world.takeInteractionSounds()) {
             Lan::GameEvent event; event.kind = Lan::EventKind::Interaction; event.dimension = static_cast<DimensionId>(index); event.position = sound.position;
             event.flags = (sound.metal ? 1 : 0) | (sound.opening ? 2 : 0) | (sound.button ? 4 : 0);
+            if (sound.workstation != 255) { event.kind = Lan::EventKind::Workstation; event.flags = sound.workstation; }
             if (hostingLan()) broadcastGameEvent(event, false, true);
             else if (index == static_cast<size_t>(dimension) && lanEvents.size() < 256) lanEvents.push_back(event);
         }
@@ -829,10 +872,10 @@ void GameSession::updatePlaying(
     if (!Plugins::content().runtimeFault.empty()) return;
     autosaveSeconds += dt;
     if (autosaveSeconds >= 30.0f) {
-        beginAutosave(feedback.autosaveMetadataError);
+        requestAutosave(feedback.autosaveMetadataError);
         autosaveSeconds = 0.0f;
     }
-    processAutosave(feedback.autosaveFlushError);
+    advanceAutosave(feedback.autosaveFlushError);
 }
 
 GameSession::CommandResult GameSession::executeCommand(
@@ -888,6 +931,7 @@ GameSession::CommandResult GameSession::executeCommandImpl(
         message("/help");
         message("/gamemode 0|1|3");
         message("/give <item> [1..64]");
+        message("/enchant <targets> <enchantment> [level]");
         message("/experience|xp add|set <targets> <amount> [points|levels]");
         message("/experience|xp query <player> points|levels");
         message("/tp <x> <y> <z>");
@@ -904,6 +948,23 @@ GameSession::CommandResult GameSession::executeCommandImpl(
     }
     if (!worldMetadata.cheatsEnabled) {
         message(localization.text("message.cheats_disabled"));
+        return result;
+    }
+    if (command.type == CommandType::Enchant) {
+        std::vector<Player*> targets;
+        const auto& target = command.experienceTarget;
+        const auto hostName = hostIdentity.nickname.empty() ? "Player" : hostIdentity.nickname;
+        if (target == "@s" || target == "@a" || target == hostName) targets.push_back(&player);
+        if (target != "@s") for (auto& entry : guests) if (target == "@a" || target == entry.second->profile.identity.nickname) targets.push_back(&entry.second->player);
+        unsigned applied = 0;
+        for (auto* actor : targets) {
+            auto& stack = actor->inventory().slot(static_cast<size_t>(actor->selectedSlot()));
+            if (stack.empty() || stack.id == ItemId::BOOK || stack.id == ItemId::ENCHANTED_BOOK || !EnchantingRules::supports(stack.id,command.enchantment)) continue;
+            bool compatible = true;
+            for (size_t i = 0; i < ENCHANTMENTS.size(); ++i) if (i != static_cast<size_t>(command.enchantment) && stack.enchantment(static_cast<EnchantmentId>(i)) && !compatibleEnchantments(command.enchantment,static_cast<EnchantmentId>(i))) compatible = false;
+            if (compatible && stack.components.enchantments.set(command.enchantment,command.itemCount)) ++applied;
+        }
+        message(localization.text(applied ? "message.enchant_success" : "message.enchant_failed"));
         return result;
     }
     if(command.type==CommandType::Experience) {
@@ -1475,13 +1536,16 @@ void GameSession::ensureDimensionSafePosition() {
 void GameSession::updateSaveMetadata() {
     saveActiveDimensionState();
     worldMetadata.inventory = player.inventory();
+    worldMetadata.heldItems[0] = hostWindow.cursor();
+    for (size_t i = 0; i < 9; ++i) worldMetadata.heldItems[i+1] = hostWindow.crafting()[i];
+    for (size_t i = 0; i < 2; ++i) worldMetadata.heldItems[i+10] = hostWindow.workstation ? hostWindow.workstation->chest[i] : hostWindow.recoveredWorkstationInputs[i];
     worldMetadata.health = player.survivalStats().health();
     worldMetadata.hunger = player.survivalStats().hunger();
     worldMetadata.saturation = player.survivalStats().saturation();
     worldMetadata.exhaustion = player.survivalStats().exhaustion();
     worldMetadata.foodTickTimer = player.survivalStats().foodTickTimer();
     worldMetadata.effects=player.statusEffects().active();
-    worldMetadata.experience=player.experience();
+    worldMetadata.experience=player.experience(); worldMetadata.enchantmentSeed=player.enchantmentSeed;
     if (simulations[0]->initialized) {
         worldMetadata.worldTicks = simulations[0]->ticks;
         worldMetadata.overworldDayPhase = simulations[0]->daylight.phase();
@@ -1495,7 +1559,7 @@ void GameSession::updateSaveMetadata() {
     worldMetadata.entities.clear();
 }
 
-void GameSession::beginAutosave(const std::function<void()>& onError) {
+void GameSession::requestAutosave(const std::function<void()>& onError) {
     if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return;
     if (!saveStore || !terrainGenerated || autosavePending) return;
     try {
@@ -1515,7 +1579,7 @@ void GameSession::beginAutosave(const std::function<void()>& onError) {
     }
 }
 
-void GameSession::processAutosave(const std::function<void()>& onError) {
+void GameSession::advanceAutosave(const std::function<void()>& onError) {
     if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return;
     if (!autosavePending) return;
     try {
@@ -1556,8 +1620,9 @@ void GameSession::saveNow(const std::function<void()>& onError) {
     if (!saveStore || (!terrainGenerated && !hostingLan())) return;
     try {
         updateSaveMetadata();
-        for (auto& entry : guests) saveLanPlayer(*entry.second);
         flushDimensions(true);
+        for (auto& entry : guests) saveLanPlayer(*entry.second);
+        saveActiveDimensionState();updateSaveMetadata();
         saveStore->saveMetadata(worldMetadata);
         autosavePending = false;
     } catch (const std::exception& error) {
@@ -1719,7 +1784,7 @@ Player* GameSession::pluginActor(uint64_t id,uint32_t& dim){
     if(lanJoining)return nullptr;
     const auto found=guests.find(id);if(found==guests.end())return nullptr;dim=static_cast<uint32_t>(found->second->profile.dimension);return &found->second->player;
 }
-uint64_t GameSession::pluginActionState(uint64_t id){uint32_t dim=0;const auto* p=pluginActor(id,dim);if(!p)return 0;const auto item=p->activeItem();return 1+(uint64_t(dim)<<32)+(uint64_t(p->selectedSlot())<<24)+(uint64_t(item.id)<<8)+(uint64_t(item.damage)<<48)+item.count;}
+uint64_t GameSession::pluginActionState(uint64_t id){uint32_t dim=0;const auto* p=pluginActor(id,dim);if(!p)return 0;const auto item=p->activeItem();return 1+(uint64_t(dim)<<32)+(uint64_t(p->selectedSlot())<<24)+(uint64_t(item.id)<<8)+(uint64_t(item.damage)<<48)+item.count+item.components.fingerprint();}
 bool GameSession::pluginActionCooldown(uint64_t id,const std::string& key,float& out){uint32_t dim=0;auto* p=pluginActor(id,dim);if(!p||!Plugins::content().extensions.actions.count(key))return false;out=p->pluginCooldown(key);return true;}
 bool GameSession::pluginActionTarget(uint64_t id,const std::string& key,bool preview,MC_ActionTarget& out,bool* handled){
     if(handled)*handled=false;

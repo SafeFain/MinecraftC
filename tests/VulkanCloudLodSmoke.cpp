@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "core/Window.h"
 #include "renderer/BlockAtlasData.h"
 #include "renderer/CloudRenderData.h"
@@ -75,7 +76,7 @@ void runSmoke(const std::filesystem::path& assets) {
 }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
     if (argc != 2) {
         std::cerr << "Usage: vulkan_cloud_lod_smoke <asset-directory>\n";
         return 2;
@@ -90,4 +91,6 @@ int main(int argc, char** argv) {
         std::cerr << "Cloud LOD smoke failed: " << error.what() << '\n';
         return 1;
     }
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

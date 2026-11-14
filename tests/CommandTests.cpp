@@ -37,8 +37,12 @@ int main(int argc, char** argv) {
          "/give stone_bricks 999999999999", "/give stone_bricks 2 extra"})
         require(!parseCommand(invalid).command, "give rejects invalid names/counts/arguments");
     const std::string prefix = "/give polished_";
-    require(commandSuggestions(prefix, prefix.size()).size() == 5,
-            "give completes four original polished stone variants and native polished blackstone");
+    const auto polished=commandSuggestions(prefix,prefix.size());
+    for(const char* name:{"polished_granite","polished_basalt","polished_limestone","polished_tuff","polished_blackstone"})
+        require(std::any_of(polished.begin(),polished.end(),[&](const auto& suggestion){return suggestion.text==name;}),
+            "give completion omitted a polished variant");
+    for(const auto& suggestion:polished)require(suggestion.text.rfind("polished_",0)==0&&itemFromCommandName(suggestion.text).has_value(),
+        "give completion returned a nonmatching or unknown item");
     for (uint16_t raw = 183; raw <= 208; ++raw) {
         const auto item = static_cast<ItemId>(raw);
         require(itemFromCommandName(itemCommandName(item)) == item,
@@ -134,11 +138,13 @@ int main(int argc, char** argv) {
     const std::string structurePrefix = "/locate structure de";
     const auto structureSuggestions = commandSuggestions(
         structurePrefix, structurePrefix.size());
-    require(structureSuggestions.size() == 3 &&
-                structureSuggestions[0].text == "desert_temple" &&
-                structureSuggestions[1].text == "desert_village" &&
-                structureSuggestions[2].text == "desert_well",
-            "structure argument completion did not return sorted matches");
+    for(const char* name:{"desert_temple","desert_village","desert_well"})
+        require(std::any_of(structureSuggestions.begin(),structureSuggestions.end(),[&](const auto& suggestion){return suggestion.text==name;}),
+            "structure argument completion omitted a desert structure");
+    require(std::is_sorted(structureSuggestions.begin(),structureSuggestions.end(),[](const auto& a,const auto& b){return a.text<b.text;}),
+            "structure completion must be sorted");
+    for(const auto& suggestion:structureSuggestions)require(suggestion.text.rfind("de",0)==0&&parseStructureCommandName(suggestion.text).has_value(),
+        "structure completion returned an invalid match");
     const std::string heavenStructurePrefix = "/locate structure cloud";
     const auto heavenStructureSuggestions = commandSuggestions(
         heavenStructurePrefix, heavenStructurePrefix.size());

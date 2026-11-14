@@ -11,7 +11,7 @@ inline void writeStatusEffects(Writer& writer,const std::vector<ActiveStatusEffe
 }
 inline std::vector<ActiveStatusEffect> readStatusEffects(Reader& reader) {
     const auto count=reader.u8();
-    if(count>7)throw ProtocolError("Too many status effects");
+    if(count>8)throw ProtocolError("Too many status effects");
     std::vector<ActiveStatusEffect> effects;
     for(uint8_t i=0;i<count;++i)effects.push_back({static_cast<StatusEffectType>(reader.u8()),reader.u8(),reader.u32()});
     if(!validStatusEffects(effects))throw ProtocolError("Invalid status effects");

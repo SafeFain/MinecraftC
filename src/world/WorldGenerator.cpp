@@ -1,3 +1,4 @@
+#include "world/OreExposure.h"
 #include "world/WorldGenerator.h"
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
@@ -327,7 +328,7 @@ void WorldGenerator::generate(Chunk& chunk,
                     current != BlockId::CALCITE) continue;
                 BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
                     static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f,
-                    current, biomeMap[x][z]);
+                    current, biomeMap[x][z], [&] { return oreExposed(m_heightPipeline,m_caveGenerator,wx,y,wz,&caveVolume); });
                 if (ore != BlockId::AIR) chunk.setBlock(x, y, z, ore);
             }
             if (!m_structureGenerator.reservationAt(wx,wz)) {

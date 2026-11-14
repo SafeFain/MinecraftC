@@ -225,6 +225,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                     return;
                 if (m_warmChunkSet.count(packedChunkKey(key.first, key.second)) != 0)
                     return;
+                if(m_world.chunkPinned(key.first,key.second)) {cleanupRemaining=true;return;}
                 if (chunk->meshInProgress.load() ||
                     chunk->generationInProgress.load() ||
                     chunk->cacheReadInProgress.load() ||
@@ -264,6 +265,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                 // out-of-range neighbor does not change world blocks, and
                 // invalidating the boundary strip here caused a synchronous
                 // relight whenever the player crossed a 16-block boundary.
+                if(m_world.chunkPinned(key.first,key.second)) {cleanupRemaining=true;continue;}
                 m_world.retireChunkUnlocked(*chunk, false);
                 m_prefetchedEntities.erase(key);
                 m_boundaryLightingChunks.erase(
@@ -277,6 +279,7 @@ void ChunkStreamer::update(const glm::dvec3& playerPos, int loadBudgetOverride,
                 m_warmChunkSet.erase(packedChunkKey(key.first, key.second));
                 Chunk* chunk = store.findUnlocked(key.first, key.second);
                 if (chunk == nullptr) continue;
+                if(m_world.chunkPinned(key.first,key.second)) {m_warmChunkSet.insert(packedChunkKey(key.first,key.second));m_warmChunkOrder.push_back(key);cleanupRemaining=true;break;}
                 m_world.retireChunkUnlocked(*chunk, false);
                 m_prefetchedEntities.erase(key);
                 m_boundaryLightingChunks.erase(

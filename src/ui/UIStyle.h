@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <string>
+#include <vector>
 
 #include "game/Item.h"
 #include "game/Localization.h"
@@ -528,12 +529,18 @@ inline std::string tooltipDetail(const ItemStack& stack,
                  ? localization->format("tooltip.food", {std::to_string(props.food)})
                  : "Food +" + std::to_string(props.food));
     }
+    if (!stack.components.customName().empty()) detail = stack.components.customName() + "\n" + detail;
+    for (const auto* levels : {&stack.components.enchantments,&stack.components.storedEnchantments}) for (size_t i = 0; i < ENCHANTMENTS.size(); ++i) {
+        const auto id = static_cast<EnchantmentId>(i); const auto level = levels->level(id); if (!level) continue;
+        const auto key = std::string(ENCHANTMENTS[i].key); const auto label = localization ? localization->text("enchantment." + key.substr(key.find(':')+1)) : key;
+        detail += "\n" + label; if (ENCHANTMENTS[i].maximumLevel > 1) detail += " " + std::to_string(level);
+    }
     return detail;
 }
 
 template <class T>
 inline void tooltip(T& ui, float x, float y, const std::string& text,
-                    float scale = 0.9f) {
+                    float scale = 0.9f, const std::vector<std::string>& redTerms = {}) {
     if (text.empty()) return;
     const float width=std::max(1.0f,ui.canvasWidth()-32.0f);
     const auto lines=wrapTextPixels(text,width,[&](const std::string& value){
@@ -549,7 +556,15 @@ inline void tooltip(T& ui, float x, float y, const std::string& text,
     x=std::clamp(x,4.0f,std::max(4.0f,ui.canvasWidth()-size.x-20));
     y=std::clamp(y,4.0f,std::max(4.0f,ui.canvasHeight()-size.y-20));
     panel(ui,x,y,size.x+16,size.y+16,TOOLTIP_FILL);
-    textWithShadow(ui,wrapped,x+8,y+8,scale,TEXT);
+    const float step = size.y / std::max<size_t>(1,lines.size());
+    float baseline = y + 8 + size.y - step;
+    bool curse = false;
+    for (const auto& line : lines) {
+        if (std::any_of(redTerms.begin(),redTerms.end(),[&](const std::string& term) { return line.find(term) != std::string::npos; })) curse = true;
+        else if (!line.empty()) curse = false;
+        textWithShadow(ui,line,x+8,baseline,scale,curse ? glm::vec3(1,.3f,.3f) : TEXT);
+        baseline -= step;
+    }
 }
 
 } // namespace UiTheme

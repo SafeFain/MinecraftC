@@ -1,0 +1,19 @@
+{
+  "key": "sticky_piston_top",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 939122711,
+    "images": [
+      "textures/materials/sticky_piston_top-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/sticky_piston_top-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/sticky_piston_top-0-properties.png"
+    ]
+  }
+}

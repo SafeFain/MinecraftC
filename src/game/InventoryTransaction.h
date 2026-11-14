@@ -1,6 +1,7 @@
 #pragma once
 
 #include "game/InventoryModel.h"
+#include "game/Experience.h"
 #include "world/BlockEntity.h"
 #include <array>
 #include <cstdint>
@@ -16,7 +17,7 @@ struct InventorySlot {
 };
 enum class InventoryOperation : uint8_t {
     Click, QuickMove, SwapHotbar, SwapOffhand, Drop, Gather, Distribute,
-    Craft, FillRecipe, CreativeGrant, Close, CreativeClone
+    Craft, FillRecipe, CreativeGrant, Close, CreativeClone, Enchant, Rename
 };
 struct InventoryAction {
     uint64_t sequence=0;
@@ -27,6 +28,7 @@ struct InventoryAction {
     uint16_t argument=0;
     bool alternate=false;
     std::vector<InventorySlot> targets;
+    std::string text;
 };
 struct InventoryContext {
     bool creative=false;
@@ -35,15 +37,23 @@ struct InventoryContext {
     // providing this pointer, and serializes all actions on the main thread.
     BlockEntity* container=nullptr;
     uint64_t containerRevision=0;
+    Experience* experience = nullptr;
+    uint32_t* enchantmentSeed = nullptr;
+    unsigned bookshelves = 0;
+    uint64_t* randomState = nullptr;
 };
 struct InventoryOutcome {
     bool accepted=false;
     bool containerChanged=false;
     std::vector<ItemStack> drops;
     std::map<std::string,uint64_t> furnaceExperience;
+    uint32_t workstationExperience = 0;
+    bool anvilUsed = false;
 };
 class InventoryTransaction {
 public:
+    std::optional<BlockEntity> workstation;
+    std::array<ItemStack,2> recoveredWorkstationInputs{};
     uint64_t revision() const { return m_revision; }
     const ItemStack& cursor() const { return m_cursor; }
     const std::array<ItemStack,9>& crafting() const { return m_crafting; }

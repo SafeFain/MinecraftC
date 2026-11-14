@@ -1,0 +1,19 @@
+{
+  "key": "redstone_dust",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 1380947224,
+    "images": [
+      "textures/materials/redstone_dust-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/redstone_dust-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/redstone_dust-0-properties.png"
+    ]
+  }
+}

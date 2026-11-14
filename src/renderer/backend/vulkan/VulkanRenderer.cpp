@@ -727,8 +727,8 @@ void VulkanRenderer::renderParticles(
     m_impl->particleCameraRight=cameraRight;
     m_impl->particleCameraUp=cameraUp;
     m_impl->particleIntensity=std::clamp(intensity,0.0f,1.0f);
-    m_impl->particleTime=static_cast<float>(
-        RuntimeClock::seconds(RuntimeClock{}.now()));
+    m_impl->particleTime=m_impl->diagnosticParticleTime.value_or(static_cast<float>(
+        RuntimeClock::seconds(RuntimeClock{}.now())));
     m_impl->drawQueued=true;
 }
 void VulkanRenderer::renderClouds(const glm::dvec3& playerPosition,

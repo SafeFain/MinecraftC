@@ -56,7 +56,7 @@ int main() {
     model::AnimationClip idle;
     idle.name = "idle";
     asset.animations = {walk, idle};
-    require(asset.findClip("idle") == &asset.animations[1],
+    require(asset.findClip("idle") && asset.findClip("idle")->name == "idle",
             "clip lookup did not find the requested animation");
     require(asset.findClip("missing") == nullptr,
             "clip lookup returned a nonmatching animation");

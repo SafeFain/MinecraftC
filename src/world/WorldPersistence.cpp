@@ -10,6 +10,7 @@
 #include "world/FluidLogic.h"
 #include "world/Structure.h"
 #include "world/WorldGenContext.h"
+#include "game/EnchantingRules.h"
 
 #include <algorithm>
 
@@ -116,6 +117,28 @@ void WorldPersistence::registerGeneratedBlockEntityUnlocked(
         const auto& table=Plugins::content().extensions.loot.at(entity.lootKey);
         for(size_t i=0;i<table.entries.size();++i){const auto& entry=table.entries[i];const uint64_t h=WorldGenContext::mix(lootSeed^(uint64_t(i)+1)*0x9E3779B97F4A7C15ULL);if(h%100>=entry.chance)continue;const auto amount=entry.minimum+((h>>8)%(entry.maximum-entry.minimum+1));if(!amount)continue;size_t slot=(h>>24)%entity.chest.size();for(size_t probe=0;probe<entity.chest.size();++probe){auto& target=entity.chest[(slot+probe)%entity.chest.size()];if(target.empty()){target={Plugins::resolveItem(entry.item),static_cast<uint8_t>(amount),0};break;}}}
     } else populateGeneratedLoot(entity,lootProfile,lootSeed);
+    if (entity.type == BlockEntityType::Chest && entity.lootKey.empty() && lootProfile != StructureLootProfile::None) {
+        uint64_t random = WorldGenContext::mix(lootSeed ^ 0x454e43484c4f4f54ULL);
+        if (EquipmentRules::random(random) % 100 < 20) {
+            ItemStack book{ItemId::BOOK,1};
+            book = EnchantingRules::randomEnchant(book,30,random,true);
+            if (lootProfile == StructureLootProfile::NetherBastion || lootProfile == StructureLootProfile::JungleRuins) {
+                book = {ItemId::ENCHANTED_BOOK,1};
+                book.components.storedEnchantments.set(lootProfile == StructureLootProfile::NetherBastion ? EnchantmentId::SoulSpeed : EnchantmentId::SwiftSneak, static_cast<uint8_t>(1+EquipmentRules::random(random)%3));
+            }
+            for (auto& slot : entity.chest) if (slot.empty()) { slot = book; break; }
+        }
+    }
+    if (entity.type == BlockEntityType::Chest && entity.lootKey.empty() && lootProfile != StructureLootProfile::None) {
+        uint64_t random = WorldGenContext::mix(lootSeed ^ 0x454e434847454152ULL);
+        if (EquipmentRules::random(random) % 100 < 12) {
+            const ItemId gear = lootProfile == StructureLootProfile::RuinedPortal ? ItemId::GOLDEN_SWORD :
+                lootProfile == StructureLootProfile::NetherBastion ? ItemId::DIAMOND_PICKAXE : ItemId::IRON_BOOTS;
+            auto item = EnchantingRules::randomEnchant({gear,1},15+EquipmentRules::random(random)%16,random,false);
+            for (auto& slot : entity.chest) if (slot.empty()) { slot = item; break; }
+        }
+        entity.lootRevision = "native-enchanting-v22";
+    }
     entity.lootInitialized=entity.type==BlockEntityType::Chest;
     entities.emplace(localIndex, entity);
     m_dirtyBlockEntityChunks.insert({cx, cz});
@@ -345,10 +368,13 @@ void WorldPersistence::tickBlockEntities() {
     m_chunks.withUnique([&](ChunkStore& store) {
         for (auto& [key, entities] : m_blockEntities) {
             const auto* chunk=store.findUnlocked(key.first,key.second);
-            if(!chunk||!chunk->generated.load())continue;
+            if(!chunk||!chunk->generated.load()||chunk->lifecycle==Chunk::LifecycleState::Warm)continue;
             bool changed = false;
             for (auto& [index, entity] : entities) {
-                changed = tickFurnace(entity) || changed;
+                if(tickFurnace(entity)) {
+                    changed=true;
+                    if(m_containerChange)m_containerChange({key.first*16+int(index%16),Config::WORLD_MIN_Y+int(index/256),key.second*16+int(index/16%16)});
+                }
             }
             if (changed) m_dirtyBlockEntityChunks.insert(key);
         }
@@ -366,7 +392,7 @@ std::vector<glm::ivec3> WorldPersistence::tickButtons() {
     m_chunks.withUnique([&](ChunkStore& store) {
         for(const auto& [cx,cz,index]:m_pressedButtons) {
             const Chunk* chunk=store.findUnlocked(cx,cz);
-            if(!chunk || !chunk->generated.load())continue;
+            if(!chunk || !chunk->generated.load() || chunk->lifecycle==Chunk::LifecycleState::Warm)continue;
             const auto found=m_blockEntities.find({cx,cz});
             if(found==m_blockEntities.end())continue;
             const auto entry=found->second.find(index);
@@ -415,4 +441,19 @@ std::vector<glm::ivec3> WorldPersistence::loadedSpawners() const {
         }
     });
     return result;
+}
+
+const BlockEntity* WorldPersistence::getBlockEntityUnlocked(const glm::ivec3& position) const {
+    const int cx=worldToChunkX(position.x),cz=worldToChunkZ(position.z);const auto index=localIndexFor(position,cx,cz);
+    const auto chunk=m_blockEntities.find({cx,cz});if(chunk==m_blockEntities.end())return nullptr;
+    const auto found=chunk->second.find(index);return found==chunk->second.end()?nullptr:&found->second;
+}
+void WorldPersistence::setCircuitState(const glm::ivec3& position,const std::vector<uint8_t>& bytes) {
+    m_chunks.withUnique([&](ChunkStore&){setCircuitStateUnlocked(position,bytes);});
+}
+void WorldPersistence::setCircuitStateUnlocked(const glm::ivec3& position,const std::vector<uint8_t>& bytes) {
+    const int cx=worldToChunkX(position.x),cz=worldToChunkZ(position.z);const auto index=localIndexFor(position,cx,cz);
+    const auto chunk=m_blockEntities.find({cx,cz});if(chunk==m_blockEntities.end())return;
+    const auto found=chunk->second.find(index);if(found==chunk->second.end() || found->second.type!=BlockEntityType::Redstone)return;
+    if(found->second.circuitState!=bytes){found->second.circuitState=bytes;m_dirtyBlockEntityChunks.insert({cx,cz});}
 }

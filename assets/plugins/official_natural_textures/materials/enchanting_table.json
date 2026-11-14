@@ -1,0 +1,19 @@
+{
+  "key": "enchanting_table",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2141548591,
+    "images": [
+      "textures/materials/enchanting_table-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/enchanting_table-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/enchanting_table-0-properties.png"
+    ]
+  }
+}

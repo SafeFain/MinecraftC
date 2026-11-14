@@ -111,11 +111,11 @@
     },
     "ancient_debris": {
       "generator": "block_item_icon",
-      "index": 326,
+      "index": 338,
       "source": "items/ancient_debris.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 40
+      "x": 2,
+      "y": 42
     },
     "andesite": {
       "generator": "block_item_icon",
@@ -125,13 +125,21 @@
       "x": 0,
       "y": 29
     },
+    "anvil": {
+      "generator": "block_item_icon",
+      "index": 319,
+      "source": "items/anvil.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 39
+    },
     "apple": {
       "generator": "item_sprite",
-      "index": 371,
+      "index": 383,
       "source": "items/apple.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 46
+      "x": 7,
+      "y": 47
     },
     "arrow": {
       "generator": "item_sprite",
@@ -143,11 +151,11 @@
     },
     "awkward_potion": {
       "generator": "item_sprite",
-      "index": 365,
+      "index": 377,
       "source": "items/awkward_potion.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 45
+      "x": 1,
+      "y": 47
     },
     "barrel": {
       "generator": "block_item_icon",
@@ -263,35 +271,35 @@
     },
     "blackstone": {
       "generator": "block_item_icon",
-      "index": 313,
+      "index": 325,
       "source": "items/blackstone.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 39
+      "x": 5,
+      "y": 40
     },
     "blackstone_bricks": {
       "generator": "block_item_icon",
-      "index": 330,
+      "index": 342,
       "source": "items/blackstone_bricks.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 41
+      "x": 6,
+      "y": 42
     },
     "blackstone_slab": {
       "generator": "block_item_icon",
-      "index": 420,
+      "index": 432,
       "source": "items/blackstone_slab.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 52
+      "x": 0,
+      "y": 54
     },
     "blackstone_stairs": {
       "generator": "block_item_icon",
-      "index": 421,
+      "index": 433,
       "source": "items/blackstone_stairs.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 52
+      "x": 1,
+      "y": 54
     },
     "blast_furnace": {
       "generator": "block_item_icon",
@@ -311,35 +319,35 @@
     },
     "blaze_powder": {
       "generator": "item_sprite",
-      "index": 356,
+      "index": 368,
       "source": "items/blaze_powder.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 44
+      "x": 0,
+      "y": 46
     },
     "blaze_rod": {
       "generator": "item_sprite",
-      "index": 355,
+      "index": 367,
       "source": "items/blaze_rod.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 44
+      "x": 7,
+      "y": 45
     },
     "blaze_spawn_egg": {
       "generator": "item_sprite",
-      "index": 423,
+      "index": 435,
       "source": "items/blaze_spawn_egg.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 52
+      "x": 3,
+      "y": 54
     },
     "blaze_spawner": {
       "generator": "block_item_icon",
-      "index": 345,
+      "index": 357,
       "source": "items/blaze_spawner.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 43
+      "x": 5,
+      "y": 44
     },
     "blue_dye": {
       "generator": "item_sprite",
@@ -383,11 +391,11 @@
     },
     "bone_block": {
       "generator": "block_item_icon",
-      "index": 347,
+      "index": 359,
       "source": "items/bone_block.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 43
+      "x": 7,
+      "y": 44
     },
     "bone_meal": {
       "generator": "item_sprite",
@@ -396,6 +404,22 @@
       "source_kind": "generated",
       "x": 7,
       "y": 25
+    },
+    "book": {
+      "generator": "item_sprite",
+      "index": 312,
+      "source": "items/book.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 39
+    },
+    "bookshelf": {
+      "generator": "block_item_icon",
+      "index": 316,
+      "source": "items/bookshelf.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 39
     },
     "bow": {
       "generator": "item_sprite",
@@ -516,6 +540,14 @@
       "source_kind": "generated",
       "x": 1,
       "y": 16
+    },
+    "chipped_anvil": {
+      "generator": "block_item_icon",
+      "index": 320,
+      "source": "items/chipped_anvil.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 40
     },
     "chiseled_stone_bricks": {
       "generator": "block_item_icon",
@@ -751,83 +783,83 @@
     },
     "crimson_button": {
       "generator": "item_sprite",
-      "index": 411,
+      "index": 423,
       "source": "items/crimson_button.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 51
+      "x": 7,
+      "y": 52
     },
     "crimson_door": {
       "generator": "item_sprite",
-      "index": 410,
+      "index": 422,
       "source": "items/crimson_door.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 51
+      "x": 6,
+      "y": 52
     },
     "crimson_fungus": {
       "generator": "block_item_icon",
-      "index": 333,
+      "index": 345,
       "source": "items/crimson_fungus.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 41
+      "x": 1,
+      "y": 43
     },
     "crimson_nylium": {
       "generator": "block_item_icon",
-      "index": 314,
+      "index": 326,
       "source": "items/crimson_nylium.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 39
+      "x": 6,
+      "y": 40
     },
     "crimson_planks": {
       "generator": "block_item_icon",
-      "index": 318,
+      "index": 330,
       "source": "items/crimson_planks.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 39
+      "x": 2,
+      "y": 41
     },
     "crimson_roots": {
       "generator": "block_item_icon",
-      "index": 335,
+      "index": 347,
       "source": "items/crimson_roots.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 41
+      "x": 3,
+      "y": 43
     },
     "crimson_slab": {
       "generator": "block_item_icon",
-      "index": 414,
+      "index": 426,
       "source": "items/crimson_slab.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 51
+      "x": 2,
+      "y": 53
     },
     "crimson_stairs": {
       "generator": "block_item_icon",
-      "index": 415,
+      "index": 427,
       "source": "items/crimson_stairs.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 51
+      "x": 3,
+      "y": 53
     },
     "crimson_stem": {
       "generator": "block_item_icon",
-      "index": 316,
+      "index": 328,
       "source": "items/crimson_stem.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 39
+      "x": 0,
+      "y": 41
     },
     "crying_obsidian": {
       "generator": "block_item_icon",
-      "index": 331,
+      "index": 343,
       "source": "items/crying_obsidian.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 41
+      "x": 7,
+      "y": 42
     },
     "cut_sandstone": {
       "generator": "block_item_icon",
@@ -836,6 +868,14 @@
       "source_kind": "generated",
       "x": 1,
       "y": 24
+    },
+    "damaged_anvil": {
+      "generator": "block_item_icon",
+      "index": 321,
+      "source": "items/damaged_anvil.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 40
     },
     "dandelion": {
       "generator": "block_item_icon",
@@ -884,6 +924,22 @@
       "source_kind": "generated",
       "x": 3,
       "y": 20
+    },
+    "deepslate_lapis_ore": {
+      "generator": "block_item_icon",
+      "index": 315,
+      "source": "items/deepslate_lapis_ore.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 39
+    },
+    "deepslate_redstone_ore": {
+      "generator": "block_item_icon",
+      "index": 455,
+      "source": "items/deepslate_redstone_ore.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 56
     },
     "desert_flower": {
       "generator": "block_item_icon",
@@ -1037,21 +1093,37 @@
       "x": 2,
       "y": 20
     },
+    "enchanted_book": {
+      "generator": "item_sprite",
+      "index": 313,
+      "source": "items/enchanted_book.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 39
+    },
+    "enchanting_table": {
+      "generator": "block_item_icon",
+      "index": 318,
+      "source": "items/enchanting_table.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 39
+    },
     "ender_pearl": {
       "generator": "item_sprite",
-      "index": 359,
+      "index": 371,
       "source": "items/ender_pearl.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 44
+      "x": 3,
+      "y": 46
     },
     "enderman_spawn_egg": {
       "generator": "item_sprite",
-      "index": 432,
+      "index": 444,
       "source": "items/enderman_spawn_egg.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 54
+      "x": 4,
+      "y": 55
     },
     "fallen_twigs": {
       "generator": "block_item_icon",
@@ -1079,11 +1151,11 @@
     },
     "fermented_spider_eye": {
       "generator": "item_sprite",
-      "index": 368,
+      "index": 380,
       "source": "items/fermented_spider_eye.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 46
+      "x": 4,
+      "y": 47
     },
     "fern": {
       "generator": "block_item_icon",
@@ -1095,11 +1167,11 @@
     },
     "fire_resistance_potion": {
       "generator": "item_sprite",
-      "index": 382,
+      "index": 394,
       "source": "items/fire_resistance_potion.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 47
+      "x": 2,
+      "y": 49
     },
     "fishing_rod": {
       "generator": "item_sprite",
@@ -1143,19 +1215,19 @@
     },
     "ghast_spawn_egg": {
       "generator": "item_sprite",
-      "index": 422,
+      "index": 434,
       "source": "items/ghast_spawn_egg.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 52
+      "x": 2,
+      "y": 54
     },
     "ghast_tear": {
       "generator": "item_sprite",
-      "index": 357,
+      "index": 369,
       "source": "items/ghast_tear.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 44
+      "x": 1,
+      "y": 46
     },
     "glass": {
       "generator": "block_item_icon",
@@ -1167,11 +1239,11 @@
     },
     "glass_bottle": {
       "generator": "item_sprite",
-      "index": 363,
+      "index": 375,
       "source": "items/glass_bottle.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 45
+      "x": 7,
+      "y": 46
     },
     "glimmer_reed": {
       "generator": "block_item_icon",
@@ -1191,11 +1263,11 @@
     },
     "glistering_melon": {
       "generator": "item_sprite",
-      "index": 369,
+      "index": 381,
       "source": "items/glistering_melon.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 46
+      "x": 5,
+      "y": 47
     },
     "glow_fern": {
       "generator": "block_item_icon",
@@ -1215,19 +1287,19 @@
     },
     "glowstone": {
       "generator": "block_item_icon",
-      "index": 323,
+      "index": 335,
       "source": "items/glowstone.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 40
+      "x": 7,
+      "y": 41
     },
     "glowstone_dust": {
       "generator": "item_sprite",
-      "index": 354,
+      "index": 366,
       "source": "items/glowstone_dust.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 44
+      "x": 6,
+      "y": 45
     },
     "gneiss": {
       "generator": "block_item_icon",
@@ -1247,11 +1319,11 @@
     },
     "gold_nugget": {
       "generator": "item_sprite",
-      "index": 349,
+      "index": 361,
       "source": "items/gold_nugget.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 43
+      "x": 1,
+      "y": 45
     },
     "gold_ore": {
       "generator": "block_item_icon",
@@ -1263,11 +1335,11 @@
     },
     "golden_apple": {
       "generator": "item_sprite",
-      "index": 372,
+      "index": 384,
       "source": "items/golden_apple.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 46
+      "x": 0,
+      "y": 48
     },
     "golden_axe": {
       "generator": "item_sprite",
@@ -1423,19 +1495,19 @@
     },
     "harming_potion": {
       "generator": "item_sprite",
-      "index": 392,
+      "index": 404,
       "source": "items/harming_potion.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 49
+      "x": 4,
+      "y": 50
     },
     "healing_potion": {
       "generator": "item_sprite",
-      "index": 390,
+      "index": 402,
       "source": "items/healing_potion.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 48
+      "x": 2,
+      "y": 50
     },
     "heather": {
       "generator": "block_item_icon",
@@ -1447,11 +1519,11 @@
     },
     "hoglin_spawn_egg": {
       "generator": "item_sprite",
-      "index": 429,
+      "index": 441,
       "source": "items/hoglin_spawn_egg.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 53
+      "x": 1,
+      "y": 55
     },
     "ice": {
       "generator": "block_item_icon",
@@ -1468,6 +1540,14 @@
       "source_kind": "generated",
       "x": 2,
       "y": 3
+    },
+    "iron_block": {
+      "generator": "block_item_icon",
+      "index": 317,
+      "source": "items/iron_block.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 39
     },
     "iron_boots": {
       "generator": "item_sprite",
@@ -1621,6 +1701,22 @@
       "x": 2,
       "y": 14
     },
+    "lapis_lazuli": {
+      "generator": "item_sprite",
+      "index": 310,
+      "source": "items/lapis_lazuli.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 38
+    },
+    "lapis_ore": {
+      "generator": "block_item_icon",
+      "index": 314,
+      "source": "items/lapis_ore.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 39
+    },
     "laterite": {
       "generator": "block_item_icon",
       "index": 236,
@@ -1701,6 +1797,14 @@
       "x": 7,
       "y": 35
     },
+    "lever": {
+      "generator": "block_item_icon",
+      "index": 445,
+      "source": "items/lever.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 55
+    },
     "limestone": {
       "generator": "block_item_icon",
       "index": 136,
@@ -1711,35 +1815,35 @@
     },
     "long_fire_resistance_potion": {
       "generator": "item_sprite",
-      "index": 383,
-      "source": "items/long_fire_resistance_potion.png",
-      "source_kind": "generated",
-      "x": 7,
-      "y": 47
-    },
-    "long_regeneration_potion": {
-      "generator": "item_sprite",
-      "index": 388,
-      "source": "items/long_regeneration_potion.png",
-      "source_kind": "generated",
-      "x": 4,
-      "y": 48
-    },
-    "long_strength_potion": {
-      "generator": "item_sprite",
-      "index": 385,
-      "source": "items/long_strength_potion.png",
-      "source_kind": "generated",
-      "x": 1,
-      "y": 48
-    },
-    "long_weakness_potion": {
-      "generator": "item_sprite",
       "index": 395,
-      "source": "items/long_weakness_potion.png",
+      "source": "items/long_fire_resistance_potion.png",
       "source_kind": "generated",
       "x": 3,
       "y": 49
+    },
+    "long_regeneration_potion": {
+      "generator": "item_sprite",
+      "index": 400,
+      "source": "items/long_regeneration_potion.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 50
+    },
+    "long_strength_potion": {
+      "generator": "item_sprite",
+      "index": 397,
+      "source": "items/long_strength_potion.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 49
+    },
+    "long_weakness_potion": {
+      "generator": "item_sprite",
+      "index": 407,
+      "source": "items/long_weakness_potion.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 50
     },
     "loom": {
       "generator": "block_item_icon",
@@ -1751,35 +1855,35 @@
     },
     "magma_block": {
       "generator": "block_item_icon",
-      "index": 332,
+      "index": 344,
       "source": "items/magma_block.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 41
+      "x": 0,
+      "y": 43
     },
     "magma_cream": {
       "generator": "item_sprite",
-      "index": 358,
+      "index": 370,
       "source": "items/magma_cream.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 44
+      "x": 2,
+      "y": 46
     },
     "magma_cube_spawn_egg": {
       "generator": "item_sprite",
-      "index": 425,
+      "index": 437,
       "source": "items/magma_cube_spawn_egg.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 53
+      "x": 5,
+      "y": 54
     },
     "magma_spawner": {
       "generator": "block_item_icon",
-      "index": 346,
+      "index": 358,
       "source": "items/magma_spawner.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 43
+      "x": 6,
+      "y": 44
     },
     "marble": {
       "generator": "block_item_icon",
@@ -1839,195 +1943,195 @@
     },
     "nether_brick": {
       "generator": "item_sprite",
-      "index": 350,
+      "index": 362,
       "source": "items/nether_brick.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 43
+      "x": 2,
+      "y": 45
     },
     "nether_brick_slab": {
       "generator": "block_item_icon",
-      "index": 418,
+      "index": 430,
       "source": "items/nether_brick_slab.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 52
+      "x": 6,
+      "y": 53
     },
     "nether_brick_stairs": {
       "generator": "block_item_icon",
-      "index": 419,
+      "index": 431,
       "source": "items/nether_brick_stairs.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 52
+      "x": 7,
+      "y": 53
     },
     "nether_bricks": {
       "generator": "block_item_icon",
-      "index": 327,
+      "index": 339,
       "source": "items/nether_bricks.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 40
+      "x": 3,
+      "y": 42
     },
     "nether_gold_ore": {
       "generator": "block_item_icon",
-      "index": 325,
+      "index": 337,
       "source": "items/nether_gold_ore.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 40
+      "x": 1,
+      "y": 42
     },
     "nether_portal_x": {
       "generator": "block_item_icon",
-      "index": 342,
+      "index": 354,
       "source": "items/nether_portal_x.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 42
+      "x": 2,
+      "y": 44
     },
     "nether_portal_z": {
       "generator": "block_item_icon",
-      "index": 343,
+      "index": 355,
       "source": "items/nether_portal_z.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 42
+      "x": 3,
+      "y": 44
     },
     "nether_quartz_ore": {
       "generator": "block_item_icon",
-      "index": 324,
+      "index": 336,
       "source": "items/nether_quartz_ore.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 40
+      "x": 0,
+      "y": 42
     },
     "nether_sprouts": {
       "generator": "block_item_icon",
-      "index": 337,
+      "index": 349,
       "source": "items/nether_sprouts.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 42
+      "x": 5,
+      "y": 43
     },
     "nether_wart": {
       "generator": "block_item_icon",
-      "index": 340,
+      "index": 352,
       "source": "items/nether_wart.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 42
+      "x": 0,
+      "y": 44
     },
     "nether_wart_block": {
       "generator": "block_item_icon",
-      "index": 320,
+      "index": 332,
       "source": "items/nether_wart_block.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 40
+      "x": 4,
+      "y": 41
     },
     "netherite_axe": {
       "generator": "item_sprite",
-      "index": 374,
+      "index": 386,
       "source": "items/netherite_axe.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 46
+      "x": 2,
+      "y": 48
     },
     "netherite_boots": {
       "generator": "item_sprite",
-      "index": 381,
+      "index": 393,
       "source": "items/netherite_boots.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 47
+      "x": 1,
+      "y": 49
     },
     "netherite_chestplate": {
       "generator": "item_sprite",
-      "index": 379,
+      "index": 391,
       "source": "items/netherite_chestplate.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 47
+      "x": 7,
+      "y": 48
     },
     "netherite_helmet": {
       "generator": "item_sprite",
-      "index": 378,
+      "index": 390,
       "source": "items/netherite_helmet.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 47
+      "x": 6,
+      "y": 48
     },
     "netherite_hoe": {
       "generator": "item_sprite",
-      "index": 376,
+      "index": 388,
       "source": "items/netherite_hoe.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 47
+      "x": 4,
+      "y": 48
     },
     "netherite_ingot": {
       "generator": "item_sprite",
-      "index": 352,
+      "index": 364,
       "source": "items/netherite_ingot.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 44
+      "x": 4,
+      "y": 45
     },
     "netherite_leggings": {
       "generator": "item_sprite",
-      "index": 380,
+      "index": 392,
       "source": "items/netherite_leggings.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 47
+      "x": 0,
+      "y": 49
     },
     "netherite_pickaxe": {
       "generator": "item_sprite",
-      "index": 373,
+      "index": 385,
       "source": "items/netherite_pickaxe.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 46
+      "x": 1,
+      "y": 48
     },
     "netherite_scrap": {
       "generator": "item_sprite",
-      "index": 351,
+      "index": 363,
       "source": "items/netherite_scrap.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 43
+      "x": 3,
+      "y": 45
     },
     "netherite_shovel": {
       "generator": "item_sprite",
-      "index": 375,
+      "index": 387,
       "source": "items/netherite_shovel.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 46
+      "x": 3,
+      "y": 48
     },
     "netherite_sword": {
       "generator": "item_sprite",
-      "index": 377,
+      "index": 389,
       "source": "items/netherite_sword.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 47
+      "x": 5,
+      "y": 48
     },
     "netherite_upgrade_template": {
       "generator": "item_sprite",
-      "index": 353,
+      "index": 365,
       "source": "items/netherite_upgrade_template.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 44
+      "x": 5,
+      "y": 45
     },
     "netherrack": {
       "generator": "block_item_icon",
-      "index": 310,
+      "index": 322,
       "source": "items/netherrack.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 38
+      "x": 2,
+      "y": 40
     },
     "nettle": {
       "generator": "block_item_icon",
@@ -2101,6 +2205,14 @@
       "x": 7,
       "y": 13
     },
+    "observer": {
+      "generator": "block_item_icon",
+      "index": 451,
+      "source": "items/observer.png",
+      "source_kind": "generated",
+      "x": 3,
+      "y": 56
+    },
     "obsidian": {
       "generator": "block_item_icon",
       "index": 118,
@@ -2133,6 +2245,14 @@
       "x": 5,
       "y": 17
     },
+    "paper": {
+      "generator": "item_sprite",
+      "index": 311,
+      "source": "items/paper.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 38
+    },
     "peat": {
       "generator": "block_item_icon",
       "index": 210,
@@ -2159,19 +2279,27 @@
     },
     "piglin_brute_spawn_egg": {
       "generator": "item_sprite",
-      "index": 427,
+      "index": 439,
       "source": "items/piglin_brute_spawn_egg.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 53
+      "x": 7,
+      "y": 54
     },
     "piglin_spawn_egg": {
       "generator": "item_sprite",
-      "index": 426,
+      "index": 438,
       "source": "items/piglin_spawn_egg.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 53
+      "x": 6,
+      "y": 54
+    },
+    "piston": {
+      "generator": "block_item_icon",
+      "index": 449,
+      "source": "items/piston.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 56
     },
     "podzol": {
       "generator": "block_item_icon",
@@ -2199,11 +2327,11 @@
     },
     "polished_blackstone": {
       "generator": "block_item_icon",
-      "index": 329,
+      "index": 341,
       "source": "items/polished_blackstone.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 41
+      "x": 5,
+      "y": 42
     },
     "polished_granite": {
       "generator": "block_item_icon",
@@ -2239,11 +2367,11 @@
     },
     "quartz": {
       "generator": "item_sprite",
-      "index": 348,
+      "index": 360,
       "source": "items/quartz.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 43
+      "x": 0,
+      "y": 45
     },
     "quartz_block": {
       "generator": "block_item_icon",
@@ -2351,11 +2479,11 @@
     },
     "red_nether_bricks": {
       "generator": "block_item_icon",
-      "index": 328,
+      "index": 340,
       "source": "items/red_nether_bricks.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 41
+      "x": 4,
+      "y": 42
     },
     "red_sand": {
       "generator": "block_item_icon",
@@ -2381,13 +2509,61 @@
       "x": 3,
       "y": 24
     },
+    "redstone_block": {
+      "generator": "block_item_icon",
+      "index": 453,
+      "source": "items/redstone_block.png",
+      "source_kind": "generated",
+      "x": 5,
+      "y": 56
+    },
+    "redstone_comparator": {
+      "generator": "block_item_icon",
+      "index": 448,
+      "source": "items/redstone_comparator.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 56
+    },
     "redstone_dust": {
       "generator": "item_sprite",
-      "index": 370,
+      "index": 382,
       "source": "items/redstone_dust.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 46
+      "x": 6,
+      "y": 47
+    },
+    "redstone_lamp": {
+      "generator": "block_item_icon",
+      "index": 452,
+      "source": "items/redstone_lamp.png",
+      "source_kind": "generated",
+      "x": 4,
+      "y": 56
+    },
+    "redstone_ore": {
+      "generator": "block_item_icon",
+      "index": 454,
+      "source": "items/redstone_ore.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 56
+    },
+    "redstone_repeater": {
+      "generator": "block_item_icon",
+      "index": 447,
+      "source": "items/redstone_repeater.png",
+      "source_kind": "generated",
+      "x": 7,
+      "y": 55
+    },
+    "redstone_torch": {
+      "generator": "block_item_icon",
+      "index": 446,
+      "source": "items/redstone_torch.png",
+      "source_kind": "generated",
+      "x": 6,
+      "y": 55
     },
     "reed_flower": {
       "generator": "block_item_icon",
@@ -2407,11 +2583,11 @@
     },
     "regeneration_potion": {
       "generator": "item_sprite",
-      "index": 387,
+      "index": 399,
       "source": "items/regeneration_potion.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 48
+      "x": 7,
+      "y": 49
     },
     "resonant_crystal": {
       "generator": "block_item_icon",
@@ -2423,11 +2599,11 @@
     },
     "respawn_anchor": {
       "generator": "block_item_icon",
-      "index": 344,
+      "index": 356,
       "source": "items/respawn_anchor.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 43
+      "x": 4,
+      "y": 44
     },
     "roasted_cloudberry": {
       "generator": "item_sprite",
@@ -2463,11 +2639,11 @@
     },
     "saddle": {
       "generator": "item_sprite",
-      "index": 361,
+      "index": 373,
       "source": "items/saddle.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 45
+      "x": 5,
+      "y": 46
     },
     "salt_crust": {
       "generator": "block_item_icon",
@@ -2519,11 +2695,11 @@
     },
     "shroomlight": {
       "generator": "block_item_icon",
-      "index": 322,
+      "index": 334,
       "source": "items/shroomlight.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 40
+      "x": 6,
+      "y": 41
     },
     "silt": {
       "generator": "block_item_icon",
@@ -2597,6 +2773,22 @@
       "x": 5,
       "y": 32
     },
+    "slime_ball": {
+      "generator": "item_sprite",
+      "index": 456,
+      "source": "items/slime_ball.png",
+      "source_kind": "generated",
+      "x": 0,
+      "y": 57
+    },
+    "slime_spawn_egg": {
+      "generator": "item_sprite",
+      "index": 457,
+      "source": "items/slime_spawn_egg.png",
+      "source_kind": "generated",
+      "x": 1,
+      "y": 57
+    },
     "small_cactus": {
       "generator": "block_item_icon",
       "index": 245,
@@ -2639,35 +2831,35 @@
     },
     "soul_fire": {
       "generator": "block_item_icon",
-      "index": 341,
+      "index": 353,
       "source": "items/soul_fire.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 42
+      "x": 1,
+      "y": 44
     },
     "soul_sand": {
       "generator": "block_item_icon",
-      "index": 311,
+      "index": 323,
       "source": "items/soul_sand.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 38
+      "x": 3,
+      "y": 40
     },
     "soul_soil": {
       "generator": "block_item_icon",
-      "index": 312,
+      "index": 324,
       "source": "items/soul_soil.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 39
+      "x": 4,
+      "y": 40
     },
     "spider_eye": {
       "generator": "item_sprite",
-      "index": 367,
+      "index": 379,
       "source": "items/spider_eye.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 45
+      "x": 3,
+      "y": 47
     },
     "spider_spawn_egg": {
       "generator": "item_sprite",
@@ -2679,115 +2871,115 @@
     },
     "splash_fire_resistance_potion": {
       "generator": "item_sprite",
-      "index": 396,
+      "index": 408,
       "source": "items/splash_fire_resistance_potion.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 49
+      "x": 0,
+      "y": 51
     },
     "splash_harming_potion": {
       "generator": "item_sprite",
-      "index": 406,
+      "index": 418,
       "source": "items/splash_harming_potion.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 50
+      "x": 2,
+      "y": 52
     },
     "splash_healing_potion": {
       "generator": "item_sprite",
-      "index": 404,
+      "index": 416,
       "source": "items/splash_healing_potion.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 50
+      "x": 0,
+      "y": 52
     },
     "splash_long_fire_resistance_potion": {
       "generator": "item_sprite",
-      "index": 397,
+      "index": 409,
       "source": "items/splash_long_fire_resistance_potion.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 49
+      "x": 1,
+      "y": 51
     },
     "splash_long_regeneration_potion": {
       "generator": "item_sprite",
-      "index": 402,
+      "index": 414,
       "source": "items/splash_long_regeneration_potion.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 50
+      "x": 6,
+      "y": 51
     },
     "splash_long_strength_potion": {
       "generator": "item_sprite",
-      "index": 399,
+      "index": 411,
       "source": "items/splash_long_strength_potion.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 49
+      "x": 3,
+      "y": 51
     },
     "splash_long_weakness_potion": {
       "generator": "item_sprite",
-      "index": 409,
+      "index": 421,
       "source": "items/splash_long_weakness_potion.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 51
+      "x": 5,
+      "y": 52
     },
     "splash_regeneration_potion": {
       "generator": "item_sprite",
-      "index": 401,
+      "index": 413,
       "source": "items/splash_regeneration_potion.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 50
+      "x": 5,
+      "y": 51
     },
     "splash_strength_potion": {
       "generator": "item_sprite",
-      "index": 398,
+      "index": 410,
       "source": "items/splash_strength_potion.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 49
+      "x": 2,
+      "y": 51
     },
     "splash_strong_harming_potion": {
       "generator": "item_sprite",
-      "index": 407,
+      "index": 419,
       "source": "items/splash_strong_harming_potion.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 50
+      "x": 3,
+      "y": 52
     },
     "splash_strong_healing_potion": {
       "generator": "item_sprite",
-      "index": 405,
+      "index": 417,
       "source": "items/splash_strong_healing_potion.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 50
+      "x": 1,
+      "y": 52
     },
     "splash_strong_regeneration_potion": {
       "generator": "item_sprite",
-      "index": 403,
+      "index": 415,
       "source": "items/splash_strong_regeneration_potion.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 50
+      "x": 7,
+      "y": 51
     },
     "splash_strong_strength_potion": {
       "generator": "item_sprite",
-      "index": 400,
+      "index": 412,
       "source": "items/splash_strong_strength_potion.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 50
+      "x": 4,
+      "y": 51
     },
     "splash_weakness_potion": {
       "generator": "item_sprite",
-      "index": 408,
+      "index": 420,
       "source": "items/splash_weakness_potion.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 51
+      "x": 4,
+      "y": 52
     },
     "spruce_button": {
       "generator": "item_sprite",
@@ -2901,6 +3093,14 @@
       "x": 1,
       "y": 1
     },
+    "sticky_piston": {
+      "generator": "block_item_icon",
+      "index": 450,
+      "source": "items/sticky_piston.png",
+      "source_kind": "generated",
+      "x": 2,
+      "y": 56
+    },
     "stone": {
       "generator": "block_item_icon",
       "index": 2,
@@ -2975,19 +3175,19 @@
     },
     "strength_potion": {
       "generator": "item_sprite",
-      "index": 384,
+      "index": 396,
       "source": "items/strength_potion.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 48
+      "x": 4,
+      "y": 49
     },
     "strider_spawn_egg": {
       "generator": "item_sprite",
-      "index": 431,
+      "index": 443,
       "source": "items/strider_spawn_egg.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 53
+      "x": 3,
+      "y": 55
     },
     "string": {
       "generator": "item_sprite",
@@ -2999,43 +3199,43 @@
     },
     "strong_harming_potion": {
       "generator": "item_sprite",
-      "index": 393,
+      "index": 405,
       "source": "items/strong_harming_potion.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 49
+      "x": 5,
+      "y": 50
     },
     "strong_healing_potion": {
       "generator": "item_sprite",
-      "index": 391,
+      "index": 403,
       "source": "items/strong_healing_potion.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 48
+      "x": 3,
+      "y": 50
     },
     "strong_regeneration_potion": {
       "generator": "item_sprite",
-      "index": 389,
+      "index": 401,
       "source": "items/strong_regeneration_potion.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 48
+      "x": 1,
+      "y": 50
     },
     "strong_strength_potion": {
       "generator": "item_sprite",
-      "index": 386,
+      "index": 398,
       "source": "items/strong_strength_potion.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 48
+      "x": 6,
+      "y": 49
     },
     "sugar": {
       "generator": "item_sprite",
-      "index": 366,
+      "index": 378,
       "source": "items/sugar.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 45
+      "x": 2,
+      "y": 47
     },
     "sulfur_crust": {
       "generator": "block_item_icon",
@@ -3167,11 +3367,11 @@
     },
     "twisting_vines": {
       "generator": "block_item_icon",
-      "index": 339,
+      "index": 351,
       "source": "items/twisting_vines.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 42
+      "x": 7,
+      "y": 43
     },
     "villager_spawn_egg": {
       "generator": "item_sprite",
@@ -3191,91 +3391,91 @@
     },
     "warped_button": {
       "generator": "item_sprite",
-      "index": 413,
+      "index": 425,
       "source": "items/warped_button.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 51
+      "x": 1,
+      "y": 53
     },
     "warped_door": {
       "generator": "item_sprite",
-      "index": 412,
+      "index": 424,
       "source": "items/warped_door.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 51
+      "x": 0,
+      "y": 53
     },
     "warped_fungus": {
       "generator": "block_item_icon",
-      "index": 334,
+      "index": 346,
       "source": "items/warped_fungus.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 41
+      "x": 2,
+      "y": 43
     },
     "warped_fungus_on_a_stick": {
       "generator": "item_sprite",
-      "index": 362,
+      "index": 374,
       "source": "items/warped_fungus_on_a_stick.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 45
+      "x": 6,
+      "y": 46
     },
     "warped_nylium": {
       "generator": "block_item_icon",
-      "index": 315,
+      "index": 327,
       "source": "items/warped_nylium.png",
       "source_kind": "generated",
-      "x": 3,
-      "y": 39
+      "x": 7,
+      "y": 40
     },
     "warped_planks": {
       "generator": "block_item_icon",
-      "index": 319,
+      "index": 331,
       "source": "items/warped_planks.png",
       "source_kind": "generated",
-      "x": 7,
-      "y": 39
+      "x": 3,
+      "y": 41
     },
     "warped_roots": {
       "generator": "block_item_icon",
-      "index": 336,
+      "index": 348,
       "source": "items/warped_roots.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 42
+      "x": 4,
+      "y": 43
     },
     "warped_slab": {
       "generator": "block_item_icon",
-      "index": 416,
+      "index": 428,
       "source": "items/warped_slab.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 52
+      "x": 4,
+      "y": 53
     },
     "warped_stairs": {
       "generator": "block_item_icon",
-      "index": 417,
+      "index": 429,
       "source": "items/warped_stairs.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 52
+      "x": 5,
+      "y": 53
     },
     "warped_stem": {
       "generator": "block_item_icon",
-      "index": 317,
+      "index": 329,
       "source": "items/warped_stem.png",
       "source_kind": "generated",
-      "x": 5,
-      "y": 39
+      "x": 1,
+      "y": 41
     },
     "warped_wart_block": {
       "generator": "block_item_icon",
-      "index": 321,
+      "index": 333,
       "source": "items/warped_wart_block.png",
       "source_kind": "generated",
-      "x": 1,
-      "y": 40
+      "x": 5,
+      "y": 41
     },
     "water": {
       "generator": "block_item_icon",
@@ -3287,27 +3487,27 @@
     },
     "water_bottle": {
       "generator": "item_sprite",
-      "index": 364,
+      "index": 376,
       "source": "items/water_bottle.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 45
+      "x": 0,
+      "y": 47
     },
     "weakness_potion": {
       "generator": "item_sprite",
-      "index": 394,
+      "index": 406,
       "source": "items/weakness_potion.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 49
+      "x": 6,
+      "y": 50
     },
     "weeping_vines": {
       "generator": "block_item_icon",
-      "index": 338,
+      "index": 350,
       "source": "items/weeping_vines.png",
       "source_kind": "generated",
-      "x": 2,
-      "y": 42
+      "x": 6,
+      "y": 43
     },
     "wet_limestone": {
       "generator": "block_item_icon",
@@ -3367,19 +3567,19 @@
     },
     "wither_skeleton_skull": {
       "generator": "item_sprite",
-      "index": 360,
+      "index": 372,
       "source": "items/wither_skeleton_skull.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 45
+      "x": 4,
+      "y": 46
     },
     "wither_skeleton_spawn_egg": {
       "generator": "item_sprite",
-      "index": 424,
+      "index": 436,
       "source": "items/wither_skeleton_spawn_egg.png",
       "source_kind": "generated",
-      "x": 0,
-      "y": 53
+      "x": 4,
+      "y": 54
     },
     "wooden_axe": {
       "generator": "item_sprite",
@@ -3439,11 +3639,11 @@
     },
     "zoglin_spawn_egg": {
       "generator": "item_sprite",
-      "index": 430,
+      "index": 442,
       "source": "items/zoglin_spawn_egg.png",
       "source_kind": "generated",
-      "x": 6,
-      "y": 53
+      "x": 2,
+      "y": 55
     },
     "zombie_spawn_egg": {
       "generator": "item_sprite",
@@ -3463,11 +3663,11 @@
     },
     "zombified_piglin_spawn_egg": {
       "generator": "item_sprite",
-      "index": 428,
+      "index": 440,
       "source": "items/zombified_piglin_spawn_egg.png",
       "source_kind": "generated",
-      "x": 4,
-      "y": 53
+      "x": 0,
+      "y": 55
     }
   },
   "priority": [
@@ -3476,7 +3676,7 @@
     "legacy",
     "missing"
   ],
-  "rows": 55,
+  "rows": 58,
   "seed": 213785369,
   "style": "bright-comfortable",
   "template_schema": {

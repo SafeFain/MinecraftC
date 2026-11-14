@@ -6,7 +6,7 @@
 #include <utility>
 
 enum class StatusEffectType : uint8_t {
-    FireResistance, Strength, Regeneration, Healing, Harming, Weakness, Wither
+    FireResistance, Strength, Regeneration, Healing, Harming, Weakness, Wither, Slowness
 };
 
 struct ActiveStatusEffect {
@@ -16,11 +16,11 @@ struct ActiveStatusEffect {
 };
 
 inline bool validStatusEffects(const std::vector<ActiveStatusEffect>& effects) {
-    if(effects.size()>7)return false;
+    if(effects.size()>8)return false;
     uint32_t seen=0;
     for(const auto& effect:effects) {
         const auto type=static_cast<uint8_t>(effect.type);
-        if(type>6||effect.amplifier>1||!effect.remaining||effect.remaining>72000||
+        if(type>7||effect.amplifier>(effect.type==StatusEffectType::Slowness?3:1)||!effect.remaining||effect.remaining>72000||
            effect.type==StatusEffectType::Healing||effect.type==StatusEffectType::Harming||
            (seen&(1u<<type)))return false;
         seen|=1u<<type;

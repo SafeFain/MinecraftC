@@ -36,11 +36,17 @@ jobs:
       - name: Install graphics and virtual-display dependencies
         run: sudo apt-get update && sudo apt-get install -y glslc libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=ON
       - name: Build
         run: cmake --build build-ci -j2
       - name: Test
-        run: ctest --test-dir build-ci --output-on-failure
+        env:
+          MINECRAFTC_TEST_XVFB: '1'
+          SDL_AUDIODRIVER: dummy
+        run: |
+          export VK_DRIVER_FILES="$(find /usr/share/vulkan/icd.d -name '*lvp*.json' -print -quit)"
+          test -n "$VK_DRIVER_FILES"
+          ctest --test-dir build-ci --output-on-failure
       - name: Verify checked-in Vulkan shaders
         run: python3 tools/vulkan_shaders.py --root . --check
       - name: Install
@@ -163,7 +169,8 @@ jobs:
           "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$sdk/Bin" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Configure
-        run: cmake -S . -B build-ci -A ${{ matrix.platform }} -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER
+        # GPU readbacks execute in the provisioned Linux Lavapipe lane.
+        run: cmake -S . -B build-ci -A ${{ matrix.platform }} -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
         run: cmake --build build-ci --config Release --parallel 2
       - name: Test
@@ -246,7 +253,8 @@ jobs:
           brew untap aws/tap >/dev/null 2>&1 || true
           brew install shaderc
       - name: Configure universal build
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
+        # GPU readbacks execute in the provisioned Linux Lavapipe lane.
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
         run: cmake --build build-ci -j2
       - name: Test native slice

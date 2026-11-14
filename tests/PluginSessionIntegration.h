@@ -16,14 +16,14 @@ inline int run(const std::filesystem::path& assets) {
     const auto item=Plugins::resolveItem("official_content:crystal_block");
     const int distance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=0;
     {
-        GameSession session(root/"saves");EntityAiTestRenderer renderer;
+        ScenarioSession session(root/"saves");EntityAiTestRenderer renderer;
         const auto id=session.createWorld("Plugin session",123,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
         session.startWorld(id,true,0);
         RuntimeClock clock;bool ready=false;
         for(int i=0;i<4000&&!ready;++i){ready=session.advanceLoading(&renderer,clock.now());if(!ready)std::this_thread::sleep_for(std::chrono::milliseconds(5));}
         check(ready,"modded world reaches normal loading gate");
         check(session.pluginGiveItem(static_cast<uint16_t>(item),4),"session host grants registered content");
-        auto& player=GameSessionTestAccess::player(session);auto& world=GameSessionTestAccess::world(session);
+        auto& player=SessionScenario::player(session);auto& world=SessionScenario::world(session);
         const int floor=Config::WORLD_MIN_Y+4;player.setPosition({.5,floor+.01,.5});player.setMouseLocked(true);player.setSelectedSlot(0);
         const glm::ivec3 target{0,floor+1,3},placement{0,floor+1,2};world.setBlock(target.x,target.y,target.z,BlockId::STONE);
         session.handleMouseButton(MouseButton::Right,ButtonAction::Press);

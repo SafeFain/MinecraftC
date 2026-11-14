@@ -1,5 +1,6 @@
 #include "plugins/ContentQueries.h"
 #include "renderer/BlockAtlasData.h"
+#include "renderer/EquipmentAppearance.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
 #include "ui/UIGeometry.h"
@@ -101,7 +102,7 @@ public:
     void drawRoundedRect(float x,float y,float w,float h,float radius,
                          const glm::vec4& color) override {
         Batch& b = batch(m_whiteMaterial);
-        const glm::vec4 tinted=uiLinearColor(color,m_opacity);
+        const glm::vec4 tinted=uiLinearColor(color*m_iconTint,m_opacity);
         appendRoundedRect(b.vertices,b.indices,x,y,w,h,radius,tinted);
     }
     void drawAtlasIcon(float x,float y,float w,float h,uint16_t tile,const glm::vec4& color)override{
@@ -136,7 +137,11 @@ public:
         quad(x,y,w,h,{tile%side/s+inset,tile/side/s+inset,
              (tile%side+1)/s-inset,(tile/side+1)/s-inset},glm::vec4(1),m_blockMaterial);
     }
+    void setAnimationTime(float seconds) override { m_animationTime = seconds; }
     void drawItemIcon(float x,float y,float w,float h,const ItemStack& stack)override{
+        const auto previous = m_iconTint;
+        struct Restore { glm::vec4& tint; glm::vec4 previous; ~Restore() { tint = previous; } } restore{m_iconTint,previous};
+        m_iconTint = enchantedSheen(stack,m_animationTime);
         if(stack.empty())return;
         const bool overlay=Plugins::content().itemIconOverrides.count(static_cast<uint16_t>(stack.id))!=0;
         if(const auto* item=Plugins::pluginItem(stack.id);item&&item->icon.empty()&&!overlay) {
@@ -178,7 +183,12 @@ public:
     }
     void drawTooltip(float x,float y,const ItemStack& stack)override{
         if (stack.empty()) return;
-        UiTheme::tooltip(*this,x,y,UiTheme::tooltipDetail(stack,m_localization));
+        std::vector<std::string> curses;
+        for (size_t i = 0; i < ENCHANTMENTS.size(); ++i) if (ENCHANTMENTS[i].curse && (stack.components.enchantments.level(static_cast<EnchantmentId>(i)) || stack.components.storedEnchantments.level(static_cast<EnchantmentId>(i)))) {
+            const auto key = std::string(ENCHANTMENTS[i].key);
+            curses.push_back(m_localization ? m_localization->text("enchantment."+key.substr(key.find(':')+1)) : key);
+        }
+        UiTheme::tooltip(*this,x,y,UiTheme::tooltipDetail(stack,m_localization),.9f,curses);
     }
     void renderText(const std::string& text,float x,float y,float scale,
                     const glm::vec3& color)override{
@@ -213,6 +223,8 @@ private:
     glm::vec2 m_canvasOrigin{0},m_canvasSize{0};glm::mat4 m_projection{1};
     std::vector<Batch> m_batches;
     float m_opacity = 1.0f;
+    float m_animationTime = 0;
+    glm::vec4 m_iconTint{1};
     int m_uiWidth=1,m_uiHeight=1;
     RenderTextureHandle m_whiteTexture{},m_itemTexture{},m_fontTexture{};
     RenderMaterialHandle m_whiteMaterial{},m_blockMaterial{},m_itemMaterial{},m_fontMaterial{};
@@ -235,7 +247,7 @@ private:
     void quad(float x,float y,float w,float h,const glm::vec4& uv,
               const glm::vec4& color,RenderMaterialHandle materialHandle){
         if (!(w>0 && h>0) || color.a<=0) return;
-        const glm::vec4 tinted=uiLinearColor(color,m_opacity);
+        const glm::vec4 tinted=uiLinearColor(color*m_iconTint,m_opacity);
         Batch& b=batch(materialHandle);const uint32_t base=static_cast<uint32_t>(b.vertices.size());
         b.vertices.insert(b.vertices.end(),{{{x,y},{uv.x,uv.y},tinted},
             {{x+w,y},{uv.z,uv.y},tinted},{{x+w,y+h},{uv.z,uv.w},tinted},

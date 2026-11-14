@@ -32,8 +32,9 @@ git diff --check
 ./build-local/terrain_benchmark 1592615476 9
 ```
 
-The default CTest suite runs CPU and LAN regressions; LAN tests require local
-loopback/multicast socket access. Enable the optional Vulkan readback suite with:
+The default desktop CTest suite includes CPU, LAN and Vulkan regressions; LAN
+tests require local loopback/multicast access. Existing build caches that disabled
+GPU checks can enable them with:
 
 ```bash
 cmake -S . -B build-local -DMINECRAFTC_VULKAN_TESTS=ON
@@ -47,7 +48,10 @@ force Xvfb when the inherited display is unavailable. A missing display and
 missing Xvfb produce an explicit skip; scene failures and Vulkan validation
 errors fail the test. Installed Khronos validation layers are enabled on Linux.
 The registered scenes run serially with bounded timeouts. Set
-`-DMINECRAFTC_VULKAN_TESTS=OFF` to return to the default suite.
+`-DMINECRAFTC_VULKAN_TESTS=OFF` for an explicitly CPU-only run; report that GPU
+coverage was excluded. Linux CI provisions Xvfb/Lavapipe for GPU checks, while
+the Windows/macOS CI jobs explicitly select CPU/package checks. See
+[test contracts and labels](testing.md) for fast/slow subsets and failure triage.
 
 For GI frame-time measurements and fixed-exposure visual comparisons, see
 [GI benchmark and validation](gi-performance.md).

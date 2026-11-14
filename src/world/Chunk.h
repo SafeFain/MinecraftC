@@ -69,6 +69,8 @@ public:
     bool isDirty() const { return m_dirty; }
     void markClean()  { m_dirty = false; }
     void markDirty()  { m_dirty = true; }
+    // Also invalidates worker snapshots whose neighboring geometry is obsolete.
+    void invalidateMeshInputs() {++m_dataRevision;m_dirty=true;}
 
     // Raw block array access (for WorldGenerator)
     uint16_t& blockAt(int x, int y, int z) { return m_blocks[index(x, y, z)]; }

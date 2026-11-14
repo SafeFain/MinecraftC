@@ -36,9 +36,10 @@ public:
                            const glm::mat4& handTransform,
                            const ItemStack& offhand, const glm::mat4& leftHandTransform,
                            const HeldItemUseState* useState = nullptr);
+    void renderMovingBlock(BlockId block,const glm::mat4& viewProjection,const glm::vec3& minimum,SmoothLightSample light);
     void renderDropped(const ItemStack& item, const glm::mat4& viewProjection,
                        const glm::vec3& position, float ageSeconds, uint32_t phaseSeed,
-                       SmoothLightSample light);
+                       SmoothLightSample light, BlockId falling = BlockId::AIR);
 
 private:
     struct CachedMesh {
@@ -54,6 +55,7 @@ private:
     RenderTextureHandle m_toolTexture{};
     RenderMaterialHandle m_toolMaterial{};
     HeldItemUseState m_use;
+    float m_animationTime = 0;
     RenderMaterialHandle m_itemMaterial{};
     RenderMaterialHandle m_blockMaterial{};
     RenderMaterialHandle m_armMaterial{};
@@ -69,6 +71,7 @@ private:
     uint32_t m_itemWidth = 0;
     uint32_t m_itemHeight = 0;
     std::unordered_map<uint16_t, CachedMesh> m_meshes;
+    std::unordered_map<uint16_t,RenderMeshHandle> m_movingBlocks;
 
     struct ModelPart {RenderMeshHandle mesh{};RenderTextureHandle texture{};RenderMaterialHandle material{};glm::vec4 color{1};};
     std::unordered_map<uint16_t,std::vector<ModelPart>> m_pluginModels;

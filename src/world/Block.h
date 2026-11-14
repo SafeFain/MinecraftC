@@ -1,5 +1,7 @@
 #pragma once
 #include "world/NetherContent.h"
+#include "world/RedstoneContent.h"
+#include "world/RedstoneNativeState.h"
 
 #include <cstdint>
 #include <algorithm>
@@ -289,6 +291,12 @@ enum class BlockId : uint16_t {
     RESPAWN_ANCHOR_CHARGED_1 = NETHER_ARCH_FIRST + 4 * 10,
     RESPAWN_ANCHOR_CHARGED_2, RESPAWN_ANCHOR_CHARGED_3, RESPAWN_ANCHOR_CHARGED_4,
     NETHER_WART_CROP_0, NETHER_WART_CROP_1, NETHER_WART_CROP_2,
+    LAPIS_ORE, DEEPSLATE_LAPIS_ORE, BOOKSHELF, IRON_BLOCK, ENCHANTING_TABLE, ANVIL, CHIPPED_ANVIL, DAMAGED_ANVIL, FROSTED_ICE,
+    ANVIL_EAST, CHIPPED_ANVIL_EAST, DAMAGED_ANVIL_EAST,
+    GRINDSTONE_STATE_FIRST,
+    GRINDSTONE_STATE_LAST = GRINDSTONE_STATE_FIRST + 10,
+    REDSTONE_FIRST,
+    REDSTONE_LAST = REDSTONE_FIRST + static_cast<uint16_t>(Redstone::NativeBlock::Count) - 1,
     COUNT,
     POPPY        = FLOWER
 };
@@ -481,6 +489,10 @@ enum class BlockTexture : uint16_t {
     MC_NETHER_BLOCKS(NETHER_TEXTURE_ENUM)
 #undef NETHER_TEXTURE_ENUM
     CrimsonDoorBottom, CrimsonDoorTop, WarpedDoorBottom, WarpedDoorTop,
+    LAPIS_ORE, DEEPSLATE_LAPIS_ORE, BOOKSHELF, IRON_BLOCK, ENCHANTING_TABLE, ANVIL, CHIPPED_ANVIL, DAMAGED_ANVIL, FROSTED_ICE,
+#define REDSTONE_TEXTURE_ENUM(id,key) id,
+    MC_REDSTONE_TEXTURES(REDSTONE_TEXTURE_ENUM)
+#undef REDSTONE_TEXTURE_ENUM
     Count
 };
 
@@ -642,4 +654,21 @@ inline int respawnAnchorCharge(BlockId id) {
 }
 inline BlockId respawnAnchorBlock(int charge) {
     return charge<=0?BlockId::RESPAWN_ANCHOR:static_cast<BlockId>(static_cast<uint16_t>(BlockId::RESPAWN_ANCHOR_CHARGED_1)+std::min(charge,4)-1);
+}
+
+inline bool isAnvil(BlockId id) {
+    return (id >= BlockId::ANVIL && id <= BlockId::DAMAGED_ANVIL) ||
+           (id >= BlockId::ANVIL_EAST && id <= BlockId::DAMAGED_ANVIL_EAST);
+}
+inline unsigned anvilDamage(BlockId id) {
+    return static_cast<uint16_t>(id) - static_cast<uint16_t>(id >= BlockId::ANVIL_EAST ? BlockId::ANVIL_EAST : BlockId::ANVIL);
+}
+inline bool isGrindstone(BlockId id) {
+    return id == BlockId::GRINDSTONE || (id >= BlockId::GRINDSTONE_STATE_FIRST && id <= BlockId::GRINDSTONE_STATE_LAST);
+}
+inline unsigned grindstoneState(BlockId id) {
+    return id == BlockId::GRINDSTONE ? 0 : static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::GRINDSTONE_STATE_FIRST) + 1;
+}
+inline BlockId grindstoneBlock(unsigned state) {
+    return !state ? BlockId::GRINDSTONE : static_cast<BlockId>(static_cast<uint16_t>(BlockId::GRINDSTONE_STATE_FIRST) + state - 1);
 }

@@ -2,7 +2,7 @@
 #include "renderer/GameRenderer.h"
 #include <stdexcept>
 
-class EntityAiTestRenderer final : public IGameRenderer {
+class EntityAiTestRenderer : public IGameRenderer {
 public:
     // ── IRenderDevice ──────────────────────────────────────────────
     RenderDeviceCapabilities capabilities() const override { return {}; }

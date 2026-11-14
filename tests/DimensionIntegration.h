@@ -21,7 +21,10 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
     const auto id=Plugins::resolveDimension("dimension_demo:plateau"),rainId=Plugins::resolveDimension("dimension_data:rainland");
     const auto dimension=static_cast<DimensionId>(id),rain=static_cast<DimensionId>(rainId);
-    check(id>=3&&rainId>=3&&id!=rainId&&Plugins::mutableContentState().extensions.dimensions.size()==5,"native/data dimensions and rollback");
+    check(id>=3&&rainId>=3&&id!=rainId&&Plugins::validDimension(id)&&Plugins::validDimension(rainId),"native/data dimensions registered independently");
+    for(const char* key:{"dimension_bad:lost","dimension_visual:lost","dimension_dependency:lost"})
+        check(std::none_of(Plugins::content().extensions.dimensions.begin(),Plugins::content().extensions.dimensions.end(),
+            [&](const auto& entry){return entry.second.key==key;}),"rejected dimension leaked into registry");
     for(const auto& info:plugins.plugins())if(info.manifest.id=="dimension_bad"||info.manifest.id=="dimension_visual"||info.manifest.id=="dimension_dependency")check(!info.active,"invalid dimension package rejected");
     size_t index=0;for(;index<plugins.plugins().size();++index)if(plugins.plugins()[index].manifest.id=="dimension_demo")break;
     MC_PluginContext ctx;ctx.manager=&plugins;ctx.index=index;
@@ -62,7 +65,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     refused=false;try{Lan::decodeProfile(oldProfile);}catch(const Lan::ProtocolError& error){refused=std::string(error.what())=="Unsupported player profile format";}check(refused,"old profile format explicitly refused");
     const int distance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=0;
     {
-        GameSession session(root/"saves");EntityAiTestRenderer renderer;session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+        ScenarioSession session(root/"saves");EntityAiTestRenderer renderer;session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
         const auto world=session.createWorld("Dimension session",12,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);session.startWorld(world,true,0);
         auto ready=[&]{RuntimeClock clock;for(int i=0;i<4000;++i){if(session.advanceLoading(&renderer,clock.now()))return true;std::this_thread::sleep_for(std::chrono::milliseconds(2));}return false;};
         check(ready(),"normal loading");
@@ -71,17 +74,17 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         check(session.activeDimension()==dimension,"queued SDK session authority travel");check(ready(),"plugin dimension loading gate");
         check(!session.weatherState().raining()&&session.playerState().getPosition().y==49.01,"default generator and clear policy");
         double mobPosition[3]{.5,49.01,.5};check(session.pluginSpawnEntity(id,static_cast<uint16_t>(EntityType::Cow),mobPosition),"explicit mob spawning ignores natural-spawn disable");
-        const auto entered=session.playerState().getPosition();GameSessionTestAccess::player(session).setPosition(entered+glm::dvec3(2,0,0));
+        const auto entered=session.playerState().getPosition();SessionScenario::player(session).setPosition(entered+glm::dvec3(2,0,0));
         check(session.switchDimension(rain,0)&&ready()&&session.weatherState().raining(),"fixed coordinate and rain policy");
         check(session.switchDimension(dimension,0)&&ready()&&session.playerState().getPosition()==entered+glm::dvec3(2,0,0),"per-dimension re-entry position");
         Localization localization;const auto fixed=parseCommand("/weather rain");check(fixed.command.has_value(),"weather parser");session.executeCommand(*fixed.command,localization);check(!session.weatherState().raining(),"fixed weather rejects command");
-        GameSessionTestAccess::player(session).setPosition({.5,Config::WORLD_MIN_Y-3,.5});check(session.handleVoidFall(0,{})&&session.activeDimension()==DimensionId::Overworld&&ready(),"declarative void return");
+        SessionScenario::player(session).setPosition({.5,Config::WORLD_MIN_Y-3,.5});check(session.handleVoidFall(0,{})&&session.activeDimension()==DimensionId::Overworld&&ready(),"declarative void return");
         const auto command=parseCommand("/dimension dimension_demo:plateau");check(command.command&&session.executeCommand(*command.command,localization).teleported&&ready(),"dimension command authority travel");
         session.respawn();check(session.activeDimension()==DimensionId::Overworld&&ready(),"declarative death target");
         check(session.switchDimension(rain,0)&&ready(),"enter rainland");session.respawn();check(session.activeDimension()==rain&&ready(),"default death stays in dimension");
         if(!session.openLanRoom(0,2,true))throw std::runtime_error("dimension LAN host starts: "+session.lanError());
-        GameSession client(root/"client"/"saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});check(client.joinLanRoom("::1",session.lanPort(),0),"dimension LAN client connects");
-        double now=0;auto pump=[&]{now+=.005;session.pollLan(now);client.pollLan(now);GameSessionTestAccess::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
+        ScenarioSession client(root/"client"/"saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});check(client.joinLanRoom("::1",session.lanPort(),0),"dimension LAN client connects");
+        double now=0;auto pump=[&]{now+=.005;session.pollLan(now);client.pollLan(now);SessionScenario::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
         for(int i=0;i<1000&&!client.lanWorldReady();++i){pump();}
         check(client.lanWorldReady()&&!client.lanConnectionFailed(),"dimension LAN registry handshake");
         const auto roster=session.roomRoster();check(roster.size()==2,"guest joined");check(session.pluginTravel(roster.back().id,id),"host travels guest to plugin dimension");
@@ -89,13 +92,15 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         check(client.activeDimension()==dimension&&!client.pluginTravel(0,rainId),"client follows authority and cannot mutate dimension");
         check(session.activeDimension()==rain,"host and guest independent dimensions");client.leaveWorld();session.closeLanRoom();
         // Remove support and block the fixed landing: failure must retain source.
-        auto& terrain=GameSessionTestAccess::world(session);terrain.setBlock(0,64,0,BlockId::AIR);
+        auto& terrain=SessionScenario::world(session);terrain.setBlock(0,64,0,BlockId::AIR);
         check(session.switchDimension(dimension,0)&&ready(),"leave edited dimension");check(!session.switchDimension(rain,0)&&session.activeDimension()==dimension,"invalid fixed landing keeps source dimension");
         bool failed=false;session.saveNow([&]{failed=true;});check(!failed,"multi-dimension save");session.leaveWorld();session.startWorld(world,false,0);check(session.activeDimension()==dimension&&ready(),"active plugin dimension reload");session.leaveWorld();
     }
     plugins.travelPlayer={};
     Config::RENDER_DISTANCE=distance;
-    plugins.shutdown();Plugins::PluginManager safe({assets,root});safe.initialize(true);check(Plugins::mutableContentState().extensions.dimensions.size()==2&&Plugins::validDimension(DimensionId::Nether)&&!Plugins::validDimension(1),"safe mode retains both native dimensions");safe.shutdown();
+    plugins.shutdown();Plugins::PluginManager safe({assets,root});safe.initialize(true);
+    check(Plugins::validDimension(DimensionId::Overworld)&&Plugins::validDimension(DimensionId::Nether)&&!Plugins::validDimension(1)&&
+        !Plugins::validDimension(id)&&!Plugins::validDimension(rainId),"safe mode retains native dimensions and excludes optional dimensions");safe.shutdown();
     std::filesystem::remove_all(root);std::cout<<"Dimension registry/runtime integration passed\n";return 0;
 }
 }

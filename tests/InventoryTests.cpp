@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <set>
 
 namespace {
 
@@ -89,7 +90,10 @@ int main() {
             static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint16_t>(BlockId::SULFUR_CRUST) == 182 &&
             static_cast<uint16_t>(BlockId::NETHERRACK) == 895 &&
-            static_cast<uint16_t>(BlockId::COUNT) == static_cast<uint16_t>(BlockId::NETHER_WART_CROP_2)+1 &&
+            static_cast<uint16_t>(BlockId::NETHER_WART_CROP_2) == 1155 &&
+            static_cast<uint16_t>(BlockId::LAPIS_ORE) == 1156 &&
+            static_cast<uint16_t>(BlockId::REDSTONE_FIRST) == static_cast<uint16_t>(BlockId::GRINDSTONE_STATE_LAST)+1 &&
+            static_cast<uint16_t>(BlockId::COUNT) == static_cast<uint16_t>(BlockId::REDSTONE_LAST)+1 &&
             getBlockProps(BlockId::WHITE_BED).shape == RenderShape::Bed &&
             std::abs(blockCollisionHeight(BlockId::WHITE_BED) - 9.0f / 16.0f) <
                 0.0001f,
@@ -129,23 +133,25 @@ int main() {
     const auto creativeItems = creativeInventoryItems();
     require(creativeItems.size() == static_cast<size_t>(ItemId::COUNT) - 1,
             "creative inventory does not expose every registered item");
-    require(creativeItems.front() == ItemId::GRASS_BLOCK &&
-            creativeItems[static_cast<size_t>(ItemId::BLASTLING_SPAWN_EGG) - 1] ==
-                ItemId::BLASTLING_SPAWN_EGG &&
-            creativeItems[static_cast<size_t>(ItemId::AETHER_GRASS) - 1] ==
-                ItemId::AETHER_GRASS &&
-            creativeItems[207] == ItemId::BONE_MEAL &&
-            creativeItems[231] == ItemId::BEACH_GRASS &&
-            creativeItems[259] == ItemId::CAVE_GLOWSHROOM &&
-            creativeItems[285] == ItemId::COOKED_SALMON &&
-            creativeItems[291] == ItemId::STONECUTTER &&
-            creativeItems[static_cast<size_t>(ItemId::STONE_BUTTON)-1] == ItemId::STONE_BUTTON &&
-            creativeItems.back() == ItemId::ENDERMAN_SPAWN_EGG,
-            "creative inventory ordering does not follow stable item ids");
+    const std::set<ItemId> catalog(creativeItems.begin(), creativeItems.end());
+    require(catalog.size() == creativeItems.size() && catalog.count(ItemId::EMPTY) == 0,
+            "creative catalog contains duplicate or empty items");
+    for (uint16_t raw = 1; raw < static_cast<uint16_t>(ItemId::COUNT); ++raw)
+        require(catalog.count(static_cast<ItemId>(raw)) == 1,
+                "creative catalog omitted a registered item");
 
     // Minecraft-style creative tabs: every registered item belongs to exactly
-    // one category and the category list agrees with the catalog ordering.
-    size_t categoryCounts[static_cast<size_t>(CreativeItemCategory::Count)] = {};
+    // one category; additions and catalog reorderings do not change the contract.
+    std::set<ItemId> categorizedItems;
+    for (size_t raw = 0; raw < static_cast<size_t>(CreativeItemCategory::Count); ++raw) {
+        const auto category = static_cast<CreativeItemCategory>(raw);
+        for (const auto id : creativeInventoryItemsIn(category)) {
+            require(catalog.count(id) && creativeInventoryCategory(id) == category,
+                    "category contains an invalid or misclassified item");
+            require(categorizedItems.insert(id).second,
+                    "item appears in multiple creative categories");
+        }
+    }
     size_t categorized = 0;
     for (uint16_t raw = 1; raw < static_cast<uint16_t>(ItemId::COUNT); ++raw) {
         const ItemId id = static_cast<ItemId>(raw);
@@ -155,28 +161,11 @@ int main() {
         const auto& bucket = creativeInventoryItemsIn(category);
         require(std::find(bucket.begin(), bucket.end(), id) != bucket.end(),
                 "category membership agrees with its item list");
-        categoryCounts[static_cast<size_t>(category)]++;
         categorized++;
     }
     require(categorized == creativeItems.size(),
             "creative categories cover exactly the full creative catalog");
-    require(categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::BuildingBlocks)] == 147 &&
-            categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Nature)] == 69 &&
-            categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Functional)] == 44 &&
-            categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Tools)] == 29 &&
-            categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Combat)] == 57 &&
-            categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Food)] == 20 &&
-            categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::Materials)] == 46 &&
-            categoryCounts[static_cast<size_t>(
-                CreativeItemCategory::SpawnEggs)] == 21,
-            "creative category sizes do not match the tab assignment");
+    require(categorizedItems == catalog, "creative categories must partition the catalog");
     require(creativeInventoryCategory(ItemId::FISHING_ROD)==CreativeItemCategory::Tools &&
             creativeInventoryCategory(ItemId::RAW_COD)==CreativeItemCategory::Food &&
             creativeInventoryCategory(ItemId::RAW_SALMON)==CreativeItemCategory::Food &&

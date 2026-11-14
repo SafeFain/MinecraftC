@@ -88,6 +88,9 @@ void GameSession::presentLanEvents(const Feedback& feedback) {
             if (feedback.playThunder) feedback.playThunder(std::clamp(static_cast<float>(delta.x) / 32, -1.0f, 1.0f), std::clamp(1 - distance / 160, .18f, 1.0f));
             if (feedback.rumble && distance < 64) feedback.rumble(std::clamp(1 - distance / 48, .12f, .8f), 220);
             break;
+        case Lan::EventKind::Workstation:
+            if (distance < 16 && feedback.playWorkstation) feedback.playWorkstation(event.flags);
+            break;
         case Lan::EventKind::Interaction:
             if (distance < 16 && feedback.playBlockInteraction) feedback.playBlockInteraction(event.flags & 1, event.flags & 2, event.flags & 4);
             break;

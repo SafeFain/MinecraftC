@@ -16,15 +16,15 @@ inline int run(const std::filesystem::path& assets) {
     const auto root=std::filesystem::temp_directory_path()/"minecraftc-gamerule-integration";
     std::filesystem::remove_all(root);
     {
-        GameSession session(root);
+        ScenarioSession session(root);
         Localization localization;
         auto run=[&](const char* text) { return runCommand(session,localization,text); };
-        GameSessionTestAccess::setCheats(session,false);
+        SessionScenario::setCheats(session,false);
         check(run("/gamerule keep_inventory true").messages[0]=="message.cheats_disabled","rule cheats gate missing");
-        GameSessionTestAccess::setCheats(session,true);
+        SessionScenario::setCheats(session,true);
         check(!session.metadata().gameRules.boolean(GameRuleId::KeepInventory),"denied mutation changed state");
         run("/gamerule keepInventory true");
-        check(GameSessionTestAccess::world(session).gameRules().boolean(GameRuleId::KeepInventory),"live rule not synchronized");
+        check(SessionScenario::world(session).gameRules().boolean(GameRuleId::KeepInventory),"live rule not synchronized");
         const auto before=session.daylightState().phase();
         run("/gamerule doDaylightCycle false"); session.updateDaylight(100,true);
         check(session.daylightState().phase()==before,"frozen time advances");
@@ -33,20 +33,23 @@ inline int run(const std::filesystem::path& assets) {
         check(session.daylightState().phase()!=night,"time resume fails");
         run("/weather thunder"); run("/gamerule advance_weather false");
         const auto timer=session.weatherState().saveState().rainTicks;
-        GameSessionTestAccess::tickWeather(session);
+        SessionScenario::tickWeather(session);
         check(session.weatherState().saveState().rainTicks==timer,"weather timer changed while disabled");
         run("/weather clear"); check(!session.weatherState().raining(),"explicit weather command blocked");
         run("/weather thunder"); run("/gamerule players_sleeping_percentage 101");
         const auto preSleep=session.daylightState().phase();
-        GameSessionTestAccess::sleepChoice(session,{});
+        SessionScenario::sleepChoice(session,{});
         check(session.daylightState().phase()==preSleep && session.weatherState().thundering(),"sleep threshold ignored");
         run("/gamerule players_sleeping_percentage 100"); run("/gamerule advance_time false");
-        GameSessionTestAccess::sleepChoice(session,{});
+        SessionScenario::sleepChoice(session,{});
         check(session.daylightState().phase()==preSleep && session.weatherState().thundering(),"sleep bypasses frozen rules");
         run("/gamerule advance_time true"); run("/gamerule advance_weather true");
-        GameSessionTestAccess::sleepChoice(session,{});
+        SessionScenario::sleepChoice(session,{});
         check(session.daylightState().phase()!=preSleep && !session.weatherState().raining(),"normal sleep no longer resets environment");
-        const auto help=run("/help gamerule keep_inventory"); check(help.messages.size()==3,"single help not limited to rule");
+        const auto help=run("/help gamerule keep_inventory");
+        for(const char* key:{"message.gamerule_help","gamerule.description.keep_inventory","message.gamerule_implemented"})
+            check(std::find(help.messages.begin(),help.messages.end(),localization.text(key))!=help.messages.end(),
+                "single rule help omitted syntax, description or support status");
         check(run("/gamerule raids false").messages.back()=="message.gamerule_unavailable","missing mechanism hidden");
         run("/gamerule send_command_feedback false");
         check(run("/gamerule keep_inventory").messages.size()==1,"query feedback suppressed");
@@ -57,10 +60,10 @@ inline int run(const std::filesystem::path& assets) {
             "silent setter hides support warning or retains success feedback");
         check(!run("/gamerule send_command_feedback true").messages.empty(),"feedback restore has no acknowledgement");
         session.inventory().slot(0)={ItemId::DIAMOND,3,0};
-        run("/gamerule keep_inventory true"); GameSessionTestAccess::die(session);
-        check(session.inventory().slot(0).count==3 && GameSessionTestAccess::entities(session).entities().empty(),"kept inventory still drops");
-        run("/gamerule keep_inventory false"); GameSessionTestAccess::die(session);
-        check(session.inventory().slot(0).empty() && !GameSessionTestAccess::entities(session).entities().empty(),"normal death no longer drops");
+        run("/gamerule keep_inventory true"); SessionScenario::die(session);
+        check(session.inventory().slot(0).count==3 && SessionScenario::entities(session).entities().empty(),"kept inventory still drops");
+        run("/gamerule keep_inventory false"); SessionScenario::die(session);
+        check(session.inventory().slot(0).empty() && !SessionScenario::entities(session).entities().empty(),"normal death no longer drops");
     }
     {
         EntityAiScenarios::Scene scene(assets);
@@ -86,14 +89,14 @@ inline int run(const std::filesystem::path& assets) {
         check(scene.player.survivalStats().health()>10,"regeneration does not resume");
     }
     {
-        GameSession session(root);
-        GameSessionTestAccess::flatRuleScene(session);
+        ScenarioSession session(root);
+        SessionScenario::flatRuleScene(session);
         GameRuleSet rules; rules.set(GameRuleId::KeepInventory,GameRuleValue::boolean(true));
-        GameSessionTestAccess::setRules(session,rules);
+        SessionScenario::setRules(session,rules);
         int deathScreens=0,deathMessages=0;
         GameSession::Feedback feedback; feedback.playerDied=[&]{++deathScreens;};
         feedback.playerDeathMessage=[&]{++deathMessages;};
-        GameSessionTestAccess::player(session).survivalStats().damage(100);
+        SessionScenario::player(session).survivalStats().damage(100);
         session.updatePlaying(0,nullptr,feedback);
         check(session.isPlayerDead() && deathScreens==1 && deathMessages==1,"normal death screen/message missing");
         session.respawn(0);
@@ -103,8 +106,8 @@ inline int run(const std::filesystem::path& assets) {
         rules.set(GameRuleId::ImmediateRespawn,GameRuleValue::boolean(true));
         rules.set(GameRuleId::ShowDeathMessages,GameRuleValue::boolean(false));
         rules.set(GameRuleId::RespawnRadius,GameRuleValue::integer(0));
-        GameSessionTestAccess::setRules(session,rules);
-        GameSessionTestAccess::player(session).survivalStats().damage(100);
+        SessionScenario::setRules(session,rules);
+        SessionScenario::player(session).survivalStats().damage(100);
         session.updatePlaying(0,nullptr,feedback);
         check(!session.isPlayerDead() && session.playerState().survivalStats().health()==20 && deathScreens==1 && deathMessages==1,
             "immediate respawn or death-message suppression ignored");

@@ -1,5 +1,6 @@
 #include "plugins/ContentQueries.h"
 #include "renderer/HeldItemRenderer.h"
+#include "renderer/EquipmentAppearance.h"
 #include "renderer/BlockAtlasData.h"
 #include "model/ModelAnimation.h"
 #include "model/ModelTexture.h"
@@ -165,6 +166,8 @@ void HeldItemRenderer::reset() {
     if (!m_renderer) return;
     for (const auto& entry : m_meshes) if(entry.second.handle)m_renderer->destroyMesh(entry.second.handle);
     m_meshes.clear();
+    for(const auto& entry:m_movingBlocks)if(entry.second)m_renderer->destroyMesh(entry.second);
+    m_movingBlocks.clear();
     for(const auto& pair:m_pluginModels)for(const auto& p:pair.second){if(p.mesh)m_renderer->destroyMesh(p.mesh);if(p.material)m_renderer->destroyMaterial(p.material);if(p.texture)m_renderer->destroyTexture(p.texture);}
     m_pluginModels.clear();m_pluginDropTransforms.clear();
     if(m_fishingCube)m_renderer->destroyMesh(m_fishingCube);
@@ -252,7 +255,7 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
 }
 
 void HeldItemRenderer::renderDropped(const ItemStack& item, const glm::mat4& vp,
-    const glm::vec3& position, float ageSeconds, uint32_t phaseSeed, SmoothLightSample light) {
+    const glm::vec3& position, float ageSeconds, uint32_t phaseSeed, SmoothLightSample light, BlockId falling) {
     if (!m_renderer || item.empty()) return;
     const CachedMesh cached=meshFor(item.id);
     if(cached.toolModel&&Plugins::content().extensions.heldModels.count(static_cast<uint16_t>(item.id))){
@@ -265,7 +268,7 @@ void HeldItemRenderer::renderDropped(const ItemStack& item, const glm::mat4& vp,
     if(drawPluginModel(item,vp,glm::translate(glm::mat4(1),position+glm::vec3(0,.08f+std::sin(ageSeconds*2)*.025f,0))*glm::rotate(glm::mat4(1),ageSeconds,glm::vec3(0,1,0))*glm::scale(glm::mat4(1),glm::vec3(.35f)),false,true))return;
     if (!cached.handle) return;
     const float phase=static_cast<float>(phaseSeed%628u)*.01f;
-    const glm::mat4 pose=glm::translate(glm::mat4(1),position+
+    const glm::mat4 pose = falling != BlockId::AIR ? glm::translate(glm::mat4(1),position+glm::vec3(0,.5f,0))*glm::rotate(glm::mat4(1),falling >= BlockId::ANVIL_EAST ? 1.5707963f : 0.f,glm::vec3(0,1,0))*glm::scale(glm::mat4(1),glm::vec3(1.f/.3f))*cached.droppedTransform : glm::translate(glm::mat4(1),position+
         glm::vec3(0,.25f+.035f*std::sin(ageSeconds*2.5f+phase),0))*
         glm::rotate(glm::mat4(1),ageSeconds*1.5f+phase,glm::vec3(0,1,0))*cached.droppedTransform;
     const float sky=std::pow(std::clamp(light.sky,0.0f,1.0f),1.20f);
@@ -276,6 +279,7 @@ void HeldItemRenderer::renderDropped(const ItemStack& item, const glm::mat4& vp,
     command.viewProjection=vp;command.useCustomViewProjection=true;
     command.tint=glm::vec4(glm::max(glm::max(glm::vec3(sky),
         glm::vec3(1,.72f,.38f)*block),glm::vec3(.025f)),1);
+    command.tint *= enchantedSheen(item,ageSeconds);
     command.model=pose;
     if (!cached.toolModel) {m_renderer->draw(command);return;}
     for (const auto& range : cached.ranges) {
@@ -287,13 +291,14 @@ void HeldItemRenderer::renderDropped(const ItemStack& item, const glm::mat4& vp,
 }
 
 void HeldItemRenderer::updateUseState(bool charging, float charge, bool blocking, float dt) {
+    m_animationTime += std::max(0.f,dt);
     m_use=advanceHeldItemUseState(m_use,charging,charge,blocking,dt);
 }
 
 void HeldItemRenderer::drawItem(const ItemStack& item, const glm::mat4& vp,
                                 const glm::mat4& transform, bool firstPerson) {
     if(item.empty())return;
-    if(drawPluginModel(item,vp,transform,firstPerson))return;
+    if(drawPluginModel(item,vp,transform,firstPerson,false,enchantedSheen(item,m_animationTime)))return;
     const CachedMesh cached=meshFor(item.id);
     if(!cached.handle)return;
     DrawCommand held;
@@ -301,7 +306,7 @@ void HeldItemRenderer::drawItem(const ItemStack& item, const glm::mat4& vp,
     held.material=cached.toolModel ? m_toolMaterial :
         (cached.blockAtlas ? m_blockMaterial : m_itemMaterial);
     held.viewProjection=vp;held.useCustomViewProjection=true;
-    held.model=transform;
+    held.model=transform; held.tint=enchantedSheen(item,m_animationTime);
     if(!cached.toolModel) {m_renderer->draw(held);return;}
     const glm::mat4 grip=(!firstPerson && item.id==ItemId::BOW && m_use.bowCharging) ?
         glm::mat4(1) : heldToolGripTransform(item.id,getItemProps(item.id).tool,firstPerson);
@@ -482,4 +487,16 @@ bool HeldItemRenderer::drawPluginModel(const ItemStack& item,const glm::mat4& vp
         grip=normalized->second;
     }
     for(const auto& part:cached->second){DrawCommand draw;draw.mesh=part.mesh;draw.material=part.material;draw.model=transform*grip;draw.tint=part.color*tint;draw.viewProjection=vp;draw.useCustomViewProjection=true;m_renderer->draw(draw);}return true;
+}
+
+void HeldItemRenderer::renderMovingBlock(BlockId block,const glm::mat4& vp,const glm::vec3& minimum,SmoothLightSample light) {
+    if(!m_renderer)return;
+    const auto key=static_cast<uint16_t>(block);auto found=m_movingBlocks.find(key);
+    if(found==m_movingBlocks.end())found=m_movingBlocks.emplace(key,m_renderer->createMesh(buildHeldBlockShapeMesh(block,m_blockTiles))).first;
+    DrawCommand command;command.mesh=found->second;command.material=m_blockMaterial;
+    command.viewProjection=vp;command.useCustomViewProjection=true;
+    command.model=glm::translate(glm::mat4(1),minimum+glm::vec3(.5f));
+    const float sky=std::pow(std::clamp(light.sky,0.f,1.f),1.2f),emission=std::pow(std::clamp(light.block,0.f,1.f),1.35f);
+    command.tint=glm::vec4(glm::max(glm::max(glm::vec3(sky),glm::vec3(1,.72f,.38f)*emission),glm::vec3(.025f)),1);
+    m_renderer->draw(command);
 }

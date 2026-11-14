@@ -22,10 +22,12 @@ public:
     void onGamepadNavigate(int dx, int dy);
     void onGamepadAction(bool select, std::function<void(ItemId)> onSelectItem);
     ItemId hoveredItem() const;
+    EnchantmentId hoveredEnchantment() const;
 
 private:
     struct Slot {
         ItemId id;
+        EnchantmentId enchantment = EnchantmentId::Count;
         float x = 0.0f, y = 0.0f;  // screen-space bottom-left
         bool hovered = false;
         bool visible = false;

@@ -24,20 +24,24 @@ int main() {
             for (const auto& candidate : browser.rooms()) if (candidate.name == room.name) return &candidate;
             return nullptr;
         };
-        for (int i = 0; i < 200 && !find(); ++i) pump();
+        const auto waitFor=[&](auto condition) {
+            const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+            while(!condition()&&std::chrono::steady_clock::now()<deadline)pump();
+        };
+        waitFor([&]{return find()!=nullptr;});
         require(find() && find()->port == 25565 && find()->capacity == 8 && find()->players == 1 && !find()->address.empty(),
                 "DNS-SD discovers complete numeric endpoint and capacity");
         require(find()->version == room.version && find()->protocol == 1 && find()->generation == 20 && find()->contentSignature==room.contentSignature,
                 "DNS-SD carries compatibility metadata");
         room.players = 3; room.pvp = true;
         require(host.advertise(room), "room metadata refresh accepted");
-        for (int i = 0; i < 200 && (!find() || find()->players != 3); ++i) pump();
+        waitFor([&]{return find()&&find()->players==3;});
         require(find() && find()->players == 3 && find()->pvp, "updated occupancy and PvP replace discovered metadata");
         host.stopAdvertising();
-        for (int i = 0; i < 200 && find(); ++i) pump();
+        waitFor([&]{return find()==nullptr;});
         require(!find(), "goodbye removes a closed LAN room");
         require(host.advertise(room), "room can advertise after closing");
-        for (int i = 0; i < 200 && !find(); ++i) pump();
+        waitFor([&]{return find()!=nullptr;});
         require(find(), "reopened room becomes discoverable");
         for (int i = 0; i < 20; ++i) pump();
         browser.poll(now + 20);

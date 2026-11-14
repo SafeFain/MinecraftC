@@ -37,8 +37,12 @@ int main() {
             static_cast<uint16_t>(BlockId::DRIPSTONE_BLOCK) == 175 &&
             static_cast<uint16_t>(BlockId::SULFUR_CRUST) == 182 &&
             static_cast<uint16_t>(BlockId::NETHERRACK) == 895 &&
-            static_cast<uint16_t>(BlockId::COUNT) == static_cast<uint16_t>(BlockId::NETHER_WART_CROP_2)+1,
-            "fluid, Heaven, emerald, and workstation states append without renumbering old ids");
+            static_cast<uint16_t>(BlockId::NETHER_WART_CROP_2) == 1155 &&
+            static_cast<uint16_t>(BlockId::LAPIS_ORE) == 1156 &&
+            static_cast<uint16_t>(BlockId::GRINDSTONE_STATE_LAST) == 1178 &&
+            static_cast<uint16_t>(BlockId::REDSTONE_FIRST) == 1179 &&
+            static_cast<uint16_t>(BlockId::REDSTONE_LAST) == 1479,
+            "fluid, Heaven, emerald, workstation and redstone states append without renumbering old ids");
     for (bool lava : {false, true}) {
         const BlockId source = fluidBlockFromAmount(lava, 8);
         const BlockId falling = fluidBlockFromAmount(lava, 8, true);

@@ -3,13 +3,45 @@
 #include "app/GameSession.h"
 #include "game/EntityTransferJournal.h"
 #include "game/SurvivalRules.h"
+#include "game/EnchantingRules.h"
 #include <cmath>
 
 namespace {
+unsigned bookshelves(const World& world, glm::ivec3 position) {
+    unsigned count = 0;
+    for (int x = -2; x <= 2; ++x) for (int z = -2; z <= 2; ++z) {
+        if (std::abs(x) != 2 && std::abs(z) != 2) continue;
+        for (int y = 0; y < 2; ++y) {
+            const auto between = position + glm::ivec3(x / 2, y, z / 2);
+            const auto shelf = position + glm::ivec3(x, y, z);
+            if (world.getLoadedBlock(between.x, between.y, between.z) == BlockId::AIR &&
+                world.getLoadedBlock(shelf.x, shelf.y, shelf.z) == BlockId::BOOKSHELF) ++count;
+        }
+    }
+    return std::min(count, 15u);
+}
+void refreshWorkstation(BlockEntity& station, const Player& owner, unsigned shelves) {
+    if (station.type == BlockEntityType::EnchantingTable) {
+        const auto offers = EnchantingRules::tableOffers(station.chest[0], shelves, owner.enchantmentSeed);
+        for (size_t i = 0; i < 3; ++i) { station.offerRequired[i] = static_cast<uint8_t>(offers[i].requiredLevel); station.offerClue[i] = static_cast<uint8_t>(offers[i].clue); station.offerClueLevel[i] = offers[i].clueLevel;
+            station.offerFailure[i] = !offers[i].requiredLevel ? 1 : owner.gameMode() == GameMode::Creative ? 0 :
+                owner.experience().level() < static_cast<int>(offers[i].requiredLevel) ? 3 :
+                station.chest[1].id != ItemId::LAPIS_LAZULI || station.chest[1].count < i+1 ? 2 : 0;
+        }
+    } else {
+        const auto result = station.type == BlockEntityType::Anvil ?
+            EnchantingRules::anvil(station.chest[0], station.chest[1], station.rename, owner.gameMode() == GameMode::Creative) :
+            EnchantingRules::grindstone(station.chest[0], station.chest[1]);
+        station.output = result.item; station.workCost = result.cost; station.workTooExpensive = result.tooExpensive;
+        station.workFailure = station.chest[0].empty() ? 0 : result.item.empty() ? 4 : result.tooExpensive ? 5 :
+            owner.gameMode() != GameMode::Creative && owner.experience().level() < static_cast<int>(result.cost) ? 3 : 0;
+    }
+}
+
 uint64_t fingerprint(const InventoryModel& inventory, const InventoryTransaction& transaction) {
     uint64_t hash = 1469598103934665603ULL;
     const auto value = [&hash](uint64_t n) { for (int i = 0; i < 8; ++i) { hash ^= static_cast<uint8_t>(n); hash *= 1099511628211ULL; n >>= 8; } };
-    const auto stack = [&value](ItemStack item) { value(static_cast<uint16_t>(item.id)); value(item.count); value(item.damage); };
+    const auto stack = [&value](ItemStack item) { value(static_cast<uint16_t>(item.id)); value(item.count); value(item.damage); value(item.components.fingerprint()); };
     value(transaction.revision());
     for (auto item : inventory.storage()) stack(item);
     for (auto item : inventory.armor()) stack(item);
@@ -20,7 +52,7 @@ uint64_t fingerprint(const InventoryModel& inventory, const InventoryTransaction
 uint64_t fingerprint(const BlockEntity& container) {
     uint64_t hash = 1469598103934665603ULL;
     const auto stack = [&hash](ItemStack item) {
-        for (uint64_t n : {uint64_t(static_cast<uint16_t>(item.id)), uint64_t(item.count), uint64_t(item.damage)}) {
+        for (uint64_t n : {uint64_t(static_cast<uint16_t>(item.id)), uint64_t(item.count), uint64_t(item.damage), item.components.fingerprint()}) {
             hash ^= n; hash *= 1099511628211ULL;
         }
     };
@@ -28,6 +60,11 @@ uint64_t fingerprint(const BlockEntity& container) {
     for(const auto& xp:container.furnaceExperience) {for(unsigned char c:xp.first){hash^=c;hash*=1099511628211ULL;}hash^=xp.second;hash*=1099511628211ULL;}
     for (auto item : container.chest) stack(item);
     stack(container.input); stack(container.fuel); stack(container.output);
+    hash ^= container.workFailure; hash *= 1099511628211ULL;
+    for (auto value : container.offerFailure) { hash ^= value; hash *= 1099511628211ULL; }
+    hash ^= container.workCost; hash *= 1099511628211ULL;
+    for (auto value : container.offerRequired) { hash ^= value; hash *= 1099511628211ULL; }
+    if (container.rename) for (unsigned char value : *container.rename) { hash ^= value; hash *= 1099511628211ULL; }
     return hash;
 }
 bool reachable(const Player& owner, const World& world, glm::ivec3 position) {
@@ -41,8 +78,13 @@ bool canOpenWindow(const Player& owner,DimensionSimulation& runtime,InventoryWin
         if (!reachable(owner, runtime.world, position)) return false;
         const auto block = runtime.world.getLoadedBlock(position.x, position.y, position.z);
         if (kind == InventoryWindowKind::CraftingTable && block != BlockId::CRAFTING_TABLE) return false;
-        if (kind == InventoryWindowKind::Container && (!block || !blockEntityTypeForBlock(*block) || !isInventoryContainer(*blockEntityTypeForBlock(*block)))) return false;
-        if (kind == InventoryWindowKind::Container && !runtime.world.getBlockEntity(position)) return false;
+        if (kind == InventoryWindowKind::Container) {
+            if (!block) return false;
+            if (!workstationTypeForBlock(*block)) {
+                const auto type = blockEntityTypeForBlock(*block);
+                if (!type || !isInventoryContainer(*type) || !runtime.world.getBlockEntity(position)) return false;
+            }
+        }
     }
     return true;
 }
@@ -54,7 +96,9 @@ void drops(Player& owner, EntityManager& entities, const std::vector<ItemStack>&
 
 void GameSession::closeAuthorityWindow(Player& owner, DimensionSimulation& runtime,
                                       InventoryTransaction& transaction, InventoryWindowView& view) {
-    drops(owner, runtime.entities, transaction.close(owner.inventory()));
+    auto returned = transaction.close(owner.inventory());
+    if (owner.survivalStats().dead() && !runtime.world.gameRules().boolean(GameRuleId::KeepInventory)) returned.erase(std::remove_if(returned.begin(),returned.end(),[](const ItemStack& stack) { return stack.enchantment(EnchantmentId::VanishingCurse) != 0; }),returned.end());
+    drops(owner, runtime.entities, returned);
     ++view.id; view.kind = InventoryWindowKind::Closed; view.container.reset();
 }
 bool GameSession::openAuthorityWindow(Player& owner, DimensionSimulation& runtime,
@@ -63,6 +107,9 @@ bool GameSession::openAuthorityWindow(Player& owner, DimensionSimulation& runtim
     if(!canOpenWindow(owner,runtime,kind,position))return false;
     closeAuthorityWindow(owner, runtime, transaction, view);
     view.kind = kind; view.position = position;
+    if (kind == InventoryWindowKind::Container) if (const auto type = workstationTypeForBlock(runtime.world.getBlock(position.x, position.y, position.z))) {
+        transaction.workstation.emplace(); transaction.workstation->type = *type;
+    }
     if(kind==InventoryWindowKind::Container && runtime.world.getBlock(position.x,position.y,position.z)==BlockId::CHEST)runtime.entities.angerPiglins(glm::dvec3(position));
     owner.cancelBowCharge();
     return true;
@@ -78,12 +125,18 @@ InventoryWindowView GameSession::authorityWindow(Player& owner, DimensionSimulat
         runtime.world.getLoadedBlock(view.position.x, view.position.y, view.position.z) != BlockId::CRAFTING_TABLE)
         closeAuthorityWindow(owner, runtime, transaction, view);
     if (view.kind == InventoryWindowKind::Container) {
-        auto* container = runtime.world.getBlockEntity(view.position);
+        auto* container = transaction.workstation ? &*transaction.workstation : runtime.world.getBlockEntity(view.position);
+        if (transaction.workstation) {
+            const auto block = runtime.world.getLoadedBlock(view.position.x, view.position.y, view.position.z);
+            const auto type = block ? workstationTypeForBlock(*block) : std::nullopt;
+            if (!type || *type != transaction.workstation->type) container = nullptr;
+            else refreshWorkstation(*container, owner, bookshelves(runtime.world, view.position));
+        }
         if (!container || !isInventoryContainer(container->type))
             closeAuthorityWindow(owner, runtime, transaction, view);
         else { if(container->type==BlockEntityType::SmithingTable)container->output=smithingResult(container->chest[0],container->chest[1],container->chest[2]);view.container = *container; view.containerRevision = fingerprint(*container); }
     }
-    view.revision = fingerprint(owner.inventory(), transaction);
+    view.revision = fingerprint(owner.inventory(), transaction) ^ (uint64_t(owner.experience().level()) << 32) ^ uint64_t(owner.experience().points()) ^ owner.enchantmentSeed;
     view.cursor = transaction.cursor(); view.crafting = transaction.crafting();
     return view;
 }
@@ -100,12 +153,27 @@ void GameSession::applyAuthorityInventory(Player& owner, DimensionSimulation& ru
     context.creative = owner.gameMode() == GameMode::Creative;
     context.craftingTable = snapshot.kind == InventoryWindowKind::CraftingTable;
     if (snapshot.kind == InventoryWindowKind::Container) {
-        context.container = runtime.world.getBlockEntity(snapshot.position);
+        context.container = transaction.workstation ? &*transaction.workstation : runtime.world.getBlockEntity(snapshot.position);
         context.containerRevision = snapshot.containerRevision;
     }
+    context.experience = &owner.experience(); context.enchantmentSeed = &owner.enchantmentSeed; context.randomState = &owner.m_equipmentRandom;
+    context.bookshelves = bookshelves(runtime.world, snapshot.position);
     action.revision = transaction.revision();
     const auto result = transaction.apply(owner.inventory(), action, context);
+    if(result.containerChanged && context.container && !transaction.workstation)
+        runtime.world.notifyContainerChanged(snapshot.position);
     if(!result.furnaceExperience.empty())runtime.entities.settleFurnaceExperience(owner.getPosition(),result.furnaceExperience);
+    if (result.accepted) {
+        if (action.operation == InventoryOperation::Enchant) runtime.world.recordWorkstationSound(snapshot.position,0);
+        else if (result.anvilUsed) runtime.world.recordWorkstationSound(snapshot.position,1);
+        else if (snapshot.container && snapshot.container->type == BlockEntityType::Grindstone && action.slot.area == InventoryArea::Container && action.slot.index == 2) runtime.world.recordWorkstationSound(snapshot.position,2);
+    }
+    if (result.workstationExperience) runtime.entities.spawnExperience(owner.getPosition(), result.workstationExperience);
+    if (result.anvilUsed && owner.isSurvival() && EquipmentRules::random(owner.m_equipmentRandom) % 100 < 12) {
+        const auto block = runtime.world.getBlock(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+        if (isAnvil(block)) runtime.world.setBlock(snapshot.position.x, snapshot.position.y, snapshot.position.z,
+            anvilDamage(block) == 2 ? BlockId::AIR : static_cast<BlockId>(static_cast<uint16_t>(block) + 1));
+    }
     drops(owner, runtime.entities, result.drops);
     if(&owner==&player)validateFishingRod();
     (void)authorityWindow(owner, runtime, transaction, view);

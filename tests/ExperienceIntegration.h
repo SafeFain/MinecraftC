@@ -101,22 +101,21 @@ inline int run(const std::filesystem::path& assets) {
         require(orbPoints(scene.mobs)>=5&&orbPoints(scene.mobs)<=9,"mining generates physical orbs");
     }
     {
-        stage="session death and commands";const auto root=std::filesystem::temp_directory_path()/("minecraftc-experience-session-"+Lan::randomToken());
-        GameSession session(root/"saves");GameSessionTestAccess::flatRuleScene(session);
-        auto& player=GameSessionTestAccess::player(session);auto& entities=GameSessionTestAccess::entities(session);
+        stage="session death and commands";TestSupport::TemporaryDirectory root;
+        ScenarioSession session(root.path()/"saves");SessionScenario::flatRuleScene(session);
+        auto& player=SessionScenario::player(session);auto& entities=SessionScenario::entities(session);
         Localization localization;
-        GameSessionTestAccess::setCheats(session,false);runCommand(session,localization,"/xp add @s 7");
+        SessionScenario::setCheats(session,false);runCommand(session,localization,"/xp add @s 7");
         require(player.experience().level()==0,"XP commands require cheats");
-        GameSessionTestAccess::setCheats(session,true);runCommand(session,localization,"/xp add @s 7");
+        SessionScenario::setCheats(session,true);runCommand(session,localization,"/xp add @s 7");
         require(player.experience().level()==1,"XP command reaches authority player");
         runCommand(session,localization,"/xp set @s 9 points");require(player.experience().points()==0,"invalid set points leaves authority unchanged");
         runCommand(session,localization,"/xp add @s -7");
-        player.experience().addPoints(1395);GameSessionTestAccess::die(session);
+        player.experience().addPoints(1395);SessionScenario::die(session);
         require(player.experience().level()==0&&orbPoints(entities)==100,"death drops capped XP and clears player");
         entities.clear();player.experience().addPoints(352);GameRuleSet rules;rules.set(GameRuleId::KeepInventory,GameRuleValue::boolean(true));
-        GameSessionTestAccess::setRules(session,rules);GameSessionTestAccess::die(session);
+        SessionScenario::setRules(session,rules);SessionScenario::die(session);
         require(player.experience().level()==16&&orbPoints(entities)==0,"keepInventory retains XP without dropping");
-        std::filesystem::remove_all(root);
     }
     {
         stage="state protocol";Lan::AuthorityState state;state.experience.addPoints(1628);state.experiencePickups=42;state.experienceLevelSounds=3;

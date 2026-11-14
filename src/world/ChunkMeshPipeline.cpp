@@ -311,6 +311,37 @@ void ChunkMeshPipeline::buildMeshesSync(IGameRenderer* renderer, int maxCount) {
     });
 }
 
+// Piston transitions are small, sparse edits, but their old mesh cannot remain
+// visible under the moving model or publish half a cross-chunk chain. Build from
+// immutable snapshots and publish every touched mesh before the next draw.
+void ChunkMeshPipeline::buildAtomicMeshes(IGameRenderer* renderer,const std::set<std::pair<int,int>>& coordinates) {
+    if(!renderer)return;
+    m_renderer=renderer;
+    for(const auto& coordinate:coordinates) {
+        Chunk* target=nullptr;MeshSnapshot snapshot;uint64_t revision=0;
+        m_chunks.withShared([&](ChunkStore& store) {
+            auto* chunk=store.findUnlocked(coordinate.first,coordinate.second);
+            if(!chunk || !chunk->generated.load() || chunk->lifecycle==Chunk::LifecycleState::Warm)return;
+            chunk->invalidateMeshInputs();
+            if(!makeMeshSnapshot(store,chunk,snapshot))return;
+            target=chunk;revision=chunk->dataRevision();
+        });
+        if(!target)continue;
+        ChunkMesh prepared;
+        prepared.build(target->worldX(),target->worldZ(),snapshot.targetBlocks.data(),snapshot.columnData(),
+            [&](int x,int y,int z){return snapshot.block(x,y,z);},
+            [&](int x,int y,int z){return snapshot.sampleLight(x,y,z);});
+        if(target->dataRevision()!=revision){target->markDirty();continue;}
+        {
+            std::lock_guard lock(target->getMeshMutex());
+            target->getMesh().adoptCpuGeometry(prepared);
+            renderer->uploadChunkMesh(target->getMesh());
+        }
+        target->markClean();target->markFluidMeshRevision(target->fluidRevision());target->markNonFluidMeshRevision(target->nonFluidRevision());
+        target->lifecycle=Chunk::LifecycleState::Renderable;
+    }
+}
+
 void ChunkMeshPipeline::invalidateGpuMeshes() {
     m_chunks.withShared([&](ChunkStore& store) {
         store.forEachSharedUnlocked([&](Chunk* chunk) {

@@ -72,9 +72,17 @@ python3 tests/test_official_package.py
 
 The music test covers score/seed variation, seven voices, envelope endpoints,
 out-of-band partial removal, cache independence, centered bass, wrapping notes,
-periodic reverb, DC removal, mastering, CLI routing and reports. It checks the
-committed hashes and completely regenerates all eight WAVs for byte comparison,
+periodic reverb, DC removal, mastering, CLI routing and reports. It reads the
+authored score and completely regenerates every committed WAV for byte comparison,
 including effects and mastering. This takes longer than the earlier prefix-only
 test. Format, duration, RMS, peak, stereo difference and loop seams are checked
 independently. Listen to phrase transitions and two consecutive cycles as well;
 numeric checks do not establish subjective musical quality.
+
+CTest runs engine invariants in `audio_engine_envelopes_tails_and_mastering`
+(`fast`); complete regeneration is in `music_assets_determinism_format_and_loop`
+(`slow;assets`). See [test execution and review](../../docs/testing.md).
+
+## Equipment workstations
+
+Enchanting, anvil use/break/landing and grindstone feedback are original runtime-synthesized tones/noise envelopes in `src/platform/sdl/SdlAudioSystem.cpp`. They use the existing optional procedural effects mixer and its project license; no sampled or Mojang audio is included. `WorkstationEvent` carries host-authorized playback to LAN guests.

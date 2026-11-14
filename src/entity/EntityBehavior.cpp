@@ -1,3 +1,4 @@
+#include "entity/SlimeRules.h"
 #include "entity/EntityManager.h"
 #include "entity/EntityPresentation.h"
 #include "entity/EntityAttackTiming.h"
@@ -327,6 +328,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
     if (m_aiTime+1e-6>=ai.nextDecision) {
         decideBehavior(entity,player,isDay,playerTargetable,worldTick,thunderstorm);
         if(const auto* e=Plugins::entityContent(static_cast<uint16_t>(entity.type)))ai.speed=e->speed;
+        else if(entity.type==EntityType::Slime)ai.speed=2.f;
         else if(nativeNetherMob(entity.type))ai.speed=nativeMobSpeed(entity.type);
         const float interval=nearestPlayerDistance<=Config::AI_NEAR_DISTANCE ?
             Config::AI_NEAR_INTERVAL : Config::AI_FAR_INTERVAL;
@@ -338,8 +340,8 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
         Entity* other=aiEntity(ai.targetId);
         return other && livingMob(*other) ? std::optional<glm::dvec3>(other->position) : std::nullopt;
     };
-    const float baseDamage=Plugins::entityContent(static_cast<uint16_t>(entity.type))?Plugins::entityContent(static_cast<uint16_t>(entity.type))->damage:entityTemplate(entity.type)==EntityType::IronGolem ? 10 : nativeMobDamage(entity.type);
-    const float meleeDamage=std::max(0.f,baseDamage+3*entity.effects.level(StatusEffectType::Strength)-4*entity.effects.level(StatusEffectType::Weakness));
+    const float baseDamage=entity.type==EntityType::Slime?float(slimeDamage(entity.nether.magmaSize)):Plugins::entityContent(static_cast<uint16_t>(entity.type))?Plugins::entityContent(static_cast<uint16_t>(entity.type))->damage:entityTemplate(entity.type)==EntityType::IronGolem ? 10 : nativeMobDamage(entity.type);
+    const float meleeDamage=entity.type==EntityType::Slime && entity.nether.magmaSize==0?0.f:std::max(0.f,baseDamage+3*entity.effects.level(StatusEffectType::Strength)-4*entity.effects.level(StatusEffectType::Weakness));
     presentation().advance(entity.type,entity.id,dt);
     auto resolveAttack=[&](EntityAttackEvent event) {
         entity.attackPending=false;
@@ -367,6 +369,7 @@ void EntityManager::updateMobAi(Entity& entity,Player& player,float dt,bool isDa
                 source.amount=meleeDamage; source.cause=DamageCause::Melee;
                 source.shieldBlockable=true; source.hasOrigin=true; source.origin=origin;
                 source.impulse=knockback*4.0f+glm::vec3(0,2,0);
+                source.retaliate = [&](float damage) { damageEntity(entity,damage,glm::vec3(0),true,player.getPosition(),ai.targetId); };
                 const auto outcome=player.takeDamage(source);
                 if(outcome.appliedDamage>0 && entity.type==EntityType::WitherSkeleton)player.statusEffects().apply(StatusEffectType::Wither,0,200);
             } else if (Entity* other=aiEntity(ai.targetId)) {
@@ -500,6 +503,7 @@ void EntityManager::tickNativeState(Entity& entity,float dt) {
             Entity drop;drop.type=EntityType::Item;drop.health=1;drop.position=entity.position+glm::dvec3(0,.8,0);
             drop.velocity=entity.facing*2.f+glm::vec3(0,2,0);drop.actionCooldown=1;
             drop.item={drops[roll%8],static_cast<uint8_t>(roll%8==6?1:2+(roll>>8)%3),0};
+            if (roll % 20 == 0) { drop.item = {ItemId::ENCHANTED_BOOK,1}; drop.item.components.storedEnchantments.set(EnchantmentId::SoulSpeed,static_cast<uint8_t>(1+(roll>>16)%3)); }
             m_nativeSpawns.push_back(drop);
         }
     }
@@ -515,8 +519,8 @@ void EntityManager::tickNativeState(Entity& entity,float dt) {
             entity.velocity.y=std::max(entity.velocity.y,0.f);entity.ai.grounded=true;
         }
     }
-    if(entity.type==EntityType::MagmaCube && entity.ai.grounded && entity.nether.attackTicks==0) {
-        entity.velocity.y=5.f+entity.nether.magmaSize;entity.ai.grounded=false;entity.nether.attackTicks=30;
+    if(jumpingCube(entity.type) && entity.ai.grounded && entity.nether.attackTicks==0) {
+        entity.velocity.y=5.f+float(entity.nether.magmaSize)*(entity.type==EntityType::Slime?.5f:1.f);entity.ai.grounded=false;entity.nether.attackTicks=30;
     }
 }
 

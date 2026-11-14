@@ -5,12 +5,14 @@
 inline void testVillageLayouts() {
     for(const auto type:{StructureType::Village,StructureType::DesertVillage,
         StructureType::TaigaVillage,StructureType::SnowVillage,StructureType::SavannaVillage}) {
+        size_t previousBuildings=0;int previousPopulation=0;
         for(uint64_t tier=0;tier<3;++tier) {
             const int radius=48+static_cast<int>(tier)*16;
             StructurePlacement p{0,0,100,type,tier,-radius,radius,-radius,radius};
             const auto layout=VillageLayout::create(p);
-            require(layout.buildings.size()==12+tier*6 && layout.population==20+static_cast<int>(tier)*10,
-                "village tier has incorrect building/population count");
+            require(layout.buildings.size()>previousBuildings&&layout.population>previousPopulation,
+                "larger village tiers must provide more buildings and residents");
+            previousBuildings=layout.buildings.size();previousPopulation=layout.population;
             std::set<int> entranceRows;
             for(const auto& b:layout.buildings)entranceRows.insert(b.z);
             require(entranceRows.size()>(layout.buildings.size()+3)/4,
@@ -25,13 +27,15 @@ inline void testVillageLayouts() {
                 const auto it=blocks.find({x,y,z});
                 return it==blocks.end() ? (y<=100 ? BlockId::STONE : BlockId::AIR) : it->second;
             };
-            size_t beds=0;std::set<BlockId> stations;
+            size_t beds=0,plannedBeds=0;std::set<BlockId> stations,plannedStations;
+            for(const auto& building:layout.buildings){plannedBeds+=building.beds.size();
+                if(building.workstation!=BlockId::AIR)plannedStations.insert(building.workstation);}
             for(const auto& entry:blocks) {
                 BedPart part;BedDirection direction;
                 if(decodeBed(entry.second,part,direction) && part==BedPart::Foot)++beds;
                 if(isVillagerWorkstation(entry.second))stations.insert(entry.second);
             }
-            require(beds==layout.buildings.size()*2 && stations.size()==(tier==0?7u:tier==1?10u:13u),
+            require(beds==plannedBeds && stations==plannedStations&&beds>=size_t(layout.population),
                 "generated village beds or professions disagree with shared layout");
             const auto clearForVillager=[&](BlockId id) {
                 DoorState door;

@@ -68,19 +68,19 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     s.minY=-87;plugins.describeCapabilities();check(g.pluginStructureFingerprint()!=fingerprint&&Lan::contentSignature(description)!=Lan::contentSignature(Plugins::mutableContentState().networkDescription),"V2 bounds invalidate cache and LAN identity");s.minY=-88;plugins.describeCapabilities();
     const int distance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=0;
     {
-        GameSession session(root/"host/saves");EntityAiTestRenderer renderer;
+        ScenarioSession session(root/"host/saves");EntityAiTestRenderer renderer;
         session.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
         const auto world=session.createWorld("Policy V2",12,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
         session.startWorld(world,true,0);
         auto ready=[&]{RuntimeClock clock;for(int i=0;i<4000;++i){if(session.advanceLoading(&renderer,clock.now()))return true;std::this_thread::sleep_for(std::chrono::milliseconds(2));}return false;};
         check(ready()&&session.switchDimension(dim,0)&&ready()&&session.playerState().getPosition()==*spawn,"session enters sampled lower layer");
-        auto& terrain=GameSessionTestAccess::world(session);
+        auto& terrain=SessionScenario::world(session);
         terrain.update({16.5,181,16.5});terrain.enqueueGeneration();terrain.waitForInitialGeneration(1500);terrain.processCompletedGenerations(false);
         const auto* loot=terrain.getBlockEntity({17,181,16});check(loot&&loot->lootSeed==0&&loot->structureKey==key,"streaming registers final chest metadata");
         check(!terrain.getBlockEntity({16,181,16}),"AIR overwrite leaves no ghost chest");
         check(session.switchDimension(DimensionId::Overworld,0)&&ready(),"leave sampled dimension");
         check(session.switchDimension(dim,0)&&ready()&&session.playerState().getPosition()==*spawn,"sampled re-entry");
-        GameSessionTestAccess::player(session).setPosition(*spawn+glm::dvec3(1,0,0));
+        SessionScenario::player(session).setPosition(*spawn+glm::dvec3(1,0,0));
         check(session.switchDimension(DimensionId::Overworld,0)&&ready()&&session.switchDimension(dim,0)&&ready()&&session.playerState().getPosition()==*spawn+glm::dvec3(1,0,0),"valid historical position preferred");
         terrain.setBlock(1,101,0,BlockId::STONE);
         check(session.switchDimension(DimensionId::Overworld,0)&&ready()&&session.switchDimension(dim,0)&&ready()&&session.playerState().getPosition()==*spawn,"invalid history falls back to sampled layer");terrain.setBlock(1,101,0,BlockId::AIR);
@@ -88,15 +88,15 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         check(session.switchDimension(DimensionId::Overworld,0)&&ready()&&!session.switchDimension(dim,0)&&session.activeDimension()==DimensionId::Overworld,"dangerous sample refuses travel without surface fallback");terrain.setBlock(0,101,0,BlockId::AIR);
         check(session.switchDimension(dim,0)&&ready(),"restore sample landing");session.respawn();check(ready()&&session.playerState().getPosition()==*spawn,"respawn uses sample");
         check(terrain.placeBed({3,101,0},BedDirection::South),"sampled dimension bed fixture");
-        GameSessionTestAccess::dimensionBed(session,id,glm::ivec3(3,101,0));session.respawn();
+        SessionScenario::dimensionBed(session,id,glm::ivec3(3,101,0));session.respawn();
         check(ready()&&session.playerState().getPosition().x==3.5&&session.playerState().getPosition().y<102,"valid bed wins over sampled spawn");
         auto& sourcePolicy=Plugins::mutableContentState().extensions.dimensions.at(0);const auto deathTarget=sourcePolicy.deathTarget;
         sourcePolicy.deathTarget=d.key;terrain.setBlock(0,101,0,BlockId::FIRE);
+        SessionScenario::player(session).setPosition(*spawn);
         check(session.switchDimension(DimensionId::Overworld,0)&&ready(),"leave target bed for cross-dimension respawn");
-        GameSessionTestAccess::dimensionPosition(session,id,*spawn);
         session.respawn();check(session.activeDimension()==dim&&ready()&&session.playerState().getPosition().x==3.5,"cross-dimension respawn reuses safe bed despite unsafe sample");
         sourcePolicy.deathTarget=deathTarget;terrain.setBlock(0,101,0,BlockId::AIR);
-        terrain.setBlock(3,101,0,BlockId::AIR);GameSessionTestAccess::dimensionBed(session,id,std::nullopt);session.respawn();check(ready()&&session.playerState().getPosition()==*spawn,"removed bed falls back to sampled spawn");
+        terrain.setBlock(3,101,0,BlockId::AIR);SessionScenario::dimensionBed(session,id,std::nullopt);session.respawn();check(ready()&&session.playerState().getPosition()==*spawn,"removed bed falls back to sampled spawn");
         bool failed=false;session.saveNow([&]{failed=true;});check(!failed,"sampled dimension save");session.leaveWorld();
         SaveStore saved(WorldCatalog(root/"host/saves").open(world));
         const auto metadataPath=saved.worldDirectory()/"level.bin";
@@ -105,15 +105,15 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         try{session.startWorld(world,false,0);}catch(const std::exception&){refused=true;}
         check(refused&&bytes()==before&&!session.hasWorldStore(),"spawn policy revision refuses saved world without writes");d.revision="1";
         session.startWorld(world,false,0);check(ready()&&session.playerState().getPosition()==*spawn,"sampled dimension reload");
-        check(session.openLanRoom(0,2,true),"policy LAN host");GameSession client(root/"client/saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
+        check(session.openLanRoom(0,2,true),"policy LAN host");ScenarioSession client(root/"client/saves");client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
         check(client.joinLanRoom("::1",session.lanPort(),0),"policy LAN join");double now=0;
-        auto pump=[&]{now+=.005;session.pollLan(now);client.pollLan(now);GameSessionTestAccess::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
+        auto pump=[&]{now+=.005;session.pollLan(now);client.pollLan(now);SessionScenario::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
         for(int i=0;i<1500&&!client.lanWorldReady()&&!client.lanConnectionFailed();++i)pump();
-        if(!client.lanWorldReady())std::cerr<<GameSessionTestAccess::replicaLoadingDiagnostic(client)<<'\n';
+        if(!client.lanWorldReady())std::cerr<<SessionScenario::replicaLoadingDiagnostic(client)<<'\n';
         check(client.lanWorldReady(),"policy LAN handshake");
-        const auto peer=GameSessionTestAccess::replicaPeer(client);check(session.pluginTravel(peer,id),"host travels guest to sampled layer");
+        const auto peer=SessionScenario::replicaPeer(client);check(session.pluginTravel(peer,id),"host travels guest to sampled layer");
         for(int i=0;i<1500&&client.activeDimension()!=dim;++i)pump();
-        check(client.activeDimension()==dim&&GameSessionTestAccess::guest(session,peer).player.getPosition()==*spawn,"LAN guest uses identical sample");
+        check(client.activeDimension()==dim&&SessionScenario::guest(session,peer).player.getPosition()==*spawn,"LAN guest uses identical sample");
         client.leaveWorld();session.closeLanRoom();session.leaveWorld();
     }
     Config::RENDER_DISTANCE=distance;

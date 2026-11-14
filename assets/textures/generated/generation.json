@@ -69,6 +69,10 @@
       "effective_seed": 213785369,
       "sha256": "13504a92a103b863bbd9a156cacdc221564a6bc81e5046e60269a23914ae5248"
     },
+    "anvil": {
+      "effective_seed": 213785369,
+      "sha256": "cb93154c07214c6d00e347b3ec49153dfb77b0951054c9697cd1a7e70923474a"
+    },
     "barrel": {
       "effective_seed": 213785369,
       "sha256": "fe7f2bbda089aebef1b4a7f80c17d5c2132ca7395bd1d2927390930bb0149899"
@@ -169,6 +173,10 @@
       "effective_seed": 213785369,
       "sha256": "19a9bdab80615184fbe96f47671458a66a2762f8a87e1aaf10c4c96b022a6d3a"
     },
+    "bookshelf": {
+      "effective_seed": 213785369,
+      "sha256": "ce9f4867e65d490db5092ae85b59be73f8beaf89a23a8d5f305ab165963b71b2"
+    },
     "brewing_stand": {
       "effective_seed": 213785369,
       "sha256": "3a24f50f254620e76c46fdf701d4beeec3b22c24f0b27cddcbee8cdf0b741241"
@@ -240,6 +248,10 @@
     "chest_top": {
       "effective_seed": 213785369,
       "sha256": "485e3bec370add7729af5f586d2eb5818bf4e53a0e86681001131b029145c270"
+    },
+    "chipped_anvil": {
+      "effective_seed": 213785369,
+      "sha256": "daf9a4a82242368d0a7382cdc0832aff77991ae241fbcc6d594ac03c5fd7fae2"
     },
     "chiseled_stone_bricks": {
       "effective_seed": 213785369,
@@ -369,6 +381,10 @@
       "effective_seed": 213785369,
       "sha256": "5bdfbf0369711c24fe7de3ed3e62e0c3938600bbebd8eed25ec21d0964654cf2"
     },
+    "damaged_anvil": {
+      "effective_seed": 213785369,
+      "sha256": "8e506f15c6cc49906f2bc762817c914dcb7489f8308f72af04fed077d717808f"
+    },
     "dandelion": {
       "effective_seed": 213785369,
       "sha256": "94a903260d446a94eb105b5c90434aef073327b0a6e9733ef557c84da594a03b"
@@ -392,6 +408,14 @@
     "deepslate_emerald_ore": {
       "effective_seed": 213785369,
       "sha256": "2503532d1e24ffe62926929fdb2807336c93ac84332f51ff41b441765a00234d"
+    },
+    "deepslate_lapis_ore": {
+      "effective_seed": 213785369,
+      "sha256": "c8a0beca2440756cb525a67ee57f649d3776654853d35b526462474b9ca462f9"
+    },
+    "deepslate_redstone_ore": {
+      "effective_seed": 213785369,
+      "sha256": "a10b8aca7095f853c22ae427f0f27b7175944cf35d4653b84d2f1dc6b62d39a8"
     },
     "desert_flower": {
       "effective_seed": 213785369,
@@ -429,6 +453,10 @@
       "effective_seed": 213785369,
       "sha256": "dafa7806a175ca951e91f305035e5c27b6e908d2432e6c2de79c6c804780e682"
     },
+    "enchanting_table": {
+      "effective_seed": 213785369,
+      "sha256": "d51b620636e749f34632310a3e2d55c1380a973f16c81466cf98dd3b6e800031"
+    },
     "fallen_twigs": {
       "effective_seed": 213785369,
       "sha256": "bdaefe9fd58f3955ffdfddedbe8ea544602e69f24f885d8c835a5348f2896f4f"
@@ -464,6 +492,10 @@
     "flower": {
       "effective_seed": 213785369,
       "sha256": "58ece9d75368cae43278b53f598bd33fdfa2525d9e7d17c0a795e6593c1a5a41"
+    },
+    "frosted_ice": {
+      "effective_seed": 213785369,
+      "sha256": "6972672f2a6012aedcf5af8325f070e9abaa8f4bd371eff5e09679be298bd0c6"
     },
     "furnace": {
       "effective_seed": 213785369,
@@ -569,6 +601,10 @@
       "effective_seed": 213785369,
       "sha256": "c49b99c00038357be4ff5de4b5e76d7745fd72c0a112d21ff671aff8a9843b4a"
     },
+    "iron_block": {
+      "effective_seed": 213785369,
+      "sha256": "70f12728919a6345af9ca522b6d097544d61e779cbafd6f5308a2538eb8e3aa2"
+    },
     "iron_door_bottom": {
       "effective_seed": 213785369,
       "sha256": "9fd47a869c343ad2485323346ff748d4a25614926669948ae6fd682febe9ce73"
@@ -617,6 +653,10 @@
       "effective_seed": 213785369,
       "sha256": "6c41280a496c609133145070476391535cf78ed0ea79df82f7074c3673cdc4df"
     },
+    "lapis_ore": {
+      "effective_seed": 213785369,
+      "sha256": "7de73cbf49eecb709bd0fbfd6269f0c3e5008dd09a1899df6d0c9769c8fe265c"
+    },
     "laterite": {
       "effective_seed": 213785369,
       "sha256": "c1c4953cea42a368a29378b621ca696ca499345186365c338a5cea780d620de1"
@@ -644,6 +684,10 @@
     "lectern": {
       "effective_seed": 213785369,
       "sha256": "8c112b8908dc7d5c35a80c3149068755b0a73549ed68fb2570e35fc7d0caa90a"
+    },
+    "lever": {
+      "effective_seed": 213785369,
+      "sha256": "e0404318d16187dd3dececa798347de14f6a63084174e08b35b2548e12e7ff27"
     },
     "limestone": {
       "effective_seed": 213785369,
@@ -765,6 +809,22 @@
       "effective_seed": 213785369,
       "sha256": "363fb4586e9b213a84a64e5f177d6d58876dba496639eba3223797367e985764"
     },
+    "observer": {
+      "effective_seed": 213785369,
+      "sha256": "cad58e49cb0bd1fc1279cbf4c18ddf136a2966a39b42c798af35cb449d263ed6"
+    },
+    "observer_back": {
+      "effective_seed": 213785369,
+      "sha256": "6da2dde4c722f0af67f8dd403a0760282294264c04368a5b801f28f70a0d1861"
+    },
+    "observer_back_on": {
+      "effective_seed": 213785369,
+      "sha256": "79be53f97f1c5fdca9fc95086d5574b14d6f3fdaca9ed79cb37cf5ea6dd55177"
+    },
+    "observer_face": {
+      "effective_seed": 213785369,
+      "sha256": "8b5f02a367f2d260c561cfa7a80ff9e034cc15d41d4824328c5df4539d837dba"
+    },
     "obsidian": {
       "effective_seed": 213785369,
       "sha256": "1a5e50b351d2ca1d43dac1f226eacbdb9155d8200a4ff87b5a9d03a165bdad55"
@@ -788,6 +848,18 @@
     "permafrost": {
       "effective_seed": 213785369,
       "sha256": "2fd61d2c5fe1ccd2d5684e76427cc67772cd02b8c47520e9d6d5900129e12da4"
+    },
+    "piston": {
+      "effective_seed": 213785369,
+      "sha256": "50e5bd781d467405746cfabcb26083c1bf35de2f22ef4de2cc9abd138ed3ecc4"
+    },
+    "piston_side": {
+      "effective_seed": 213785369,
+      "sha256": "ea82479b8679c44eedd6f86c106c99192289643aa169f04b05cb423672831606"
+    },
+    "piston_top": {
+      "effective_seed": 213785369,
+      "sha256": "3d2e14930ac38f40dbb8a63331fd0cfe15589f2147e3f12e7f2b608d507ea639"
     },
     "podzol_top": {
       "effective_seed": 213785369,
@@ -848,6 +920,110 @@
     "red_wool": {
       "effective_seed": 213785369,
       "sha256": "8a4d91daf31fc89999f4f4cb2e4bb2dcb63bc8800fcd5a883de162d814c77cdf"
+    },
+    "redstone_block": {
+      "effective_seed": 213785369,
+      "sha256": "c2e448c9921c96bf3c8e064dcd503d9f6a666dcabf649173a3a2b75f44b5c9c6"
+    },
+    "redstone_comparator": {
+      "effective_seed": 213785369,
+      "sha256": "6b8e69b652d95489c64f84b46f1536eb3a7f008ffa45977234b30dfd2db4344a"
+    },
+    "redstone_comparator_on": {
+      "effective_seed": 213785369,
+      "sha256": "ba8f0d2bd1970f8eab0707d9eb1e8dbb038f663fd1102f8963ff55e2427aa40c"
+    },
+    "redstone_dust": {
+      "effective_seed": 213785369,
+      "sha256": "acf6911cc04860caa2cf66f6d7441758adc4c13fbf6d8fb121eaadb906538004"
+    },
+    "redstone_dust_1": {
+      "effective_seed": 213785369,
+      "sha256": "069b5e57f255d36944e8e55df8dbdaac72e3938ee6c3427992d996f18dacf6f0"
+    },
+    "redstone_dust_10": {
+      "effective_seed": 213785369,
+      "sha256": "3a4b920e13feab2961605175181846e42c18ab309cecaf55af8ffc6c859bc538"
+    },
+    "redstone_dust_11": {
+      "effective_seed": 213785369,
+      "sha256": "2030e04b9fa8590389d64ce2e692bd2d2cf7afea98dee64757701d28ba58551d"
+    },
+    "redstone_dust_12": {
+      "effective_seed": 213785369,
+      "sha256": "1f9d601462d12297298f3f91b0ab398173f9e5e1e34638e391a6f01c0125abe0"
+    },
+    "redstone_dust_13": {
+      "effective_seed": 213785369,
+      "sha256": "0701ba2569c98d5b24f99e20f2cdec4fbc81bb0c47940ef9e10a05f69454d319"
+    },
+    "redstone_dust_14": {
+      "effective_seed": 213785369,
+      "sha256": "95879d5b6c3bb50677bb29f41ebcdd652057c1cce754d048e338aa1873ee5f95"
+    },
+    "redstone_dust_2": {
+      "effective_seed": 213785369,
+      "sha256": "d206be4e19a7965de545cac95fd2cabafe9706b68c77fb220675198dbc11f005"
+    },
+    "redstone_dust_3": {
+      "effective_seed": 213785369,
+      "sha256": "e42ccf5cf86ed771620123b53e593c7c960966e5f637009e11ae513c30a54565"
+    },
+    "redstone_dust_4": {
+      "effective_seed": 213785369,
+      "sha256": "a347d3a574ffea7821eaa951169a7fca9f171c56c2b78053e4e9470e222e7802"
+    },
+    "redstone_dust_5": {
+      "effective_seed": 213785369,
+      "sha256": "73147ed1a7d6efcc68d82fe9df982e98a29b901af880aaa7b4fae7bd1493fc03"
+    },
+    "redstone_dust_6": {
+      "effective_seed": 213785369,
+      "sha256": "c4e1b5c30f13811650979d371010ecd55bdf6b4ca3b94df1bf6ba88b78d22715"
+    },
+    "redstone_dust_7": {
+      "effective_seed": 213785369,
+      "sha256": "3bad0537adcb1894d0c764125bfdc260d7740d43d7c7afe33e506218c67f557e"
+    },
+    "redstone_dust_8": {
+      "effective_seed": 213785369,
+      "sha256": "ff9d5ee8df300d100a5e6987db43cb2ecc79ffc1ab4f50d7e75118631c0be16e"
+    },
+    "redstone_dust_9": {
+      "effective_seed": 213785369,
+      "sha256": "2fdfbe680ab466d6af0cb95486dfe0652c4ed5188079ae01d256b1521080e5e7"
+    },
+    "redstone_dust_on": {
+      "effective_seed": 213785369,
+      "sha256": "28dd8561035d364fbf737904da64c08f4664dcc887ce0311e8dda5f754ce38b8"
+    },
+    "redstone_lamp": {
+      "effective_seed": 213785369,
+      "sha256": "019a8274e5a1ef42c58b0d9217becfc5d449d5b80451b20f48494921d42ba5d6"
+    },
+    "redstone_lamp_on": {
+      "effective_seed": 213785369,
+      "sha256": "c5c943d952b8d2db9626ba098887ca7863a94631815bc67f325d7127aa74a92b"
+    },
+    "redstone_ore": {
+      "effective_seed": 213785369,
+      "sha256": "b93c17ccd622e7e07551aa8e8b0a46505e9c94cf8ddc39ca2012f02c3d5a182b"
+    },
+    "redstone_repeater": {
+      "effective_seed": 213785369,
+      "sha256": "fa0f8f57c8e4ace707cd07bcb08ea86f5fbdbf8f0934ae856397232b4ce2baef"
+    },
+    "redstone_repeater_on": {
+      "effective_seed": 213785369,
+      "sha256": "858c41b019da9a20ff39d05970bce28e3ca1357c64f2030db1e9e73fed84f837"
+    },
+    "redstone_torch": {
+      "effective_seed": 213785369,
+      "sha256": "97ebf8643d43b10879b17255bb8567972802722bbbeffec4e8eeca7378bb669d"
+    },
+    "redstone_torch_off": {
+      "effective_seed": 213785369,
+      "sha256": "c17ca3cd8a6d153a6e116752f7357a6ccafca0442296be9399bcb1134d4be352"
     },
     "reed_flower": {
       "effective_seed": 213785369,
@@ -1016,6 +1192,10 @@
     "starflower": {
       "effective_seed": 213785369,
       "sha256": "d4853a02df291fad417900433ae06b33826834669c2012bf3654728f90afcbe0"
+    },
+    "sticky_piston_top": {
+      "effective_seed": 213785369,
+      "sha256": "fff44ea7b33c1575e4a20ac52b98893ee5f208487e6e103f05a3438bbc6436c6"
     },
     "stone": {
       "effective_seed": 213785369,

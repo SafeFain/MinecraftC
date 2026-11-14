@@ -213,6 +213,7 @@ set(MINECRAFTC_SDL_BACKEND_SOURCES
     src/platform/sdl/SdlGamepadManager.cpp
     src/platform/sdl/SdlWindow.cpp)
 set(MINECRAFTC_VULKAN_BACKEND_SOURCES
+    src/renderer/backend/vulkan/VulkanDiagnostics.cpp
     src/renderer/backend/vulkan/VulkanHelpers.cpp
     src/renderer/backend/vulkan/VulkanModelBackend.cpp
     src/renderer/backend/vulkan/VulkanPipelineFactory.cpp
@@ -578,11 +579,18 @@ if(ANDROID OR IOS)
 endif()
 if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
-    add_test(NAME api_dependency_boundaries
+    include(tools/test_policy.cmake)
+    add_executable(pixel_readback_tests tests/PixelReadbackTests.cpp)
+    minecraftc_add_test(NAME pixel_readback_negative_controls COMMAND pixel_readback_tests)
+    minecraftc_add_test(NAME test_harness_isolation_and_readback_guards
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_harness.py)
+    minecraftc_add_test(NAME api_boundary_guard_mutations
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_api_boundaries.py)
+    minecraftc_add_test(NAME api_dependency_boundaries
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tools/check_api_boundaries.py
                 --root ${CMAKE_SOURCE_DIR})
-    add_test(NAME numbered_prerelease_versions
+    minecraftc_add_test(NAME numbered_prerelease_versions
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_project_version.py
                 --cmake ${CMAKE_COMMAND})
     foreach(cli_case version help opengl)
@@ -593,27 +601,29 @@ if(BUILD_TESTING)
         else()
             set(cli_name removed_opengl_renderer_cli)
         endif()
-        add_test(NAME ${cli_name} COMMAND ${Python3_EXECUTABLE}
+        minecraftc_add_test(NAME ${cli_name} COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/test_cli.py $<TARGET_FILE:minecraftc>
-            ${cli_case} ${MINECRAFTC_VERSION_DISPLAY})
+            ${cli_case} ${MINECRAFTC_VERSION_DISPLAY} ${MINECRAFTC_VERSION})
         set_tests_properties(${cli_name} PROPERTIES TIMEOUT 10)
     endforeach()
-    add_test(NAME texture_recipes_sequences_and_workbench
+    minecraftc_add_test(NAME texture_recipes_sequences_and_workbench
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_texture_recipes.py)
-    add_test(NAME official_provider_package_resources
+    minecraftc_add_test(NAME official_provider_package_resources
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_official_package.py)
-    add_test(NAME texture_generator_determinism_tiling_and_atlas
+    minecraftc_add_test(NAME texture_generator_determinism_tiling_and_atlas
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_texture_generator.py)
-    add_test(NAME music_assets_determinism_format_and_loop
+    minecraftc_add_test(NAME audio_engine_envelopes_tails_and_mastering
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_audio_assets.py EngineTests)
+    minecraftc_add_test(NAME music_assets_determinism_format_and_loop
         COMMAND ${Python3_EXECUTABLE}
-                ${CMAKE_SOURCE_DIR}/tests/test_audio_assets.py)
-    add_test(NAME vulkan_shader_assets
+                ${CMAKE_SOURCE_DIR}/tests/test_audio_assets.py AssetTests)
+    minecraftc_add_test(NAME vulkan_shader_assets
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tools/vulkan_shaders.py
                 --root ${CMAKE_SOURCE_DIR})
 
-    add_test(NAME vulkan_shader_provenance
+    minecraftc_add_test(NAME vulkan_shader_provenance
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_vulkan_shaders.py)
 
@@ -624,7 +634,7 @@ if(BUILD_TESTING)
         target_compile_options(vulkan_index_rebase_tests PRIVATE
             -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME vulkan_zero_base_vertex_index_rebasing
+    minecraftc_add_test(NAME vulkan_zero_base_vertex_index_rebasing
         COMMAND vulkan_index_rebase_tests)
 
     add_executable(model_asset_tests
@@ -635,7 +645,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(model_asset_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME model_asset_layout_and_weights COMMAND model_asset_tests)
+    minecraftc_add_test(NAME model_asset_layout_and_weights COMMAND model_asset_tests)
 
     add_executable(model_animation_tests
         tests/ModelAnimationTests.cpp
@@ -645,7 +655,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(model_animation_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME model_animation_sampling_and_pose_math COMMAND model_animation_tests)
+    minecraftc_add_test(NAME model_animation_sampling_and_pose_math COMMAND model_animation_tests)
 
     add_executable(animation_graph_tests
         tests/AnimationGraphTests.cpp
@@ -659,7 +669,7 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(animation_graph_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME animation_graph_layers_queues_masks_and_events
+    minecraftc_add_test(NAME animation_graph_layers_queues_masks_and_events
         COMMAND animation_graph_tests)
 
     add_executable(gltf_loader_tests
@@ -675,7 +685,7 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(gltf_loader_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME gltf_loader_validation_and_conversion COMMAND gltf_loader_tests)
+    minecraftc_add_test(NAME gltf_loader_validation_and_conversion COMMAND gltf_loader_tests)
 
     add_executable(platform_tests tests/PlatformTests.cpp)
     target_include_directories(platform_tests PRIVATE src)
@@ -685,7 +695,7 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(platform_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME platform_paths_and_atomic_replace COMMAND platform_tests)
+    minecraftc_add_test(NAME platform_paths_and_atomic_replace COMMAND platform_tests)
 
     add_executable(asset_definition_tests
         tests/AssetDefinitionTests.cpp
@@ -702,7 +712,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(asset_definition_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME asset_json_block_item_and_atlas_mapping
+    minecraftc_add_test(NAME asset_json_block_item_and_atlas_mapping
              COMMAND asset_definition_tests)
 
     add_executable(cavegen_tests
@@ -717,7 +727,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(cavegen_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME cavegen_determinism_and_boundaries COMMAND cavegen_tests)
+    minecraftc_add_test(NAME cavegen_determinism_and_boundaries COMMAND cavegen_tests)
 
     add_executable(worldgen_tests
         tests/WorldGenerationTests.cpp src/game/NetherProgression.cpp src/game/Item.cpp
@@ -740,11 +750,15 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(worldgen_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --overworld-tests)
-    add_test(NAME nether_native_generation_and_portals COMMAND worldgen_tests --nether-tests)
-    add_test(NAME heaven_worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --heaven-tests)
-    add_test(NAME heaven_p1_independent_migration_reference COMMAND worldgen_tests --heaven-migration-tests)
-    add_test(NAME village_layout_counts_access_and_reservations COMMAND worldgen_tests --village-layout-tests)
+    minecraftc_add_test(NAME worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --overworld-tests)
+    minecraftc_add_test(NAME overworld_structure_placement_and_reservations COMMAND worldgen_tests --structure-tests)
+    minecraftc_add_test(NAME overworld_ore_hosts_biomes_and_seed_variation COMMAND worldgen_tests --ore-tests)
+    minecraftc_add_test(NAME world_mesh_material_layers_and_lighting COMMAND worldgen_tests --mesh-tests)
+    minecraftc_add_test(NAME overworld_ecology_and_blueprints COMMAND worldgen_tests --ecology-tests)
+    minecraftc_add_test(NAME nether_native_generation_and_portals COMMAND worldgen_tests --nether-tests)
+    minecraftc_add_test(NAME heaven_worldgen_determinism_boundaries_and_distribution COMMAND worldgen_tests --heaven-tests)
+    minecraftc_add_test(NAME heaven_p1_independent_migration_reference COMMAND worldgen_tests --heaven-migration-tests)
+    minecraftc_add_test(NAME village_layout_counts_access_and_reservations COMMAND worldgen_tests --village-layout-tests)
 
     add_executable(lod_terrain_tests
         tests/LodTerrainTests.cpp
@@ -773,7 +787,8 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(lod_terrain_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME lod_terrain_determinism_cache_and_mesh COMMAND lod_terrain_tests)
+    minecraftc_add_test(NAME lod_terrain_determinism_cache_and_mesh COMMAND lod_terrain_tests)
+    minecraftc_add_test(NAME lod_replica_replacement_uploads COMMAND lod_terrain_tests --replica-replacement-tests)
 
     add_executable(terrain_preview
         tools/terrain_preview.cpp
@@ -822,7 +837,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(rendering_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME rendering_day_cycle_and_environment COMMAND rendering_logic_tests)
+    minecraftc_add_test(NAME rendering_day_cycle_and_environment COMMAND rendering_logic_tests)
 
     add_executable(ui_style_tests tests/UiStyleTests.cpp)
     target_include_directories(ui_style_tests PRIVATE src)
@@ -830,7 +845,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(ui_style_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME modern_ui_geometry_and_layout COMMAND ui_style_tests)
+    minecraftc_add_test(NAME modern_ui_geometry_and_layout COMMAND ui_style_tests)
 
     add_executable(vulkan_ui_smoke EXCLUDE_FROM_ALL
         src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp src/ui/PluginMenu.cpp
@@ -853,6 +868,7 @@ if(BUILD_TESTING)
         src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
         src/ui/SurvivalInventory.cpp src/ui/TouchControls.cpp src/ui/UIRenderer.cpp
         src/ui/VillagerTradeScreen.cpp src/world/BiomeMap.cpp src/world/Block.cpp)
+    target_sources(vulkan_ui_smoke PRIVATE src/entity/EntityModelRegistry.cpp src/model/AnimationGraph.cpp src/model/AnimationMixer.cpp)
     target_include_directories(vulkan_ui_smoke PRIVATE src external external/stb external/nlohmann external/cgltf)
     target_include_directories(vulkan_ui_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_ui_smoke PRIVATE
@@ -1035,11 +1051,11 @@ if(BUILD_TESTING)
         target_compile_options(vulkan_gi_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
-    option(MINECRAFTC_VULKAN_TESTS "Register display-dependent Vulkan readback tests" OFF)
+    option(MINECRAFTC_VULKAN_TESTS "Register display-dependent Vulkan readback tests" ON)
     if(MINECRAFTC_VULKAN_TESTS)
         foreach(scene gi model_fog)
             set_property(TARGET vulkan_${scene}_smoke PROPERTY EXCLUDE_FROM_ALL FALSE)
-            add_test(NAME vulkan_${scene}_readback COMMAND ${Python3_EXECUTABLE}
+            minecraftc_add_test(NAME vulkan_${scene}_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py
                 $<TARGET_FILE:vulkan_${scene}_smoke> ${CMAKE_SOURCE_DIR}/assets ${scene})
             set_tests_properties(vulkan_${scene}_readback PROPERTIES
@@ -1083,7 +1099,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(voxel_gi_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME voxel_gi_clipmap_and_temporal COMMAND voxel_gi_tests)
+    minecraftc_add_test(NAME voxel_gi_clipmap_and_temporal COMMAND voxel_gi_tests)
 
     add_executable(player_physics_tests
         tests/PlayerPhysicsTests.cpp
@@ -1094,7 +1110,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(player_physics_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME player_ledge_and_auto_jump_logic COMMAND player_physics_tests)
+    minecraftc_add_test(NAME player_ledge_and_auto_jump_logic COMMAND player_physics_tests)
 
     add_executable(nether_progression_tests tests/NetherProgressionTests.cpp
         src/game/NetherProgression.cpp src/game/Item.cpp src/game/InventoryModel.cpp
@@ -1106,7 +1122,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(nether_progression_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME nether_native_brewing_smithing_and_effects COMMAND nether_progression_tests)
+    minecraftc_add_test(NAME nether_native_brewing_smithing_and_effects COMMAND nether_progression_tests)
 
     add_executable(inventory_tests
         tests/InventoryTests.cpp
@@ -1120,7 +1136,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(inventory_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME survival_item_registry_and_inventory COMMAND inventory_tests)
+    minecraftc_add_test(NAME survival_item_registry_and_inventory COMMAND inventory_tests)
 
     add_executable(plugin_tests tests/PluginTests.cpp src/model/GltfLoader.cpp src/model/ModelAnimation.cpp
         src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
@@ -1133,12 +1149,15 @@ if(BUILD_TESTING)
     target_compile_definitions(plugin_tests PRIVATE MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
     target_link_libraries(plugin_tests PRIVATE glm::glm minecraftc_platform)
-    add_test(NAME natural_texture_plugin COMMAND plugin_tests --natural-textures)
-    add_test(NAME natural_texture_assets COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_natural_pixels.py)
+    minecraftc_add_test(NAME natural_texture_plugin COMMAND plugin_tests --natural-textures)
+    minecraftc_add_test(NAME natural_texture_manifest_and_coverage COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/test_natural_pixels.py NaturalPixelsTests.test_full_coverage_and_sequences)
+    minecraftc_add_test(NAME natural_texture_assets COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_SOURCE_DIR}/tests/test_natural_pixels.py NaturalPixelsTests.test_reproducible_and_publishable)
     minecraftc_add_content_package(package_fixture
         ROOT "${CMAKE_SOURCE_DIR}/examples/plugins/package_demo" MODE BUILTIN)
     target_link_libraries(plugin_tests PRIVATE package_fixture)
-    add_test(NAME content_package_authoring_loading_and_delivery
+    minecraftc_add_test(NAME content_package_authoring_loading_and_delivery
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_content_package.py
             --plugin-tests $<TARGET_FILE:plugin_tests>
             --builtin-stage "${CMAKE_BINARY_DIR}/content-assets/plugins/package_demo")
@@ -1169,10 +1188,10 @@ if(BUILD_TESTING)
         add_library(plugin_callback_fault MODULE tests/PluginBadEntry.cpp)
         target_compile_definitions(plugin_callback_fault PRIVATE MC_CALLBACK_FAULT=1)
         add_dependencies(plugin_tests plugin_native_demo plugin_bad_abi plugin_bad_entry plugin_callback_fault)
-        add_test(NAME plugin_loader_content_events_and_persistence COMMAND plugin_tests
+        minecraftc_add_test(NAME plugin_loader_content_events_and_persistence COMMAND plugin_tests
             $<TARGET_FILE:plugin_native_demo> $<TARGET_FILE:plugin_bad_abi> $<TARGET_FILE:plugin_bad_entry> $<TARGET_FILE:plugin_callback_fault>)
     else()
-        add_test(NAME plugin_loader_content_events_and_persistence COMMAND plugin_tests)
+        minecraftc_add_test(NAME plugin_loader_content_events_and_persistence COMMAND plugin_tests)
     endif()
 
     add_executable(save_store_tests
@@ -1187,7 +1206,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(save_store_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME survival_save_roundtrip_and_corruption COMMAND save_store_tests)
+    minecraftc_add_test(NAME survival_save_roundtrip_and_corruption COMMAND save_store_tests)
 
     add_executable(fishing_tests tests/FishingTests.cpp src/game/FishingSystem.cpp
         src/game/NetherProgression.cpp src/game/Item.cpp src/game/InventoryModel.cpp src/game/SurvivalRules.cpp src/world/Block.cpp)
@@ -1196,7 +1215,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(fishing_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME classic_fishing_simulation_and_rules COMMAND fishing_tests)
+    minecraftc_add_test(NAME classic_fishing_simulation_and_rules COMMAND fishing_tests)
 
     add_executable(survival_rules_tests
         tests/SurvivalRulesTests.cpp
@@ -1211,8 +1230,8 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(survival_rules_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME survival_mining_crafting_and_smelting COMMAND survival_rules_tests)
-    add_test(NAME heaven_p1_independent_content_reference
+    minecraftc_add_test(NAME survival_mining_crafting_and_smelting COMMAND survival_rules_tests)
+    minecraftc_add_test(NAME heaven_p1_independent_content_reference
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_heaven_content_reference.py
                 $<TARGET_FILE:survival_rules_tests>)
 
@@ -1224,7 +1243,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(fluid_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME java_26_2_fluid_logic COMMAND fluid_logic_tests)
+    minecraftc_add_test(NAME java_26_2_fluid_logic COMMAND fluid_logic_tests)
 
     add_executable(survival_stats_tests
         tests/SurvivalStatsTests.cpp
@@ -1237,7 +1256,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(survival_stats_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME survival_health_hunger_and_starvation COMMAND survival_stats_tests)
+    minecraftc_add_test(NAME survival_health_hunger_and_starvation COMMAND survival_stats_tests)
 
     add_executable(combat_rules_tests
         tests/CombatRulesTests.cpp
@@ -1249,7 +1268,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(combat_rules_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME java_1_9_combat_rules COMMAND combat_rules_tests)
+    minecraftc_add_test(NAME java_1_9_combat_rules COMMAND combat_rules_tests)
 
     add_executable(world_catalog_tests
         tests/WorldCatalogTests.cpp
@@ -1264,7 +1283,8 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(world_catalog_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME survival_multiple_world_catalog COMMAND world_catalog_tests)
+    minecraftc_add_test(NAME survival_multiple_world_catalog COMMAND world_catalog_tests)
+    minecraftc_add_test(NAME world_recovery_transactions COMMAND world_catalog_tests --recovery)
 
     add_executable(command_tests
         tests/CommandTests.cpp
@@ -1277,7 +1297,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(command_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME cheat_gamemode_command_parsing COMMAND command_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/java-1.21.11-gamerules.tsv)
+    minecraftc_add_test(NAME cheat_gamemode_command_parsing COMMAND command_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/java-1.21.11-gamerules.tsv)
 
     add_executable(weather_logic_tests
         tests/WeatherTests.cpp
@@ -1288,7 +1308,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(weather_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME weather_cycle_precipitation_and_commands COMMAND weather_logic_tests)
+    minecraftc_add_test(NAME weather_cycle_precipitation_and_commands COMMAND weather_logic_tests)
 
     add_executable(ground_navigation_tests tests/GroundNavigationTests.cpp
         src/entity/GroundNavigation.cpp src/world/Block.cpp src/world/Chunk.cpp)
@@ -1297,7 +1317,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(ground_navigation_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME entity_ground_navigation COMMAND ground_navigation_tests)
+    minecraftc_add_test(NAME entity_ground_navigation COMMAND ground_navigation_tests)
 
     add_executable(entity_logic_tests tests/EntityLogicTests.cpp src/world/Block.cpp)
     target_include_directories(entity_logic_tests PRIVATE src)
@@ -1305,7 +1325,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(entity_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME survival_entity_spawning_despawn_and_sweep COMMAND entity_logic_tests)
+    minecraftc_add_test(NAME survival_entity_spawning_despawn_and_sweep COMMAND entity_logic_tests)
 
     add_executable(voxel_raycast_tests tests/VoxelRaycastTests.cpp)
     target_include_directories(voxel_raycast_tests PRIVATE src)
@@ -1313,7 +1333,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(voxel_raycast_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME world_voxel_raycast_distance_and_obstruction COMMAND voxel_raycast_tests)
+    minecraftc_add_test(NAME world_voxel_raycast_distance_and_obstruction COMMAND voxel_raycast_tests)
 
     add_executable(chunk_index_tests tests/ChunkIndexTests.cpp)
     target_include_directories(chunk_index_tests PRIVATE src)
@@ -1321,7 +1341,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(chunk_index_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME world_chunk_override_index_decode COMMAND chunk_index_tests)
+    minecraftc_add_test(NAME world_chunk_override_index_decode COMMAND chunk_index_tests)
 
     add_executable(entity_model_registry_tests
         tests/EntityModelRegistryTests.cpp
@@ -1342,7 +1362,7 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(entity_model_registry_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME entity_model_registry_sharing_and_fallback
+    minecraftc_add_test(NAME entity_model_registry_sharing_and_fallback
              COMMAND entity_model_registry_tests)
 
     add_custom_target(entity_model_assets
@@ -1350,7 +1370,7 @@ if(BUILD_TESTING)
                 ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-    add_test(NAME entity_model_asset_contract
+    minecraftc_add_test(NAME entity_model_asset_contract
         COMMAND ${CMAKE_COMMAND} -E env
                 ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_entity_models.py)
@@ -1361,7 +1381,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(thread_pool_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME thread_pool_priority_idle_and_shutdown COMMAND thread_pool_tests)
+    minecraftc_add_test(NAME thread_pool_priority_idle_and_shutdown COMMAND thread_pool_tests)
     set_tests_properties(thread_pool_priority_idle_and_shutdown PROPERTIES TIMEOUT 15)
 
     add_executable(lighting_logic_tests tests/LightingLogicTests.cpp src/world/Block.cpp
@@ -1371,7 +1391,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(lighting_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME rendering_cross_chunk_block_light COMMAND lighting_logic_tests)
+    minecraftc_add_test(NAME rendering_cross_chunk_block_light COMMAND lighting_logic_tests)
 
     add_executable(client_input_tests
         tests/ClientInputTests.cpp
@@ -1394,7 +1414,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(client_input_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME client_settings_bindings_and_inventory_gestures COMMAND client_input_tests)
+    minecraftc_add_test(NAME client_settings_bindings_and_inventory_gestures COMMAND client_input_tests)
 
     add_executable(input_routing_tests
         tests/InputRoutingTests.cpp
@@ -1418,7 +1438,7 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(input_routing_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME application_input_routing COMMAND input_routing_tests)
+    minecraftc_add_test(NAME application_input_routing COMMAND input_routing_tests)
 
     add_executable(session_flow_tests
         src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
@@ -1500,7 +1520,7 @@ if(BUILD_TESTING)
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/NetherPortalWorld.cpp src/world/World.cpp
+        src/world/NetherPortalWorld.cpp src/world/World.cpp src/world/RedstoneWorld.cpp
         src/world/WorldReplication.cpp
         src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
@@ -1516,26 +1536,35 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(session_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME lan_game_replica COMMAND session_flow_tests --lan-replica-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
-    set_tests_properties(lan_game_replica PROPERTIES TIMEOUT 30)
-    add_test(NAME lan_gameplay_authority COMMAND session_flow_tests --lan-authority-tests)
+    minecraftc_add_test(NAME redstone_lan_atomic_motion COMMAND session_flow_tests --redstone-lan-tests)
+    set_tests_properties(redstone_lan_atomic_motion PROPERTIES LABELS "fast;integration" TIMEOUT 180)
+    minecraftc_add_test(NAME lan_game_replica COMMAND session_flow_tests --lan-replica-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    set_tests_properties(lan_game_replica PROPERTIES TIMEOUT 180 LABELS "slow;integration")
+    add_executable(lod_subscription_tests tests/LodSubscriptionTests.cpp)
+    target_include_directories(lod_subscription_tests PRIVATE src)
+    target_link_libraries(lod_subscription_tests PRIVATE glm::glm)
+    minecraftc_add_test(NAME lan_lod_subscription_replacement COMMAND lod_subscription_tests)
+    set_tests_properties(lan_lod_subscription_replacement PROPERTIES TIMEOUT 15)
+    minecraftc_add_test(NAME lan_gameplay_authority COMMAND session_flow_tests --lan-authority-tests)
     set_tests_properties(lan_gameplay_authority PROPERTIES TIMEOUT 30)
     if(NOT ANDROID AND NOT IOS)
         add_library(plugin_legacy_fixture MODULE tests/PluginLegacyEntry.cpp)
         add_library(plugin_lan_fixture MODULE tests/PluginLanEntry.cpp)
         add_dependencies(session_flow_tests plugin_legacy_fixture plugin_lan_fixture)
-        add_test(NAME plugin_lan_multiplayer COMMAND session_flow_tests --plugin-lan-tests
+        minecraftc_add_test(NAME plugin_lan_multiplayer COMMAND session_flow_tests --plugin-lan-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_legacy_fixture> $<TARGET_FILE:plugin_lan_fixture>)
     endif()
-    add_test(NAME lan_multiplayer_simulation COMMAND session_flow_tests --lan-simulation-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
-    add_test(NAME game_session_flow COMMAND session_flow_tests)
-    add_test(NAME experience_integration COMMAND session_flow_tests --experience-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME lan_multiplayer_simulation COMMAND session_flow_tests --lan-simulation-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME game_session_flow COMMAND session_flow_tests)
+    minecraftc_add_test(NAME experience_integration COMMAND session_flow_tests --experience-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME enchantment_integration COMMAND session_flow_tests --enchantment-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    set_tests_properties(enchantment_integration PROPERTIES TIMEOUT 120)
     set_tests_properties(experience_integration PROPERTIES TIMEOUT 60)
     target_sources(session_flow_tests PRIVATE
         src/renderer/BlockAtlasData.cpp
         tests/reference/heaven_v9/FrozenParticleSystem.cpp
         tests/reference/heaven_v9/FrozenHeavenV9.cpp)
-    add_test(NAME heaven_p1_independent_particle_reference
+    minecraftc_add_test(NAME heaven_p1_independent_particle_reference
         COMMAND session_flow_tests --heaven-particle-migration)
     if(NOT ANDROID AND NOT IOS)
         foreach(p1_fixture_kind RANGE 0 2)
@@ -1545,14 +1574,14 @@ if(BUILD_TESTING)
             set_target_properties(plugin_heaven_p1_${p1_fixture_kind} PROPERTIES PREFIX "")
             add_dependencies(session_flow_tests plugin_heaven_p1_${p1_fixture_kind})
         endforeach()
-        add_test(NAME heaven_p1_native_registration_and_rollback COMMAND session_flow_tests --heaven-p1-tests
+        minecraftc_add_test(NAME heaven_p1_native_registration_and_rollback COMMAND session_flow_tests --heaven-p1-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_heaven_p1_0>
             $<TARGET_FILE:plugin_heaven_p1_1> $<TARGET_FILE:plugin_heaven_p1_2>)
         add_library(plugin_worldgen_v2_bad_registration MODULE examples/plugins/worldgen_v2_demo/plugin.cpp)
         target_include_directories(plugin_worldgen_v2_bad_registration PRIVATE sdk)
         target_compile_definitions(plugin_worldgen_v2_bad_registration PRIVATE MC_WORLDGEN_BAD_REGISTRATION=1)
         add_dependencies(session_flow_tests plugin_worldgen_v2_demo plugin_worldgen_v2_bad_registration)
-        add_test(NAME plugin_worldgen_v2_batch_and_lod COMMAND session_flow_tests --worldgen-v2-tests
+        minecraftc_add_test(NAME plugin_worldgen_v2_batch_and_lod COMMAND session_flow_tests --worldgen-v2-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_worldgen_v2_demo> $<TARGET_FILE:plugin_worldgen_v2_bad_registration>)
         set_tests_properties(plugin_worldgen_v2_batch_and_lod PROPERTIES TIMEOUT 180)
         add_library(plugin_policy_v2_bad MODULE examples/plugins/worldgen_policy_v2/plugin.cpp)
@@ -1560,24 +1589,34 @@ if(BUILD_TESTING)
         target_compile_definitions(plugin_policy_v2_bad PRIVATE MC_POLICY_BAD_REGISTRATION=1)
         set_target_properties(plugin_policy_v2_bad PROPERTIES PREFIX "")
         add_dependencies(session_flow_tests plugin_worldgen_policy_v2 plugin_policy_v2_bad)
-        add_test(NAME plugin_seeded_spawn_and_structure_v2 COMMAND session_flow_tests --policy-v2-tests
+        minecraftc_add_test(NAME plugin_seeded_spawn_and_structure_v2 COMMAND session_flow_tests --policy-v2-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_worldgen_policy_v2> $<TARGET_FILE:plugin_policy_v2_bad>)
         set_tests_properties(plugin_seeded_spawn_and_structure_v2 PROPERTIES TIMEOUT 180)
         add_dependencies(session_flow_tests plugin_entity_demo plugin_terrain_demo plugin_dimension_demo)
         add_dependencies(vulkan_ui_smoke plugin_render_demo)
         if(MINECRAFTC_VULKAN_TESTS)
             set_property(TARGET vulkan_ui_smoke PROPERTY EXCLUDE_FROM_ALL FALSE)
-            add_test(NAME experience_vulkan_readback COMMAND ${Python3_EXECUTABLE}
+            minecraftc_add_test(NAME redstone_vulkan_readback COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
+                ${CMAKE_SOURCE_DIR}/assets redstone)
+            set_tests_properties(redstone_vulkan_readback PROPERTIES
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
+            minecraftc_add_test(NAME enchanting_vulkan_readback COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
+                ${CMAKE_SOURCE_DIR}/assets enchanting)
+            set_tests_properties(enchanting_vulkan_readback PROPERTIES
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
+            minecraftc_add_test(NAME experience_vulkan_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                 ${CMAKE_SOURCE_DIR}/assets experience)
             set_tests_properties(experience_vulkan_readback PROPERTIES
-                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 120 RESOURCE_LOCK vulkan_device)
-            add_test(NAME natural_texture_vulkan_readback COMMAND ${Python3_EXECUTABLE}
+                LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
+            minecraftc_add_test(NAME natural_texture_vulkan_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                 ${CMAKE_SOURCE_DIR}/assets natural_textures)
             set_tests_properties(natural_texture_vulkan_readback PROPERTIES
                 LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
-            add_test(NAME content_package_vulkan_readback COMMAND ${Python3_EXECUTABLE}
+            minecraftc_add_test(NAME content_package_vulkan_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/test_content_package.py
                 --plugin-tests $<TARGET_FILE:plugin_tests>
                 --builtin-stage "${CMAKE_BINARY_DIR}/content-assets/plugins/package_demo"
@@ -1585,14 +1624,14 @@ if(BUILD_TESTING)
                 ContentPackageTests.test_native_build_and_runtime)
             set_tests_properties(content_package_vulkan_readback PROPERTIES
                 LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
-            add_test(NAME plugin_vulkan_extensions_readback COMMAND ${Python3_EXECUTABLE}
+            minecraftc_add_test(NAME plugin_vulkan_extensions_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                 ${CMAKE_SOURCE_DIR}/assets plugins $<TARGET_FILE:plugin_render_demo>)
-            add_test(NAME plugin_vulkan_capabilities_readback COMMAND ${Python3_EXECUTABLE}
+            minecraftc_add_test(NAME plugin_vulkan_capabilities_readback COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                 ${CMAKE_SOURCE_DIR}/assets capabilities)
             foreach(heaven_scene heaven_model heaven_off)
-                add_test(NAME plugin_vulkan_${heaven_scene}_readback COMMAND ${Python3_EXECUTABLE}
+                minecraftc_add_test(NAME plugin_vulkan_${heaven_scene}_readback COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_SOURCE_DIR}/tests/run_vulkan_test.py $<TARGET_FILE:vulkan_ui_smoke>
                     ${CMAKE_SOURCE_DIR}/assets ${heaven_scene})
                 set_tests_properties(plugin_vulkan_${heaven_scene}_readback PROPERTIES
@@ -1604,28 +1643,28 @@ if(BUILD_TESTING)
                 LABELS vulkan SKIP_RETURN_CODE 77 TIMEOUT 240 RESOURCE_LOCK vulkan_device)
         endif()
         add_dependencies(session_flow_tests plugin_block_shapes_demo plugin_capability_native)
-        add_test(NAME plugin_heaven_remaining_p0 COMMAND session_flow_tests --remaining-p0-tests
+        minecraftc_add_test(NAME plugin_heaven_remaining_p0 COMMAND session_flow_tests --remaining-p0-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_capability_native>)
         set_tests_properties(plugin_heaven_remaining_p0 PROPERTIES TIMEOUT 180)
-        add_test(NAME plugin_gameplay_presentation_capabilities COMMAND session_flow_tests --capability-tests
+        minecraftc_add_test(NAME plugin_gameplay_presentation_capabilities COMMAND session_flow_tests --capability-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_capability_native>)
         set_tests_properties(plugin_gameplay_presentation_capabilities PROPERTIES TIMEOUT 180)
-        add_test(NAME plugin_block_shapes_registration_and_runtime COMMAND session_flow_tests --shape-tests
+        minecraftc_add_test(NAME plugin_block_shapes_registration_and_runtime COMMAND session_flow_tests --shape-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_block_shapes_demo>)
         set_tests_properties(plugin_block_shapes_registration_and_runtime PROPERTIES TIMEOUT 180)
-        add_test(NAME plugin_dimension_registration_and_runtime COMMAND session_flow_tests --dimension-tests
+        minecraftc_add_test(NAME plugin_dimension_registration_and_runtime COMMAND session_flow_tests --dimension-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_dimension_demo>)
         set_tests_properties(plugin_dimension_registration_and_runtime PROPERTIES TIMEOUT 180)
-        add_test(NAME plugin_entity_worldgen_extensions COMMAND session_flow_tests --extension-tests
+        minecraftc_add_test(NAME plugin_entity_worldgen_extensions COMMAND session_flow_tests --extension-tests
             ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE:plugin_entity_demo> $<TARGET_FILE:plugin_terrain_demo>)
     endif()
-    add_test(NAME plugin_game_session_integration COMMAND session_flow_tests --plugin-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
-    add_test(NAME gamerule_integration COMMAND session_flow_tests --gamerule-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME plugin_game_session_integration COMMAND session_flow_tests --plugin-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME gamerule_integration COMMAND session_flow_tests --gamerule-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(gamerule_integration PROPERTIES TIMEOUT 120)
-    add_test(NAME entity_ai_integration COMMAND session_flow_tests --ai-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
-    add_test(NAME entity_combat_timing COMMAND session_flow_tests --combat-timing-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME entity_ai_integration COMMAND session_flow_tests --ai-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME entity_combat_timing COMMAND session_flow_tests --combat-timing-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(entity_combat_timing PROPERTIES TIMEOUT 120)
-    add_test(NAME projectile_flight_integration COMMAND session_flow_tests --projectile-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME projectile_flight_integration COMMAND session_flow_tests --projectile-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(projectile_flight_integration PROPERTIES TIMEOUT 120)
     set_tests_properties(entity_ai_integration PROPERTIES TIMEOUT 120)
     # This test is normally sub-second; a generous ceiling turns a future
@@ -1641,7 +1680,7 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(chunk_io_queue_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME chunk_io_queue_startup_drain_and_shutdown COMMAND chunk_io_queue_tests)
+    minecraftc_add_test(NAME chunk_io_queue_startup_drain_and_shutdown COMMAND chunk_io_queue_tests)
     set_tests_properties(chunk_io_queue_startup_drain_and_shutdown PROPERTIES TIMEOUT 30)
 
     add_executable(application_flow_tests
@@ -1747,7 +1786,7 @@ if(BUILD_TESTING)
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/NetherPortalWorld.cpp src/world/World.cpp
+        src/world/NetherPortalWorld.cpp src/world/World.cpp src/world/RedstoneWorld.cpp
         src/world/WorldReplication.cpp
         src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
@@ -1764,8 +1803,8 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(application_flow_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME application_flow_state_transitions COMMAND application_flow_tests)
-    add_test(NAME dropped_item_rendering COMMAND application_flow_tests
+    minecraftc_add_test(NAME application_flow_state_transitions COMMAND application_flow_tests)
+    minecraftc_add_test(NAME dropped_item_rendering COMMAND application_flow_tests
         --dropped-item-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
 
     add_executable(world_orchestration_tests
@@ -1796,7 +1835,7 @@ if(BUILD_TESTING)
         src/world/RegionGenerator.cpp
         src/world/TreeGenerator.cpp
         src/world/StructureGenerator.cpp
-        src/world/NetherPortalWorld.cpp src/world/World.cpp
+        src/world/NetherPortalWorld.cpp src/world/World.cpp src/world/RedstoneWorld.cpp
         src/world/WorldReplication.cpp
         src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
         src/world/WorldLighting.cpp
@@ -1812,7 +1851,21 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(world_orchestration_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME world_orchestration_state_transitions COMMAND world_orchestration_tests)
+    # The circuit GPU scene executes real World motion and mesh publication.
+    get_target_property(MINECRAFTC_CIRCUIT_WORLD_SOURCES world_orchestration_tests SOURCES)
+    list(REMOVE_ITEM MINECRAFTC_CIRCUIT_WORLD_SOURCES tests/WorldOrchestrationTests.cpp)
+    get_target_property(MINECRAFTC_CIRCUIT_UI_SOURCES vulkan_ui_smoke SOURCES)
+    list(APPEND MINECRAFTC_CIRCUIT_UI_SOURCES ${MINECRAFTC_CIRCUIT_WORLD_SOURCES})
+    list(REMOVE_DUPLICATES MINECRAFTC_CIRCUIT_UI_SOURCES)
+    set_property(TARGET vulkan_ui_smoke PROPERTY SOURCES ${MINECRAFTC_CIRCUIT_UI_SOURCES})
+    target_include_directories(vulkan_ui_smoke PRIVATE external/FastNoiseLite)
+    minecraftc_add_test(NAME world_orchestration_state_transitions COMMAND world_orchestration_tests)
+    minecraftc_add_test(NAME redstone_world_circuits COMMAND world_orchestration_tests --redstone-tests)
+    set_tests_properties(redstone_world_circuits PROPERTIES TIMEOUT 180)
+    foreach(scenario IN ITEMS comparators lamps buttons pistons)
+        minecraftc_add_test(NAME redstone_tick_${scenario} COMMAND world_orchestration_tests --redstone-budget-tests ${scenario})
+        set_tests_properties(redstone_tick_${scenario} PROPERTIES LABELS "fast;integration" TIMEOUT 180)
+    endforeach()
     # The benchmark legs allow 60s each on heavily loaded CI runners; keep the
     # whole orchestration test well under the job timeout with diagnostics.
     set_tests_properties(world_orchestration_state_transitions PROPERTIES TIMEOUT 600)
@@ -1839,7 +1892,7 @@ if(BUILD_TESTING)
     elseif(MSVC)
         target_compile_options(localization_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME localization_resources_utf8_and_cjk_font
+    minecraftc_add_test(NAME localization_resources_utf8_and_cjk_font
              COMMAND localization_tests)
 
     add_executable(survival_integration_tests
@@ -1859,7 +1912,7 @@ if(BUILD_TESTING)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(survival_integration_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
-    add_test(NAME survival_progression_persistence_and_recovery COMMAND survival_integration_tests)
+    minecraftc_add_test(NAME survival_progression_persistence_and_recovery COMMAND survival_integration_tests)
 endif()
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
@@ -1893,7 +1946,7 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
     elseif(MSVC)
         target_compile_options(network_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME lan_protocol_and_tcp COMMAND network_tests)
+    minecraftc_add_test(NAME lan_protocol_and_tcp COMMAND network_tests)
 endif()
 
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
@@ -1908,7 +1961,7 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
     elseif(MSVC)
         target_compile_options(inventory_transaction_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME authoritative_inventory_transactions COMMAND inventory_transaction_tests)
+    minecraftc_add_test(NAME authoritative_inventory_transactions COMMAND inventory_transaction_tests)
 endif()
 
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
@@ -1920,7 +1973,7 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
     elseif(MSVC)
         target_compile_options(chunk_protocol_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME lan_chunk_protocol COMMAND chunk_protocol_tests)
+    minecraftc_add_test(NAME lan_chunk_protocol COMMAND chunk_protocol_tests)
 endif()
 
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS AND NOT APPLE)
@@ -1931,7 +1984,7 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS AND NOT APPLE)
     elseif(MSVC)
         target_compile_options(lan_discovery_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
-    add_test(NAME lan_dns_sd_discovery COMMAND lan_discovery_tests)
+    minecraftc_add_test(NAME lan_dns_sd_discovery COMMAND lan_discovery_tests)
     set_tests_properties(lan_dns_sd_discovery PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
@@ -1958,7 +2011,62 @@ if(BUILD_TESTING)
             target_link_libraries(${heaven_test_target} PRIVATE minecraftc_heaven_test_support)
         endif()
     endforeach()
-    add_test(NAME nether_native_mobs_barter_riding_and_persistence COMMAND session_flow_tests --nether-mob-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
-    add_test(NAME nether_native_session_portals_and_anchors COMMAND session_flow_tests --nether-session-tests)
-    add_test(NAME nether_native_without_plugins COMMAND session_flow_tests --nether-mob-tests-no-plugins ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME nether_native_mobs_barter_riding_and_persistence COMMAND session_flow_tests --nether-mob-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME redstone_slime_survival_and_replication COMMAND session_flow_tests --redstone-mob-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+    minecraftc_add_test(NAME nether_native_session_portals_and_anchors COMMAND session_flow_tests --nether-session-tests)
+    minecraftc_add_test(NAME nether_native_without_plugins COMMAND session_flow_tests --nether-mob-tests-no-plugins ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+endif()
+
+if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
+    add_executable(enchantment_component_tests tests/EnchantmentComponentTests.cpp)
+    target_include_directories(enchantment_component_tests PRIVATE src)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(enchantment_component_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(enchantment_component_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    minecraftc_add_test(NAME enchantment_components COMMAND enchantment_component_tests)
+    add_executable(redstone_tests tests/RedstoneTests.cpp)
+    target_include_directories(redstone_tests PRIVATE src)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(redstone_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(redstone_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    minecraftc_add_test(NAME redstone_rules_and_scheduling COMMAND redstone_tests)
+    add_executable(redstone_ore_tests tests/RedstoneOreTests.cpp src/world/OreGenerator.cpp src/world/Noise.cpp)
+    target_include_directories(redstone_ore_tests PRIVATE src external/FastNoiseLite)
+    target_link_libraries(redstone_ore_tests PRIVATE glm::glm)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(redstone_ore_tests PRIVATE -Wall -Wextra -Wpedantic)
+    elseif(MSVC)
+        target_compile_options(redstone_ore_tests PRIVATE /W4 /permissive- /utf-8)
+    endif()
+    minecraftc_add_test(NAME redstone_ore_determinism COMMAND redstone_ore_tests)
+endif()
+
+if(BUILD_TESTING)
+    set_tests_properties(
+        texture_recipes_sequences_and_workbench
+        texture_generator_determinism_tiling_and_atlas
+        music_assets_determinism_format_and_loop
+        natural_texture_assets
+        PROPERTIES LABELS "slow;assets" TIMEOUT 900)
+    set_tests_properties(overworld_structure_placement_and_reservations
+        overworld_ore_hosts_biomes_and_seed_variation
+        worldgen_determinism_boundaries_and_distribution
+        heaven_worldgen_determinism_boundaries_and_distribution
+        heaven_p1_independent_migration_reference
+        PROPERTIES LABELS "slow;worldgen" TIMEOUT 1200)
+    set_tests_properties(world_orchestration_state_transitions
+        PROPERTIES LABELS "slow;integration" TIMEOUT 600)
+    set_tests_properties(plugin_worldgen_v2_batch_and_lod
+        PROPERTIES LABELS "slow;integration" TIMEOUT 180)
+    get_property(minecraftc_tests DIRECTORY PROPERTY TESTS)
+    foreach(test IN LISTS minecraftc_tests)
+        get_test_property(${test} LABELS test_labels)
+        if("vulkan" IN_LIST test_labels)
+            set_property(TEST ${test} APPEND PROPERTY LABELS "slow;integration")
+        endif()
+    endforeach()
 endif()

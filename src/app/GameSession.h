@@ -1,10 +1,12 @@
 #pragma once
+#include "network/PistonProtocol.h"
 
 #include "plugins/Runtime.h"
 
 #include "core/RuntimeClock.h"
 #include "app/DimensionSimulation.h"
 #include "app/LanPlayerRuntime.h"
+#include "app/GameSessionServices.h"
 #include "network/GameplayProtocol.h"
 #include "network/ChunkProtocol.h"
 #include "network/StateProtocol.h"
@@ -72,6 +74,7 @@ public:
         std::function<void(float, uint32_t)> rumble;
         std::function<void(FishingEventKind)> playFishing;
         std::function<void(bool)> playExperience;
+        std::function<void(uint8_t)> playWorkstation;
         std::function<void(bool,bool,bool)> playBlockInteraction;
         std::function<void()> playerDied;
         std::function<void()> playerDeathMessage;
@@ -100,7 +103,14 @@ public:
         LoadingReason reason = LoadingReason::World;
     };
 
-    explicit GameSession(const std::filesystem::path& savesDirectory);
+    explicit GameSession(const std::filesystem::path& savesDirectory,
+                         GameSessionServices services = {});
+    ~GameSession();
+    void prepareDimension(DimensionId target);
+    void recoverPlayerSpawn();
+    void requestAutosave(const std::function<void()>& onError);
+    void advanceAutosave(const std::function<void()>& onError);
+    std::optional<glm::dvec3> preparePortalLanding(DimensionId target,const glm::dvec3& position);
 
     Platform::LanAdvertisement lanAdvertisement() const;
     std::string lanNickname() const;
@@ -200,6 +210,8 @@ public:
     void setDefenseCallback(std::function<void(const DamageOutcome&)> callback);
     void setBedCallback(std::function<void(const glm::ivec3&)> callback);
     void setLocalControl(bool enabled);
+    void updateFishing(float dt);
+    bool updatePortals(float dt,const Feedback& feedback);
     void cancelBowCharge();
     void handleMouseDelta(float dx, float dy, float sensitivity, bool invertY);
     void handleMovement(const InputState& input, float dt);
@@ -242,7 +254,7 @@ public:
     bool pluginEntitySnapshot(uint32_t,uint64_t,MC_EntitySnapshot&,std::string&);
     bool pluginRemoveEntity(uint32_t,uint64_t);
     bool pluginEntityIntent(uint32_t,uint64_t,const MC_EntityIntent&);
-    void giveCreativeItem(ItemId item, int hotbarSlot);
+    void giveCreativeItem(ItemId item, int hotbarSlot, EnchantmentId enchantment = EnchantmentId::Count);
     void dropSelectedItem(int hotbarSlot, bool entireStack);
     void dropInventoryItem(ItemStack stack);
     struct PickBlockResult { int slot = 0; bool itemChanged = false; };
@@ -251,24 +263,21 @@ public:
     void dropContainerRemainder(ItemStack stack);
 
 private:
-    // Flow tests need to construct states that normally require a full render
-    // loading gate. The bypass is unavailable to application code.
-    friend struct GameSessionTestAccess;
     void detachSaveStore();
-    void safeSpawn();
-    void beginAutosave(const std::function<void()>& onError);
-    void processAutosave(const std::function<void()>& onError);
     void resetTransientState(bool newWorld, uint64_t worldTicks,
                              RuntimeClock::Tick loadingStarted);
     // Stores outlive world I/O, and both dimensions outlive their players.
     std::unique_ptr<SaveStore> saveStore;
-    ThreadPool threadPool;
+    GameSessionServices services;
+    std::unique_ptr<ThreadPool> ownedThreadPool;
+    ThreadPool& threadPool;
     DimensionId dimension = DimensionId::Overworld;
     std::vector<std::unique_ptr<DimensionSimulation>> simulations;
     Player player;
     // Declared after dimensions: all remote Players are destroyed before Worlds.
     std::map<uint64_t, std::unique_ptr<LanPlayerRuntime>> guests;
-    Lan::Host lanHost;
+    std::unique_ptr<Lan::Host> ownedLanHost;
+    Lan::Host& lanHost;
     Lan::ChunkJournal chunkJournal;
     InventoryTransaction hostWindow;
     InventoryWindowView hostWindowView, replicaWindow;
@@ -302,7 +311,8 @@ private:
     void bindLanFeedback(Player& owner, uint64_t id);
     void broadcastGameEvent(Lan::GameEvent event, bool ownerOnly = false, bool locally = false);
     void presentLanEvents(const Feedback& feedback);
-    Lan::Client lanClient;
+    std::unique_ptr<Lan::Client> ownedLanClient;
+    Lan::Client& lanClient;
     bool lanPvp = false;
     uint64_t observedExperiencePickups=0,observedExperienceLevelSounds=0;
     bool replicaExperiencePickup=false,replicaExperienceLevel=false;
@@ -314,6 +324,7 @@ private:
     double replicaLastInputSent = -1;
     std::vector<Lan::PlayerView> replicaOthers;
     std::vector<Lan::RoomPlayer> replicaRoster;
+    Lan::BlockTransactionAssembler replicaBlockAssembler;
     std::deque<Lan::Message> replicaChunks;
     size_t replicaChunkBytes = 0;
     std::map<Lan::ChunkAddress, uint64_t> replicaRevisions;
@@ -347,8 +358,6 @@ private:
     void updateLanSleep(float dt);
     bool trySkipLanNight(DimensionId target);
     bool travelLanPlayer(LanPlayerRuntime& guest, DimensionId target, bool respawn = false, std::optional<glm::dvec3> destination = {});
-    std::optional<glm::dvec3> netherPortalLanding(DimensionId,const glm::dvec3&);
-    bool updateNetherPortals(float,const Feedback&);
     bool useRespawnAnchor(uint64_t,const glm::ivec3&);
     void explodeRestBlock(DimensionId,const glm::ivec3&);
     enum class AnchorRespawnStatus { Pending, Invalid, Ready };

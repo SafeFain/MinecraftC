@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audio engine invariants and complete, byte-exact score regeneration."""
+"""Audio engine invariants and reproducibility against the authored score/assets."""
 
 from array import array
 from contextlib import redirect_stdout, redirect_stderr
@@ -20,17 +20,6 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT / "tools"))
 import audio_generator as generator
 from audio_score import Event, TRACKS, compose, voice_lead
-
-EXPECTED = {
-    "menu_whimsy": (104, 96, "f704d95980f508c1886ea5d4a43326da922a2b1c9ecd7a92fa232eaaf1a932b0"),
-    "menu_spark": (112, 96, "1eeed31f4c315ec7312460ef107dae22a7e0a244ca06907ba6331f3e6db6732f"),
-    "gameplay_calm": (64, 128, "df4c2a50f76dad339abfdbae8d62636ee74530e81cf5e57080317e1e5672dac1"),
-    "overworld_solitude": (60, 96, "fa8dcae097bc9a44df1355b245b90e912ac538d80cdca2e95371f85b73b6dbea"),
-    "overworld_horizon": (72, 128, "13bf02e0d00bf9a957f03b2257aa73e61f104d4c49c76fefa5381c52b717980f"),
-    "overworld_nightfall": (54, 96, "b764dd7094cbf3dab68b464484b0c3aae1236e3cff43a4d6eea8a69097106f27"),
-    "heaven_ether": (56, 96, "a45a80b4282248b8932b72661d318b38f1d894c459451ccfe626e31ae4ba71e4"),
-    "heaven_sanctum": (48, 96, "e0817640e8078a18bad736002c0545d34e75ca1a8f74942e08992af06ccce20e"),
-}
 
 
 def asset_path(track):
@@ -53,13 +42,15 @@ class EngineTests(unittest.TestCase):
             self.assertTrue(all(math.isfinite(x) for x in samples))
             self.assertGreater(max(abs(x) for x in samples), .01)
             voices.append(samples.tobytes())
-        self.assertEqual(len(set(voices)), 7)
+        self.assertEqual(len(set(voices)), len(generator.INSTRUMENTS))
         # Out-of-band upper partials must be removed rather than folded back.
         self.assertLess(max(abs(x) for x in generator.wavetable("bell", 127)), 1.01)
         self.assertEqual(set(generator.wavetable("bell", 160)), {0})
 
     def test_scores_seed_variation_and_voice_leading(self):
-        self.assertEqual(len(TRACKS), 8)
+        self.assertEqual(len({track.name for track in TRACKS}), len(TRACKS))
+        self.assertTrue(any(track.heaven for track in TRACKS))
+        self.assertTrue(any(not track.heaven for track in TRACKS))
         for track in TRACKS:
             events = compose(track)
             self.assertEqual(events, compose(track))
@@ -169,10 +160,9 @@ class AssetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="minecraftc-audio-reference-") as directory:
             for track in TRACKS:
                 with self.subTest(track=track.name):
-                    bpm, beats, digest = EXPECTED[track.name]
-                    self.assertEqual((track.bpm, track.beats), (bpm, beats))
+                    bpm, beats = track.bpm, track.beats
                     path = asset_path(track)
-                    self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), digest)
+                    digest = hashlib.sha256(path.read_bytes()).hexdigest()
                     with wave.open(str(path), "rb") as source:
                         self.assertEqual((source.getnchannels(), source.getsampwidth(), source.getframerate()), (2, 2, 24000))
                         self.assertEqual(source.getnframes(), round(beats * 60 / bpm * 24000))

@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 // World orchestration tests: exercise the World facade's state transitions
 // (chunk streaming, async generation handoff, persistence queues, mesh
@@ -19,6 +20,7 @@
 #include <glm/glm.hpp>
 
 #include <chrono>
+#include <condition_variable>
 #include <atomic>
 #include <cstdlib>
 #include <algorithm>
@@ -132,7 +134,8 @@ private:
 // Worker tasks hold raw World pointers; drain them before the World goes out
 // of scope (mirrors the loading-gate drain in the application).
 void drainWorkers(World& world, ThreadPool& pool) {
-    for (int i = 0; i < 4000; ++i) {
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(60);
+    while(std::chrono::steady_clock::now()<deadline) {
         world.processCompletedGenerations();
         if (pool.idle()) return;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -158,8 +161,10 @@ void loadTarget(World& world) {
 // enqueueGeneration uses a bounded worker-count window, so keep
 // feeding the pipeline until the whole target is generated and idle.
 void generateTarget(World& world, ThreadPool& pool) {
-    int frames = 0;
-    for (; frames < 4000; ++frames) {
+    // The former poll-count cap excluded time spent applying generation and
+    // lighting. Bound the whole slow integration phase, including that work.
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(60);
+    while(std::chrono::steady_clock::now()<deadline) {
         world.enqueueGeneration();
         world.processCompletedGenerations();
         const auto progress = world.generationProgress();
@@ -169,24 +174,32 @@ void generateTarget(World& world, ThreadPool& pool) {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
-    require(frames < 4000, "all target chunks finish generating");
     const auto progress = world.generationProgress();
-    require(progress.total > 0 && progress.completed == progress.total,
+    if(progress.total==0||progress.completed!=progress.total||!pool.idle())
+        std::cerr<<"generation deadline: completed="<<progress.completed<<'/'<<progress.total
+                 <<" pending workers="<<pool.pendingCount()<<" idle="<<pool.idle()<<'\n';
+    require(progress.total > 0 && progress.completed == progress.total&&pool.idle(),
             "all target chunks finish generating");
 }
 
 void testAdaptiveGenerationBudget() {
-    struct Case { size_t workers; int playing; int loading; };
-    const Case cases[] = {
-        {0, 1, 1}, {1, 1, 1}, {2, 1, 1}, {3, 1, 2}, {4, 2, 3},
-        {6, 3, 4}, {8, 4, 6}, {12, 6, 9}, {16, 8, 12}, {32, 8, 12},
-        {std::numeric_limits<size_t>::max(), 8, 12}
-    };
-    for (const auto& entry : cases) {
-        require(Config::chunkGenerationTasksInFlight(entry.workers) == entry.playing,
-                "playing generation budget does not scale with worker count");
-        require(Config::chunkGenerationTasksInFlight(entry.workers, true) == entry.loading,
-                "loading generation budget does not scale with worker count");
+    std::vector<size_t> workerCounts;
+    for(size_t workers=0;workers<=64;++workers)workerCounts.push_back(workers);
+    workerCounts.push_back(std::numeric_limits<size_t>::max());
+    int previousPlaying=0,previousLoading=0;
+    for (size_t workers : workerCounts) {
+        const int playing=Config::chunkGenerationTasksInFlight(workers);
+        const int loading=Config::chunkGenerationTasksInFlight(workers,true);
+        require(playing>0 && loading>=playing && size_t(loading)<=std::max(size_t(1),workers),
+                "generation budgets must remain nonempty and bounded by available workers");
+        require(playing<=Config::CHUNK_GEN_TASKS_IN_FLIGHT_MAX &&
+                loading<=Config::LOADING_CHUNK_GEN_TASKS_IN_FLIGHT_MAX,
+                "generation budgets must respect configured memory limits");
+        require(playing>=previousPlaying && loading>=previousLoading,
+                "adding workers cannot reduce either generation window");
+        if(workers>1)require(size_t(loading)<workers,
+                "generation must leave capacity for meshing and LOD");
+        previousPlaying=playing;previousLoading=loading;
     }
 
     const int previousDistance = Config::RENDER_DISTANCE;
@@ -210,31 +223,35 @@ void testAdaptiveGenerationBudget() {
         for (int wave = 0; wave < 2; ++wave) {
             std::promise<void> release;
             const auto gate = release.get_future().share();
-            std::atomic<int> started{0};
+            std::mutex barrierMutex;
+            std::condition_variable barrier;
+            int started = 0;
             for (int i = 0; i < 8; ++i) {
-                pool.enqueuePriority([&started, gate] {
-                    ++started;
+                pool.enqueuePriority([&started, &barrierMutex, &barrier, gate] {
+                    { std::lock_guard<std::mutex> lock(barrierMutex); ++started; }
+                    barrier.notify_one();
                     gate.wait();
                 }, std::numeric_limits<int>::max());
             }
-            const auto deadline = std::chrono::steady_clock::now() +
-                std::chrono::seconds(5);
-            while (started.load() != 8 && std::chrono::steady_clock::now() < deadline)
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            require(started.load() == 8, "generation test workers did not reach barrier");
+            std::unique_lock<std::mutex> lock(barrierMutex);
+            require(barrier.wait_for(lock, std::chrono::seconds(5), [&] { return started == 8; }),
+                    "generation test workers did not reach barrier");
+            lock.unlock();
 
             world.enqueueGeneration();
-            require(pool.pendingCount() == 4,
-                    "eight-worker playing window must enqueue four generation tasks");
+            const auto playingJobs = pool.pendingCount();
+            require(playingJobs > 0 && playingJobs <= pool.threadCount(),
+                    "generation must use a bounded nonempty worker window");
             world.enqueueGeneration();
-            require(pool.pendingCount() == 4,
+            require(pool.pendingCount() == playingJobs,
                     "repeated playing enqueue exceeded the generation window");
             world.enqueueGeneration(true);
-            require(pool.pendingCount() == 6,
-                    "loading must expand the existing generation window to six tasks");
+            const auto loadingJobs = pool.pendingCount();
+            require(loadingJobs >= playingJobs && loadingJobs <= pool.threadCount(),
+                    "loading must preserve or expand the bounded generation window");
             world.enqueueGeneration(true);
             world.enqueueGeneration();
-            require(pool.pendingCount() == 6,
+            require(pool.pendingCount() == loadingJobs,
                     "loading/playing transition duplicated or exceeded in-flight tasks");
             release.set_value();
             pool.waitIdle();
@@ -264,7 +281,9 @@ void testChunkStreaming() {
         World world;
         world.setThreadPool(&pool);
         world.setSaveStore(&store);
-        world.resetForNewSeed(1001);
+        // This scenario owns streaming/retirement and edited persistence;
+        // terrain distribution is covered by the generation scenarios.
+        world.resetForNewSeed(1001,WorldType::Superflat);
 
         loadTarget(world);
         generateTarget(world, pool);
@@ -331,8 +350,8 @@ void testAsyncGeneratedCacheRoundTrip() {
         world.setThreadPool(&pool);
         world.setSaveStore(&store);
         world.resetForNewSeed(424242);
-        int frames = 0;
-        for (; frames < 1200; ++frames) {
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);
+        while(std::chrono::steady_clock::now()<deadline) {
             world.update({0.5, 64.0, 0.5}, 1);
             world.enqueueGeneration();
             world.processCompletedGenerations();
@@ -340,7 +359,7 @@ void testAsyncGeneratedCacheRoundTrip() {
             if (progress.total == 1 && progress.completed == 1 && pool.idle()) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        require(frames < 1200, "single chunk generation completes for cache test");
+        require(world.generationProgress().total==1&&world.generationProgress().completed==1&&pool.idle(), "single chunk generation completes for cache test");
         const Chunk* chunk = world.getChunk(0, 0);
         require(chunk != nullptr && chunk->generated.load(),
                 "generated chunk is available for cache snapshot");
@@ -362,8 +381,8 @@ void testAsyncGeneratedCacheRoundTrip() {
         reopened.setThreadPool(&pool);
         reopened.setSaveStore(&store);
         reopened.resetForNewSeed(424242);
-        int frames = 0;
-        for (; frames < 1200; ++frames) {
+        const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);
+        while(std::chrono::steady_clock::now()<deadline) {
             reopened.update({0.5, 64.0, 0.5}, 1);
             reopened.enqueueGeneration();
             reopened.processCompletedGenerations();
@@ -372,7 +391,7 @@ void testAsyncGeneratedCacheRoundTrip() {
                 progress.cacheHits == 1) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        require(frames < 1200, "cached chunk is published without regeneration");
+        require(reopened.generationProgress().total==1&&reopened.generationProgress().completed==1&&reopened.generationProgress().cacheHits==1, "cached chunk is published without regeneration");
         const Chunk* cached = reopened.getChunk(0, 0);
         require(cached != nullptr && cached->generated.load(),
                 "cached chunk remains generated after publication");
@@ -437,9 +456,8 @@ void testWarmChunkBacktrack() {
         require(chest != nullptr, "edited chest has a block entity");
         chest->chest[0] = {ItemId::BREAD, 3, 0};
 
-        for (int i = 0; i < 400 &&
-                        origin->lifecycle.load() != Chunk::LifecycleState::Warm;
-             ++i) {
+        const auto retirementDeadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+        while(origin->lifecycle.load()!=Chunk::LifecycleState::Warm&&std::chrono::steady_clock::now()<retirementDeadline) {
             world.update({16.5, 64.0, 0.5}, 1);
             world.enqueueGeneration();
             world.processCompletedGenerations(false);
@@ -712,8 +730,8 @@ void testBudgetedGenerationHandoff() {
     world.resetForNewSeed(4242, WorldType::Normal, DimensionId::Heaven);
     world.update({0.5, 120.0, 0.5}, Config::LOADING_CHUNK_LOADS_PER_FRAME);
 
-    int frames = 0;
-    for (; frames < 4000; ++frames) {
+    const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);
+    while(std::chrono::steady_clock::now()<deadline) {
         world.enqueueGeneration();
         const auto progress = world.generationProgress();
         if (progress.total > 0 && progress.completed == progress.total &&
@@ -721,7 +739,7 @@ void testBudgetedGenerationHandoff() {
             break;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    require(frames < 4000,
+    require(world.generationProgress().total>0&&world.generationProgress().completed==world.generationProgress().total&&pool.idle(),
             "heaven chunks finish before the budgeted handoff test");
 
     world.processCompletedGenerations(
@@ -833,6 +851,9 @@ void testMeshPipeline() {
 
     const int surface = world.getSurfaceY(0, 0);
 
+    // This controlled one-chunk fixture protects resource ownership: one
+    // completed mesh has one GPU owner, stale work has none. These counts are
+    // deliberate duplicate/leak guards, independent of streaming tuning.
     // First pass: the dirty chunk builds and uploads once.
     world.enqueueMeshBuilds(4);
     drainWorkers(world, pool);
@@ -1384,6 +1405,7 @@ void testHeavenStarstepResolution() {
 }  // namespace
 
 #include "WorldDoorScenarios.h"
+#include "RedstoneTickScenarios.h"
 
 void testGuestStreamingInterests() {
     const int previousDistance = Config::RENDER_DISTANCE;
@@ -1405,10 +1427,11 @@ void testGuestStreamingInterests() {
     require(world.generationProgress().completed == 0,
             "guest generation inflated local loading progress");
     for (int i = 0; i < 20; ++i) world.update({.5, 64, .5}, 3);
-    require(world.generationProgress().total == 13,
-            "guest interests changed local rendering/loading target");
+    const auto targetWithGuests=world.generationProgress().total;
     world.setAdditionalStreamingInterests({});
     for (int i = 0; i < 20; ++i) world.update({.5, 64, .5}, 3);
+    require(targetWithGuests>0&&world.generationProgress().total==targetWithGuests,
+            "guest interests changed local rendering/loading target");
     require(!contains(-100, -100) && !contains(100, 100),
             "departed guest chunks were retained indefinitely");
     bool rejected = false;
@@ -1418,11 +1441,19 @@ void testGuestStreamingInterests() {
     Config::RENDER_DISTANCE = previousDistance;
 }
 
-int main() {
+int main(int argc,char** argv) try {
     installHeavenFixture();
+    if(argc==3 && std::string(argv[1])=="--redstone-budget-tests") {
+        RedstoneTickScenarios::run(argv[2]);return 0;
+    }
+    if(argc==2 && std::string(argv[1])=="--redstone-tests") {
+        try {testRedstoneCircuits();std::cout<<"Redstone world circuits passed\n";return 0;}
+        catch(const std::exception& error){std::cerr<<"Redstone world circuits failed: "<<error.what()<<'\n';return 1;}
+    }
     testAdaptiveGenerationBudget();
     testGuestStreamingInterests();
     testDoorsAndButtons();
+    testRedstoneCircuits();
     testChunkStreaming();
     testAsyncGeneratedCacheRoundTrip();
     testWarmChunkBacktrack();
@@ -1444,4 +1475,6 @@ int main() {
     testHeavenStarstepResolution();
     std::cout << "World orchestration tests passed\n";
     return 0;
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

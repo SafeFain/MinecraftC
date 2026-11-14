@@ -48,7 +48,7 @@ void slotValid(InventorySlot slot) {
 void actionValid(const GameAction& action) {
     if (!action.sequence || !action.epoch || action.kind > ActionKind::PluginCommand ||
         action.windowKind > InventoryWindowKind::Container ||
-        action.inventory.operation > InventoryOperation::CreativeClone || action.inventory.targets.size() > 64)
+        action.inventory.operation > InventoryOperation::Rename || action.inventory.targets.size() > 64)
         throw ProtocolError("Invalid game action");
     slotValid(action.inventory.slot);
     for (auto slot : action.inventory.targets) slotValid(slot);
@@ -66,6 +66,7 @@ Bytes encodeGameAction(const GameAction& action) {
     writer.u8(static_cast<uint8_t>(inventory.operation)); writer.u8(static_cast<uint8_t>(inventory.slot.area)); writer.u8(inventory.slot.index);
     writer.u16(inventory.operation==InventoryOperation::CreativeGrant?encodeItemId(static_cast<ItemId>(inventory.argument)):inventory.argument); writer.u8(inventory.alternate); writer.u8(static_cast<uint8_t>(inventory.targets.size()));
     for (auto target : inventory.targets) { writer.u8(static_cast<uint8_t>(target.area)); writer.u8(target.index); }
+    writer.text(inventory.text,200);
     writer.text(action.command,512);
     return std::move(writer.bytes);
 }
@@ -85,6 +86,7 @@ GameAction decodeGameAction(const Bytes& bytes) {
     inventory.alternate = alternate != 0;
     const auto count = reader.u8(); if (count > 64) throw ProtocolError("Too many inventory targets");
     for (uint8_t i = 0; i < count; ++i) inventory.targets.push_back({static_cast<InventoryArea>(reader.u8()), reader.u8()});
+    inventory.text=reader.text(200);
     action.command=reader.text(512);
     if(action.kind!=ActionKind::PluginCommand&&!(action.kind==ActionKind::SleepChoice&&action.inventory.argument==2)&&!action.command.empty())throw ProtocolError("Unexpected command text");
     reader.finish(); actionValid(action); return action;

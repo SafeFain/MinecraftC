@@ -1,5 +1,6 @@
 #include "game/FishingSystem.h"
 #include "Config.h"
+#include "game/EnchantingRules.h"
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -24,7 +25,7 @@ float FishingSystem::random() {
 void FishingSystem::wait() {
     m_view.phase = FishingPhase::Waiting;
     m_view.biteSeconds = 0;
-    m_remaining = 5.0f + random() * 25.0f;
+    m_remaining = std::max(.05f, 5.0f + random() * 25.0f - 5.f * m_lure);
 }
 bool FishingSystem::openWater(glm::ivec3 surface, const FishingEnvironment& env) {
     for (int z = -2; z <= 2; ++z) for (int x = -2; x <= 2; ++x)
@@ -42,7 +43,7 @@ ItemStack FishingSystem::loot(bool open, float category, float selection) {
         constexpr ItemId junk[] = {ItemId::STICK, ItemId::STRING, ItemId::BONE, ItemId::ROTTEN_FLESH};
         return {junk[static_cast<size_t>(s * 4)], 1, 0};
     }
-    constexpr ItemId treasure[] = {ItemId::BOW, ItemId::FISHING_ROD, ItemId::EMERALD};
+    constexpr ItemId treasure[] = {ItemId::BOW, ItemId::FISHING_ROD, ItemId::BOOK};
     return {treasure[static_cast<size_t>(s * 3)], 1, 0};
 }
 void FishingSystem::use(const glm::dvec3& eye, const glm::vec3& forward,
@@ -54,7 +55,17 @@ void FishingSystem::use(const glm::dvec3& eye, const glm::vec3& forward,
         if (m_view.phase == FishingPhase::Bite) {
             const float category = random();
             const float selection = random();
-            event.catchItem = loot(openWater(m_surface,env), category, selection);
+            const bool open = openWater(m_surface,env);
+            // Java luck adjusts weights before normalization.
+            const float junk = std::max(0.f, 10.f - 2.f * m_luck), treasure = 5.f + 2.f * m_luck, fish = 85.f - m_luck;
+            const float total = junk + treasure + fish;
+            const float mapped = !open ? category : category < fish/total ? category/(fish/total)*.85f : category < (fish+junk)/total ? .85f+(category-fish/total)/(junk/total)*.1f : .95f+(category-(fish+junk)/total)/(treasure/total)*.05f;
+            event.catchItem = loot(open,mapped,selection);
+            if (open && mapped >= .95f) {
+                uint64_t seed = static_cast<uint64_t>(random() * 4294967295.);
+                if (event.catchItem.id != ItemId::BOOK) event.catchItem.damage = static_cast<uint16_t>(getItemProps(event.catchItem.id).maxDurability * (.75f + .24f * random()));
+                event.catchItem = EnchantingRules::randomEnchant(event.catchItem,30,seed,true);
+            }
             event.wear = 1;
             event.experience = static_cast<uint8_t>(1+std::min(5,int(random()*6)));
         } else if (m_view.phase == FishingPhase::Stuck) event.wear = 2;

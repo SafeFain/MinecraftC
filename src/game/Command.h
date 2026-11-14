@@ -36,7 +36,8 @@ enum class CommandType {
     LocateStructure,
     Give,
     Dimension,
-    Experience
+    Experience,
+    Enchant
 };
 
 struct ParsedCommand {
@@ -47,6 +48,7 @@ struct ParsedCommand {
     std::string experienceTarget;
     int32_t experienceAmount=0;
     bool experienceLevels=false;
+    EnchantmentId enchantment = EnchantmentId::Count;
     GameMode gameMode = GameMode::Survival;
     TeleportTarget teleport;
     ItemId item = ItemId::EMPTY;
@@ -133,6 +135,23 @@ inline CommandParseResult parseCommand(const std::string& input) {
             if (tokens.size() > 3) return expected(input, tokens, 3, "<end>");
         }
         parsed.type = CommandType::Help;
+    } else if (name == "/enchant") {
+        if (tokens.size() < 2) return expected(input,tokens,1,"@s|@a|<player>");
+        if (tokens.size() < 3) return expected(input,tokens,2,"<enchantment>");
+        parsed.experienceTarget = tokens[1].text;
+        for (size_t i = 0; i < ENCHANTMENTS.size(); ++i) {
+            const auto key = ENCHANTMENTS[i].key;
+            if (tokens[2].text == key || tokens[2].text == key.substr(key.find(':')+1)) parsed.enchantment = static_cast<EnchantmentId>(i);
+        }
+        if (!validEnchantment(parsed.enchantment)) return expected(input,tokens,2,"<enchantment>");
+        if (tokens.size() > 3) {
+            const auto& value = tokens[3].text;
+            if (value.size() != 1 || value[0] < '1' || value[0] > '5') return expected(input,tokens,3,"<level>");
+            parsed.itemCount = static_cast<uint8_t>(value[0]-'0');
+        }
+        if (parsed.itemCount > ENCHANTMENTS[static_cast<size_t>(parsed.enchantment)].maximumLevel) return expected(input,tokens,3,"<valid level>");
+        if (tokens.size() > 4) return expected(input,tokens,4,"<end>");
+        parsed.type = CommandType::Enchant;
     } else if (name == "/experience" || name == "/xp") {
         if(tokens.size()<2)return expected(input,tokens,1,"add|set|query");
         const auto op=tokens[1].text;
@@ -289,8 +308,8 @@ inline std::vector<CommandSuggestion> commandSuggestions(
     };
 
     if (argument == 0) {
-        constexpr std::array<std::string_view, 10> commands{
-            "/experience", "/xp", "/gamerule", "/gamemode", "/give", "/help", "/locate", "/time", "/tp", "/weather"};
+        constexpr std::array<std::string_view, 11> commands{
+            "/enchant", "/experience", "/xp", "/gamerule", "/gamemode", "/give", "/help", "/locate", "/time", "/tp", "/weather"};
         for (const auto command : commands) add(command);
     } else {
         const std::string& command = before[0].text;

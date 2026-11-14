@@ -1,6 +1,7 @@
 #include "plugins/ContentQueries.h"
 #include "world/BiomeBlockLogic.h"
 #include "world/Block.h"
+#include "world/RedstoneBlocks.h"
 #include "core/AssetStore.h"
 
 #include <algorithm>
@@ -70,7 +71,11 @@ constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
 #define NETHER_TEXTURE_NAME(id,key,name,r,g,b,shape,light) key,
     MC_NETHER_BLOCKS(NETHER_TEXTURE_NAME)
 #undef NETHER_TEXTURE_NAME
-    "crimson_door_bottom","crimson_door_top","warped_door_bottom","warped_door_top"
+    "crimson_door_bottom","crimson_door_top","warped_door_bottom","warped_door_top",
+    "lapis_ore", "deepslate_lapis_ore", "bookshelf", "iron_block", "enchanting_table", "anvil", "chipped_anvil", "damaged_anvil", "frosted_ice",
+#define REDSTONE_TEXTURE_NAME(id,key) key,
+    MC_REDSTONE_TEXTURES(REDSTONE_TEXTURE_NAME)
+#undef REDSTONE_TEXTURE_NAME
 }};
 
 const std::unordered_map<std::string, BlockTexture>& textureNames() {
@@ -104,6 +109,10 @@ const std::unordered_map<std::string, BlockId>& blockNames() {
             result[std::string(names[i])+"_slab"]=slabBlock(material,BlockHalf::Bottom);
             result[std::string(names[i])+"_stairs"]=stairBlock(material,BlockHalf::Bottom,BedDirection::North);
         }
+#define REDSTONE_BLOCK_NAME(id,key,label) if(const auto placed=Redstone::namedBlock(key))result[key]=Redstone::worldBlock(*placed);
+        MC_REDSTONE_ITEMS(REDSTONE_BLOCK_NAME)
+#undef REDSTONE_BLOCK_NAME
+        Redstone::State dust;result["redstone_dust"]=Redstone::block(dust);
         result["wood"] = BlockId::WOOD;
         result["planks"] = BlockId::PLANKS;
         result["cactus_block"] = BlockId::CACTUS_BLOCK;
@@ -478,10 +487,67 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
         auto& p = table[static_cast<size_t>(portal)];
         p.solid=false;p.transparent=true;p.layer=RenderLayer::Translucent;p.alpha=.65f;
     }
+    table[static_cast<size_t>(BlockId::LAPIS_ORE)] = {BlockId::LAPIS_ORE, "Lapis Ore", glm::vec3(0.42f,0.46f,0.62f), true, false, RenderShape::Cube};
+    table[static_cast<size_t>(BlockId::DEEPSLATE_LAPIS_ORE)] = {BlockId::DEEPSLATE_LAPIS_ORE, "Deepslate Lapis Ore", glm::vec3(0.23f,0.25f,0.38f), true, false, RenderShape::Cube};
+    table[static_cast<size_t>(BlockId::BOOKSHELF)] = {BlockId::BOOKSHELF, "Bookshelf", glm::vec3(0.55f,0.4f,0.22f), true, false, RenderShape::Cube};
+    table[static_cast<size_t>(BlockId::IRON_BLOCK)] = {BlockId::IRON_BLOCK, "Iron Block", glm::vec3(0.8f,0.82f,0.84f), true, false, RenderShape::Cube};
+    table[static_cast<size_t>(BlockId::ENCHANTING_TABLE)] = {BlockId::ENCHANTING_TABLE, "Enchanting Table", glm::vec3(0.22f,0.12f,0.27f), true, false, RenderShape::Boxes};
+    table[static_cast<size_t>(BlockId::ANVIL)] = {BlockId::ANVIL, "Anvil", glm::vec3(0.33f,0.34f,0.36f), true, false, RenderShape::Boxes};
+    table[static_cast<size_t>(BlockId::CHIPPED_ANVIL)] = {BlockId::CHIPPED_ANVIL, "Chipped Anvil", glm::vec3(0.3f,0.31f,0.33f), true, false, RenderShape::Boxes};
+    table[static_cast<size_t>(BlockId::DAMAGED_ANVIL)] = {BlockId::DAMAGED_ANVIL, "Damaged Anvil", glm::vec3(0.27f,0.28f,0.3f), true, false, RenderShape::Boxes};
+    table[static_cast<size_t>(BlockId::FROSTED_ICE)] = {BlockId::FROSTED_ICE, "Frosted Ice", glm::vec3(0.5f,0.7f,0.9f), true, false, RenderShape::Cube};
+    for (unsigned i = 0; i < 3; ++i) {
+        const auto raw = static_cast<uint16_t>(BlockId::ANVIL_EAST) + i;
+        table[raw] = table[static_cast<size_t>(BlockId::ANVIL) + i]; table[raw].id = static_cast<BlockId>(raw); table[raw].name += " East";
+    }
+    table[static_cast<size_t>(BlockId::FROSTED_ICE)] = table[static_cast<size_t>(BlockId::ICE)];
+    table[static_cast<size_t>(BlockId::FROSTED_ICE)].id = BlockId::FROSTED_ICE;
+    table[static_cast<size_t>(BlockId::FROSTED_ICE)].name = "Frosted Ice";
+    table[static_cast<size_t>(BlockId::GRINDSTONE)].shape = RenderShape::Boxes;
+    for (uint16_t raw = static_cast<uint16_t>(BlockId::GRINDSTONE_STATE_FIRST); raw <= static_cast<uint16_t>(BlockId::GRINDSTONE_STATE_LAST); ++raw) {
+        table[raw] = table[static_cast<size_t>(BlockId::GRINDSTONE)]; table[raw].id = static_cast<BlockId>(raw);
+        table[raw].name += " State " + std::to_string(raw);
+    }
+    for(unsigned raw=unsigned(BlockId::REDSTONE_FIRST);raw<=unsigned(BlockId::REDSTONE_LAST);++raw) {
+        const auto id=static_cast<BlockId>(raw);const auto state=Redstone::blockState(id);
+        const bool thin=state && Redstone::thin(state->kind);
+        const bool boxes=thin || (state && state->kind==Redstone::Kind::Piston) || Redstone::pistonHead(Redstone::nativeSlot(id));
+        std::string name;
+        if(state) {
+            constexpr const char* names[]={"Redstone Dust","Lever","Redstone Torch","Redstone Repeater","Redstone Comparator","Observer","Piston","Redstone Lamp","Redstone Block"};
+            name=names[unsigned(state->kind)];
+        } else name=Redstone::ore(Redstone::nativeSlot(id))?"Redstone Ore":"Piston Head";
+        table[raw]={id,name+" State "+std::to_string(raw),glm::vec3(.6f,.18f,.12f),!thin || (state && (state->kind==Redstone::Kind::Repeater || state->kind==Redstone::Kind::Comparator)),thin,boxes?RenderShape::Boxes:RenderShape::Cube,thin?RenderLayer::Cutout:RenderLayer::Opaque};
+    }
     return table;
 }();
 
 BlockTexture getFaceTexture(BlockId id, FaceDir face) {
+    if(const auto s=Redstone::blockState(id)) {
+        const auto dir=static_cast<Redstone::Face>(face);
+        switch(s->kind) {
+            case Redstone::Kind::Dust:return !s->power?BlockTexture::RedstoneDust:s->power==15?BlockTexture::RedstoneDustOn:static_cast<BlockTexture>(unsigned(BlockTexture::RedstoneDust1)+s->power-1);
+            case Redstone::Kind::Lever:return BlockTexture::Lever;
+            case Redstone::Kind::Torch:return s->power?BlockTexture::RedstoneTorch:BlockTexture::RedstoneTorchOff;
+            case Redstone::Kind::Repeater:return s->power?BlockTexture::RedstoneRepeaterOn:BlockTexture::RedstoneRepeater;
+            case Redstone::Kind::Comparator:return s->power?BlockTexture::RedstoneComparatorOn:BlockTexture::RedstoneComparator;
+            case Redstone::Kind::Observer:return dir==s->facing?(s->power?BlockTexture::ObserverBackOn:BlockTexture::ObserverBack):dir==Redstone::opposite(s->facing)?BlockTexture::ObserverFace:BlockTexture::Observer;
+            case Redstone::Kind::Piston:return dir==s->facing?(s->alternate?BlockTexture::StickyPistonTop:BlockTexture::PistonTop):BlockTexture::PistonSide;
+            case Redstone::Kind::Lamp:return s->power?BlockTexture::RedstoneLampOn:BlockTexture::RedstoneLamp;
+            case Redstone::Kind::Block:return BlockTexture::RedstoneBlock;
+        }
+    }
+    if(Redstone::native(id)) {
+        const auto slot=Redstone::nativeSlot(id);
+        if(Redstone::pistonHead(slot)) {
+            const auto n=unsigned(slot)-unsigned(Redstone::NativeBlock::PISTON_HEAD_FIRST);
+            if(static_cast<Redstone::Face>(face)==static_cast<Redstone::Face>(n%6))return n>=6?BlockTexture::StickyPistonTop:BlockTexture::PistonTop;
+            return BlockTexture::PistonSide;
+        }
+        if(Redstone::ore(slot))return (unsigned(slot)-unsigned(Redstone::NativeBlock::REDSTONE_ORE))%2?BlockTexture::DeepslateRedstoneOre:BlockTexture::RedstoneOre;
+    }
+    if (id >= BlockId::ANVIL_EAST && id <= BlockId::DAMAGED_ANVIL_EAST) id = static_cast<BlockId>(static_cast<uint16_t>(BlockId::ANVIL) + anvilDamage(id));
+    if (id >= BlockId::GRINDSTONE_STATE_FIRST && id <= BlockId::GRINDSTONE_STATE_LAST) id = BlockId::GRINDSTONE;
     if(respawnAnchorCharge(id)>0)return BlockTexture::RESPAWN_ANCHOR;
     if(isNetherWart(id))return BlockTexture::NETHER_WART;
     switch(id) {
@@ -499,6 +565,8 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
                                                        [static_cast<size_t>(face)];
         if (defined != BlockTexture::Count) return defined;
     }
+    if (id == BlockId::BOOKSHELF && (face == FaceDir::TOP || face == FaceDir::BOTTOM)) return BlockTexture::Planks;
+    if (id >= BlockId::LAPIS_ORE && id <= BlockId::FROSTED_ICE) return static_cast<BlockTexture>(static_cast<uint16_t>(BlockTexture::LAPIS_ORE) + static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::LAPIS_ORE));
     DoorState door; ButtonState button;
     if (decodeDoor(id, door)) return static_cast<BlockTexture>(
         (door.material>=DoorMaterial::Crimson?static_cast<uint16_t>(BlockTexture::CrimsonDoorBottom)-14:static_cast<uint16_t>(BlockTexture::OakDoorBottom)) +
@@ -986,9 +1054,47 @@ BlockId architecturalBaseBlock(ArchitecturalMaterial material) {
 }
 
 BlockCollisionBoxes blockCollisionBoxes(BlockId id) {
+    if(Redstone::native(id)) {
+        if(const auto s=Redstone::blockState(id)) {
+            if(s->kind==Redstone::Kind::Dust || s->kind==Redstone::Kind::Lever || s->kind==Redstone::Kind::Torch)return {};
+            if(s->kind==Redstone::Kind::Repeater || s->kind==Redstone::Kind::Comparator) {BlockCollisionBoxes boxes;boxes.count=1;boxes.boxes[0]={{0,0,0},{1,.125f,1}};return boxes;}
+        }
+        return Redstone::geometry(id);
+    }
     BlockCollisionBoxes result;
     if(const auto* b=Plugins::pluginBlock(id))if(b->collision)return *b->collision;
     const BlockProperties& props = getBlockProps(id);
+    if (id == BlockId::ENCHANTING_TABLE) {
+        result.count = 1; result.boxes[0] = {{0, 0, 0}, {1, .75f, 1}}; return result;
+    }
+    if (isAnvil(id)) {
+        result.count = 3;
+        result.boxes[0] = {{.125f, 0, .125f}, {.875f, .25f, .875f}};
+        result.boxes[1] = {{.25f, .25f, .1875f}, {.75f, .625f, .8125f}};
+        result.boxes[2] = {{0, .625f, .1875f}, {1, 1, .8125f}};
+        if (id >= BlockId::ANVIL_EAST) for (unsigned i = 0; i < result.count; ++i) {
+            std::swap(result.boxes[i].min.x, result.boxes[i].min.z);
+            std::swap(result.boxes[i].max.x, result.boxes[i].max.z);
+        }
+        return result;
+    }
+    if (isGrindstone(id)) {
+        const auto state = grindstoneState(id);
+        result.count = 3;
+        result.boxes[0] = {{.125f, .25f, .375f}, {.875f, 1, .625f}};
+        result.boxes[1] = {{.125f, 0, .375f}, {.25f, .5f, .625f}};
+        result.boxes[2] = {{.75f, 0, .375f}, {.875f, .5f, .625f}};
+        for (unsigned i = 0; i < result.count; ++i) {
+            auto& box = result.boxes[i];
+            if (state / 4 == 2) { const float low = 1 - box.max.y; box.max.y = 1 - box.min.y; box.min.y = low; }
+            if (state / 4 == 1) { std::swap(box.min.y, box.min.z); std::swap(box.max.y, box.max.z); }
+            for (unsigned turn = 0; turn < state % 4; ++turn) {
+                const float low = 1 - box.max.z, high = 1 - box.min.z;
+                box.min.z = box.min.x; box.max.z = box.max.x; box.min.x = low; box.max.x = high;
+            }
+        }
+        return result;
+    }
     DoorState door;
     if (decodeDoor(id, door)) {
         auto facing = static_cast<uint8_t>(door.direction);
@@ -1083,6 +1189,11 @@ bool isLava(BlockId id) {
 }
 
 uint8_t getLightEmission(BlockId id) {
+    if(const auto s=Redstone::blockState(id)) {
+        if(s->kind==Redstone::Kind::Torch)return s->power?7:0;
+        if(s->kind==Redstone::Kind::Lamp)return s->power?15:0;
+    }
+    if(Redstone::native(id)&&Redstone::ore(Redstone::nativeSlot(id))&&unsigned(Redstone::nativeSlot(id))>=unsigned(Redstone::NativeBlock::REDSTONE_ORE_LIT))return 9;
     if(respawnAnchorCharge(id)>0)return static_cast<uint8_t>(respawnAnchorCharge(id)*4-1);
     switch(id) {
 #define NETHER_LIGHT(id,key,label,r,g,b,shape,light) case BlockId::id: return light;
@@ -1119,6 +1230,7 @@ std::optional<bool> semanticPlantSupport(BlockId plant,BlockId soil){
 }
 
 uint8_t getLightDampening(BlockId id) {
+    if (id == BlockId::FROSTED_ICE) id = BlockId::ICE;
     if(const auto* b=Plugins::blockBehavior(id))if(b->fields&MC_BLOCK_LIGHT)return static_cast<uint8_t>(b->light);
     if (id == BlockId::AIR || id == BlockId::GLASS || isBed(id) ||
         getBlockProps(id).shape == RenderShape::Cross ||
@@ -1216,6 +1328,7 @@ bool isFlower(BlockId id) {
 }
 
 bool isReplaceableByFluid(BlockId id) {
+    if(const auto state=Redstone::blockState(id))return Redstone::thin(state->kind);
     if(const auto* b=Plugins::blockBehavior(id))return b->replaceable;
     // Java's flowing-fluid passability admits non-collision blocks, with
     // sugar cane (REEDS) as the notable plant exception.  Crops and torches
@@ -1438,6 +1551,7 @@ BlockId woodPlanks(DoorMaterial material) {
     return woods[static_cast<uint8_t>(material)];
 }
 BlockCollisionBoxes blockSelectionBoxes(BlockId id) {
+    if(Redstone::native(id))return Redstone::geometry(id);
     if(const auto* b=Plugins::pluginBlock(id))if(b->selection)return *b->selection;
     ButtonState button;
     if (!decodeButton(id, button)) return blockCollisionBoxes(id);
@@ -1473,6 +1587,7 @@ bool doorVillagerOpen(const DoorState& s) {return s.family?Plugins::pluginBlock(
 bool buttonArrowTrigger(const ButtonState& s) {return s.family?Plugins::pluginBlock(static_cast<BlockId>(s.family))->arrowTrigger:s.material!=DoorMaterial::Iron;}
 uint32_t buttonReleaseTicks(const ButtonState& s) {return s.family?Plugins::pluginBlock(static_cast<BlockId>(s.family))->releaseTicks:s.material==DoorMaterial::Iron?20:30;}
 BlockCollisionBoxes blockModelBoxes(BlockId id) {
+    if(Redstone::native(id))return Redstone::geometry(id);
     if(const auto* b=Plugins::pluginBlock(id))if(b->model)return *b->model;
     if(getBlockProps(id).shape==RenderShape::Cube){BlockCollisionBoxes boxes;boxes.count=1;return boxes;}
     return blockSelectionBoxes(id);

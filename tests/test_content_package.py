@@ -18,7 +18,8 @@ spec.loader.exec_module(package)
 
 class ContentPackageTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="minecraftc-package-tool-")
+        # Native package builds have deeply nested MSBuild tracking paths.
+        self.temporary = tempfile.TemporaryDirectory(prefix="cp-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
 

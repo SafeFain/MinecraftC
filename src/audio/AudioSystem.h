@@ -42,6 +42,7 @@ public:
     void playFishing(FishingSound sound);
     void playCombat(CombatSound sound);
     void playExperience(bool levelUp);
+    void playWorkstation(uint8_t kind);
     void playBlockInteraction(bool metal, bool opening, bool button);
     bool available() const;
 

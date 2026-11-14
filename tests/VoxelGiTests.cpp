@@ -329,12 +329,13 @@ int main() {
         for (const auto& source : sources) if (cache.submit(*source)) ++accepted;
         require(accepted <= config.sourceCopiesPerFrame,
                 "source snapshots exceeded their bounded copy budget");
-        if (frame > 7) require(accepted == 0, "unchanged active chunks were evicted and recopied");
+        const auto warmFrames=sources.size()/size_t(std::max(1,config.sourceCopiesPerFrame))+1;
+        if(size_t(frame)>warmFrames)require(accepted==0,"unchanged active chunks were evicted and recopied");
         cache.endFrame();
         auto updates = cache.takeUpdates(config.updateSlicesPerFrame);
         cache.recycleUpdates(updates);
     }
-    require(cache.cachedChunks() > 8 && cache.pendingSlices() == 0,
+    require(cache.cachedChunks()>size_t(config.sourceCopiesPerFrame)&&cache.pendingSlices()==0,
             "multi-frame source submission did not converge");
     const auto mappingBefore = cache.levelMapping(0);
     cache.beginFrame(glm::dvec3(0.5, 65.0, 0.5), 12);
@@ -342,7 +343,7 @@ int main() {
     cache.endFrame();
     for (const auto& update : cache.takeUpdates(16)) {
         if (update.voxels.empty()) continue;
-        require(update.axis == 1 && update.voxels.size() == 32 * 32,
+        require(update.axis == 1 && update.voxels.size() == size_t(config.clipmapResolution)*config.clipmapResolution,
                 "vertical movement did not return its exposed XY plane");
         for (const auto& voxel : update.voxels)
             require(voxel.valid == 255 && voxel.opacity == 0,

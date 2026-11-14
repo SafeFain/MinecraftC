@@ -2,6 +2,10 @@
 #include <algorithm>
 
 void World::setReplicaMode(bool enabled) {
+    if(m_replicaMode!=enabled) {
+        m_redstone=RedstoneWorldState{};
+        m_pendingBlockChanges.clear();m_blockTransaction=m_pistonCommit=m_runningInteractive=false;
+    }
     m_replicaMode = enabled;
     m_streamer.setExternalSnapshots(enabled);
     m_streamer.setRenderDistanceLimit(enabled ? 16 : std::numeric_limits<int>::max());

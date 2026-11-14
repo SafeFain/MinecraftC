@@ -1,12 +1,15 @@
 #pragma once
 #include "entity/EntityLogic.h"
 #include "game/SurvivalRules.h"
+#include "world/RedstoneBlocks.h"
 
 inline uint32_t miningExperience(BlockId block, const ItemStack& tool, uint32_t random) {
     if (block==BlockId::BLAZE_SPAWNER || block==BlockId::MAGMA_SPAWNER) return 15+random%29;
-    if (getBlockDrops(block,tool).empty()) return 0;
+    if (getBlockDrops(block,tool).empty() || tool.enchantment(EnchantmentId::SilkTouch)) return 0;
+    if(Redstone::native(block) && Redstone::ore(Redstone::nativeSlot(block)))return 1+random%5;
     switch(block) {
         case BlockId::COAL_ORE: return random%3;
+        case BlockId::LAPIS_ORE: case BlockId::DEEPSLATE_LAPIS_ORE: return 2 + random % 4;
         case BlockId::DIAMOND_ORE: return 3+random%5;
         case BlockId::NETHER_QUARTZ_ORE: return 2+random%4;
         case BlockId::NETHER_GOLD_ORE: return random%2;
@@ -21,7 +24,7 @@ inline uint32_t mobExperience(EntityType type, uint8_t magmaSize, bool baby, uin
         case EntityType::Villager: case EntityType::IronGolem: return 0;
         case EntityType::Blaze: return 10;
         case EntityType::PiglinBrute: return 20;
-        case EntityType::MagmaCube: return 1u<<magmaSize;
+        case EntityType::Slime:case EntityType::MagmaCube: return 1u<<magmaSize;
         case EntityType::Zombie: case EntityType::ZombieVillager:
         case EntityType::ZombifiedPiglin: return baby ? 12 : 5;
         case EntityType::Skeleton: case EntityType::WitherSkeleton:

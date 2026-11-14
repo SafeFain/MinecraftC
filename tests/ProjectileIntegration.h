@@ -26,23 +26,25 @@ inline int run(const std::filesystem::path& assets) {
         Scene s(assets);
         s.block(3, 1, 0, BlockId::STONE);
         s.mobs.spawnArrow({.5, 1.5, .5}, {1000, 0, 0}, 2, true);
+        const auto arrowId = s.mobs.entities().back().id;
         const auto behind = s.add(EntityType::Cow, {5.5, 1, .5});
         const float health = s.mobs.entityById(behind)->health;
         s.step(.01f);
-        const auto& arrow = s.mobs.entities().front();
-        check(s.mobs.entityById(behind)->health == health && arrow.inGround &&
-              std::abs(arrow.position.x - 3.0) < 1e-9 && arrow.velocity == glm::vec3(0),
+        const auto* arrow = s.mobs.entityById(arrowId);
+        check(s.mobs.entityById(behind)->health == health && arrow && arrow->inGround &&
+              std::abs(arrow->position.x - 3.0) < 1e-9 && arrow->velocity == glm::vec3(0),
               "wall must shield targets and embed arrow on its entry surface");
     }
     {
         Scene s(assets);
         s.block(3, 1, 0, BlockId::STONE);
         s.mobs.spawnArrow({.5, 1.5, .5}, {1000, 0, 0}, 2, true);
+        const auto arrowId = s.mobs.entities().back().id;
         const auto before = s.add(EntityType::Chicken, {2, 1, .5});
         const float health = s.mobs.entityById(before)->health;
         s.step(.01f);
         check(s.mobs.entityById(before)->health == health - 2 &&
-              s.mobs.entities().size() == 1,
+              s.mobs.entityById(arrowId) == nullptr,
               "small target before wall must consume the arrow first");
     }
     {

@@ -6,8 +6,8 @@
 // one subsystem cannot perturb any other subsystem.
 class WorldGenContext {
 public:
-    static constexpr uint32_t GENERATION_VERSION = 21;
-    // v18 adds six Overworld structures; terrain/caves and Heaven v9 are unchanged.
+    static constexpr uint32_t GENERATION_VERSION = 23;
+    // v23 adds independent redstone veins; existing ores, terrain/caves and Heaven v9 are unchanged.
     // Only current-generation worlds
     // can load; old files remain listed but are never migrated.
     static constexpr bool canLoadGeneration(uint32_t version) {

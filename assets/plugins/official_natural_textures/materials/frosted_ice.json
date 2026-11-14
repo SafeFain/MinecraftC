@@ -1,0 +1,19 @@
+{
+  "key": "frosted_ice",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3577445331,
+    "images": [
+      "textures/materials/frosted_ice-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/frosted_ice-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/frosted_ice-0-properties.png"
+    ]
+  }
+}

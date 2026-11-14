@@ -2,7 +2,7 @@
 
 Current gameplay reference. Version numbers in section titles identify when content
 was introduced; they do not expand the set of loadable saves. Current requirements
-are save **v22/v23**, global generation **v21**, native Nether **v1**, optional Heaven **v9**. See
+are save **v22/v23/v24/v25**, global generation **v23**, native Nether **v1**, optional Heaven **v9**. See
 [save compatibility](saves-and-commands.md), [controls](controls.md) and [documentation index](README.md).
 
 - Infinite chunk loading around the player with a runtime-selectable render distance.
@@ -57,7 +57,7 @@ are save **v22/v23**, global generation **v21**, native Nether **v1**, optional 
 - 3×3 region generation uses padded world-coordinate sampling and a singleton
   fallback for incomplete regions.
 - 30 surface biomes, five cave biomes, seven vegetation/tree shapes, five ore
-  types, and 1155 serialized
+  types, and 1178 serialized
   non-air block IDs, including level-based water/lava states and 50 oriented
   stair/slab states across five architectural material families.
 - Opaque, cutout, and translucent rendering; greedy cubes and crossed plants.
@@ -65,7 +65,7 @@ are save **v22/v23**, global generation **v21**, native Nether **v1**, optional 
   naturally generated flowers, and seeded moving render-only voxel clouds with
   world-aligned 32/64/128-block LOD cells beyond the selected exact-cloud radius,
   extending to 4096 blocks independently of terrain LOD.
-- Separate nearest-filtered block, 433-item, and entity atlases come from JSON.
+- Separate nearest-filtered block, 445-item, and entity atlases come from JSON.
   Block-item icons share world material mappings and retain runtime fallbacks.
 - Independent 0-15 sky/block light, smooth vertex lighting/AO, cross-chunk
   propagation, day/night sky, fog, tile-safe mipmaps, sRGB, and configurable
@@ -194,7 +194,7 @@ own item; rock/terracotta requires a wooden or better pickaxe. No recipes,
 growth, underwater waterlogging, cave-ecology or Heaven expansion is added.
 Snow cover is resolved by the same surface rules used by near terrain and LOD.
 
-These materials remain available in current v21 worlds. Their introduction did
+These materials remain available in current v23 worlds. Their introduction did
 not change terrain heights; Heaven now uses the optional v9 provider.
 
 
@@ -224,7 +224,7 @@ acceleration without a harvest requirement; rock requires wooden or better
 pickaxes; crossed decorations can be collected by hand. No recipes or growth
 mechanics are added. Ten language catalogs include all new items.
 
-This ecology is part of current generation v21. The separate Heaven ecology
+This ecology is part of current generation v23. The separate Heaven ecology
 below uses provider generation v9. Save compatibility is documented centrally in
 [saves and commands](saves-and-commands.md#compatibility-and-recovery).
 
@@ -257,13 +257,13 @@ below uses provider generation v9. Save compatibility is documented centrally in
 - Existing Heaven loot gains shards, berries and bricks while the origin shrine
   retains its guaranteed Starstep Scepter. No new mobs, tool tiers or growth timers.
 - Day/night duration is world-wide (default 1200 seconds), changed with
-  `/gamerule DayNightDuration <seconds>` when cheats are enabled. Current save v23
+  `/gamerule DayNightDuration <seconds>` when cheats are enabled. Current save v25
   uses 16-bit block IDs; packed light remains derived byte-sized runtime data.
 
 ## Overworld structures (generation v18)
 
 The v18 update added six structures. Together with the five village styles added
-through v19, current generation v21 has seventeen Overworld structure types.
+through v19, current generation v23 has seventeen Overworld structure types.
 Each has seeded rotation, mirroring and material or damage variants; generation,
 reservations and locate use world-coordinate hashes. Existing structure and loot
 enum values are preserved. All new structures reuse existing blocks and supplies;
@@ -368,7 +368,7 @@ stay consumed across unload and reload. Commands also accept `minecraftc:` names
 Complete Java 1.21.11 GameRule registry (59 rules plus DayNightDuration), typed
 query/set, old/new names, Tab completion and `/help gamerule [<rule>]`. Rules
 are world-wide and persisted in save v22 (introduced in v15); legacy metadata remains
-inspectable, but opening worlds requires v22/v23. Missing/partial mechanics are explicit in feedback.
+inspectable, but opening worlds requires storage v22/v23/v24/v25 and generation v23. Missing/partial mechanics are explicit in feedback.
 See [game-rules.md](game-rules.md) for the full table and limits.
 
 ### Plugin loader
@@ -417,14 +417,14 @@ planks, two-block doors and buttons; iron doors and stone buttons complete
 the feature. Serialized state IDs keep their original values. Ordinary
 wood recipes accept all plank families; six same-family planks or iron ingots
 make three doors. One plank or stone makes a button. Wooden doors support
-direct use; iron doors only respond to button power. Buttons support wall,
+direct use; iron doors respond to redstone power. Buttons support wall,
 floor and ceiling placement and do not block movement. Stone pulses last
 20 game ticks, wooden pulses 30; arrows can hold wooden buttons.
 
-Local power reaches adjacent doors and doors adjacent to the button's full
-solid support block. Signals from multiple buttons combine; no wires, levers,
-pressure plates, pistons or recursive conduction are introduced. Save v22
-retains remaining button ticks (introduced in v18); unloaded chunks pause and resume simulation.
+Buttons feed the directional redstone network, including conductive support
+blocks, wires, logic components and pistons. Multiple inputs combine without
+premature releases. Save v25 retains remaining button ticks (introduced in v18)
+and circuit delays; unloaded chunks pause and resume simulation.
 Simultaneous pulse releases have a 256-transition tick budget; excess due
 releases remain queued for following ticks.
 
@@ -445,5 +445,16 @@ with every plugin disabled. See [Nether gameplay and persistence](nether.md).
 ## Experience (save v23)
 
 Java-style levels, a green HUD bar, durable physical orbs, mining/mob/smelting/fishing/trading rewards,
-keep-inventory death semantics and host-owned LAN pickup. Existing v22 worlds and v5 guest profiles
-start at zero experience and remain playable. See [rules, commands and limits](experience.md).
+keep-inventory death semantics and host-owned LAN pickup. Storage v22 and v5 guest profiles default to zero experience. Playing a world also
+requires current generation v23; storage readability alone does not permit legacy generation. See [rules, commands and limits](experience.md).
+
+Equipment progression: [enchanting, anvils, grindstones and Mending](enchanting.md).
+
+### Redstone circuits and mechanisms
+
+Directional redstone dust, levers/blocks, torches, locked/delayed repeaters,
+comparators, observers, lamps and six-way ordinary/sticky pistons integrate with
+buttons, doors, TNT and persistent inventories. Redstone ore, underground slime
+chunks, slimeballs and component recipes close the survival loop. Circuit timers
+and in-flight blocks persist; the LAN host owns signal, movement and damage.
+See [redstone.md](redstone.md) for supported circuits and deliberate exclusions.

@@ -5,6 +5,7 @@
 #include <string>
 
 #include "plugins/ContentTypes.h"
+#include "world/RedstoneNativeState.h"
 
 // Read-only content queries. Runtime code may include this header instead of
 // the registration APIs; the frozen registry is the single source of truth for
@@ -49,6 +50,7 @@ inline BlockId resolveBlock(const std::string& key) {
         std::string normalized;for(unsigned char c:BLOCK_TABLE[i].name)normalized+=c==' '?'_':static_cast<char>(std::tolower(c));
         if(name==normalized&&availableBlock(static_cast<BlockId>(i)))return static_cast<BlockId>(i);
     }
+    if(const auto native=Redstone::namedBlock(name))return static_cast<BlockId>(static_cast<uint16_t>(BlockId::REDSTONE_FIRST)+static_cast<uint16_t>(*native));
     throw std::runtime_error("Unknown block: "+key);
 }
 inline ItemId resolveItem(const std::string& key) {

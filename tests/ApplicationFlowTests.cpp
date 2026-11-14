@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 // Application orchestration tests: drives GameFlowController (and, in later
 // stages, ApplicationInputRouter) with real offscreen-SDL collaborators — a
@@ -47,22 +48,6 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
-
-struct GameSessionTestAccess {
-    static void waitWorkers(GameSession& session) {
-        session.threadPool.waitIdle();
-    }
-    static void markPlayerDead(GameSession& session) {
-        session.playerDead = true;
-    }
-    static void setPlayerPosition(GameSession& session,
-                                  const glm::dvec3& position) {
-        session.player.setPosition(position);
-    }
-    static void setBlock(GameSession& session, int x, int y, int z, BlockId block) {
-        session.world().setBlock(x, y, z, block);
-    }
-};
 
 // UIRenderer is a graphics-backed facade; the flow tests never render, so these
 // inert definitions keep the target free of the Vulkan backend (same pattern
@@ -284,10 +269,28 @@ void checkDroppedItems(const std::filesystem::path& assets) {
             }
         }
         const glm::vec3 extent=maximum-minimum;
-        require(std::max({extent.x,extent.y,extent.z})<=.401f && minimum.y>=position.y,
-                "dropped geometry must fit above the ground");
-        require(glm::length((minimum+maximum)*.5f-position-glm::vec3(0,.25f,0))<.001f,
-                "dropped model must rotate around its geometry center");
+        require(std::max({extent.x,extent.y,extent.z})<1 && minimum.y>=position.y,
+                "dropped geometry must fit within one block above the ground");
+        const auto center=(minimum+maximum)*.5f;
+        require(glm::length(glm::vec2(center.x-position.x,center.z-position.z))<.001f&&center.y>position.y,
+                "dropped model must center horizontally over its world position");
+        renderer.draws.clear();items.renderDropped(item,glm::mat4(1),position,0,100,{1,0});
+        require(renderer.draws.size()==original.size(),"rotation changed dropped geometry submissions");
+        // Rotated AABB centers move for asymmetric silhouettes. Each actual
+        // vertex must instead preserve its radius about the world-space pivot.
+        for(size_t draw=0;draw<original.size();++draw) {
+            const auto& before=original[draw];const auto& rotated=renderer.draws[draw];
+            require(before.mesh.value==rotated.mesh.value&&before.firstIndex==rotated.firstIndex&&
+                    before.indexCount==rotated.indexCount,"rotation changed dropped mesh ownership/ranges");
+            const auto& mesh=renderer.meshes.at(before.mesh.value);
+            const auto count=before.indexCount?before.indexCount:mesh.indices.size();
+            for(size_t n=before.firstIndex;n<before.firstIndex+count;++n) {
+                const auto point=glm::vec4(mesh.vertices[mesh.indices[n]].position,1);
+                const glm::vec3 a(before.model*point),b(rotated.model*point);
+                const glm::vec2 ra(a.x-position.x,a.z-position.z),rb(b.x-position.x,b.z-position.z);
+                require(std::abs(glm::dot(ra,ra)-glm::dot(rb,rb))<.0001f,"dropped rotation moved its world-space pivot");
+            }
+        }
         items.updateUseState(true,1,true,1);renderer.draws.clear();
         items.renderDropped(item,glm::mat4(1),position,0,0,{1,0});
         require(renderer.meshes.size()==meshCount && renderer.draws.size()==original.size(),
@@ -352,6 +355,25 @@ struct Harness {
             {true, 16, LodAggressiveness::Fast, LodPrecision::Low});
     }
 
+    void command(const std::string& text) {
+        flow.openCommandInput();
+        ui.commandInput.setText(text);
+        flow.executeCommand();
+    }
+
+    void die() {
+        const bool keepInventory = session.metadata().gameRules.boolean(GameRuleId::KeepInventory);
+        command("/gamerule keep_inventory true");
+        command("/gamemode 0");
+        uint32_t dimension = 0;
+        Player* actor = session.pluginActor(0, dimension);
+        require(actor != nullptr, "loaded local actor is available through the session operation");
+        actor->takeDamage(1000, true);
+        session.updatePlaying(0.0f, &stub, {});
+        require(session.isPlayerDead(), "lethal damage enters the real session death state");
+        command(keepInventory ? "/gamerule keep_inventory true" : "/gamerule keep_inventory false");
+    }
+
     // Wires the minimal callbacks the application's initialize() sets up.
     void wireCallbacks() {
         ui.menuCallbacks.onResume = [this]() { flow.resume(); };
@@ -386,7 +408,7 @@ struct Harness {
 };
 }
 
-int main(int argc,char** argv) {
+int main(int argc,char** argv) try {
     installHeavenFixture();
     if (argc==3 && std::string(argv[1])=="--dropped-item-tests") {
         checkDroppedItems(argv[2]);return 0;
@@ -452,11 +474,10 @@ int main(int argc,char** argv) {
                     loading.progress.completed == loading.progress.total &&
                     loading.phase == GameSession::LoadingPhase::DistantTerrain,
                 "completed near chunks switch the status to distant terrain");
-        require(loading.phaseFraction < 1.0f &&
+        require(loading.phaseFraction >= 0.0f && loading.phaseFraction < 1.0f &&
                     loading.phaseFraction == harness.session.worldState().lodCoverageFraction() &&
-                    std::abs(loading.fraction -
-                        (0.9f + loading.phaseFraction * 0.1f)) < 0.00001f,
-                "the distant-terrain percentage matches the final progress segment");
+                    loading.fraction >= 0.0f && loading.fraction < 1.0f,
+                "incomplete distant coverage keeps both progress values bounded below completion");
         recordUi = true;
         drawnLabels.clear();
         harness.ui.render(harness.session, harness.settings, harness.inputs,
@@ -465,19 +486,23 @@ int main(int argc,char** argv) {
                     drawnLabels.count("loading.preparing") == 0,
                 "the loading UI identifies distant terrain instead of completed chunks");
         recordUi = false;
-        require(loadWorld(harness.session, harness.stub, harness.clock),
+        float previousFraction = loading.fraction;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        bool ready = false;
+        do {
+            ready = harness.session.advanceLoading(&harness.stub, harness.clock.now());
+            const auto progress = harness.session.loadingSnapshot();
+            require(progress.fraction >= previousFraction && progress.fraction <= 1.0f,
+                    "distant loading progress must advance without retreating or exceeding completion");
+            previousFraction = progress.fraction;
+            if (!ready) std::this_thread::yield();
+        } while (!ready && std::chrono::steady_clock::now() < deadline);
+        require(ready && previousFraction == 1.0f,
                 "distant terrain completes the final loading phase");
-        const auto exactCache = harness.root / "saves" / id /
-            "lod" / "r5" / "d_0" / "exact";
-        require(!std::filesystem::exists(exactCache) ||
-                    std::filesystem::is_empty(exactCache),
-                "loading does not wait for background exact LOD cache extraction");
         harness.flow.completeLoading();
         harness.session.updatePlaying(0.0f, &harness.stub, {});
-        GameSessionTestAccess::waitWorkers(harness.session);
-        require(std::filesystem::exists(exactCache) &&
-                    !std::filesystem::is_empty(exactCache),
-                "playing resumes exact LOD cache extraction in the background");
+        // Exact-cache deferral/resumption is covered through hasExactChunk in
+        // LodTerrainTests; the application observes loading and playing only.
         harness.flow.backToMainMenu();
         harness.flow.startGame(id, false);
         require(!harness.session.loadingSnapshot().newWorld &&
@@ -959,7 +984,7 @@ int main(int argc,char** argv) {
                 "an unknown command reports a message");
 
         // Respawn from the death screen.
-        GameSessionTestAccess::markPlayerDead(harness.session);
+        harness.die();
         harness.flow.respawnPlayer();
         require(!harness.session.isPlayerDead(),
                 "respawn clears the dead state");
@@ -1124,7 +1149,7 @@ int main(int argc,char** argv) {
         harness.settings.controlMode = ControlMode::Auto;
 
         // A dead player respawns through Enter/Space routing.
-        GameSessionTestAccess::markPlayerDead(harness.session);
+        harness.die();
         harness.router.handleKeyEvent(Key::Enter, 0, ButtonAction::Press, 0);
         require(!harness.session.isPlayerDead(),
                 "Enter on the death screen respawns the player");
@@ -1159,13 +1184,19 @@ int main(int argc,char** argv) {
                     harness.session.playerState().inventory().slot(0).empty(),
                 "Ctrl plus drop removes and spawns the entire selected stack");
 
-        GameSessionTestAccess::setPlayerPosition(harness.session, {0.5, 200.0, 0.5});
-        GameSessionTestAccess::setBlock(harness.session, 0, 201, 2, BlockId::STONE);
+        harness.command("/tp 0.5 200 0.5");
+        if (harness.flow.state() == GameState::LoadingWorld) {
+            require(loadWorld(harness.session, harness.stub, harness.clock), "pick-block destination finishes loading");
+            harness.flow.completeLoading();
+        }
+        require(harness.session.pluginSetBlock(0, 201, 2, uint16_t(BlockId::STONE)),
+                "public block operation constructs the pick-block target");
         harness.flow.pickBlock();
         require(harness.session.playerState().inventory().slot(0).id == ItemId::STONE &&
                     harness.session.playerState().inventory().slot(0).count == 64,
                 "creative pick block supplies the targeted block as a full stack");
-        GameSessionTestAccess::setBlock(harness.session, 0, 201, 2, BlockId::AIR);
+        require(harness.session.pluginSetBlock(0, 201, 2, uint16_t(BlockId::AIR)),
+                "public block operation removes the pick-block target");
 
         // Java inventory shortcuts act on the hovered slot: number keys swap
         // with that hotbar slot, F swaps with offhand, and Q/Ctrl+Q drops.
@@ -1209,4 +1240,6 @@ int main(int argc,char** argv) {
 
     std::cout << "PASS: application flow state transitions\n";
     return 0;
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

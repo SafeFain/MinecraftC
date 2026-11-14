@@ -1,3 +1,4 @@
+#include "game/EnchantingRules.h"
 #include "network/ContentIds.h"
 #include "network/EntityProtocol.h"
 #include "plugins/Json.h"
@@ -17,11 +18,12 @@ void entityStateValid(uint16_t type,const std::string& state,uint32_t revision) 
 }
 bool flag(Reader& reader) { const auto value = reader.u8(); if (value > 1) throw ProtocolError("Invalid entity flag"); return value != 0; }
 void item(Writer& writer, ItemStack value) {
-    if (!isValidItemId(value.id) ||
-        value.count > getItemProps(value.id).maxStack || value.damage > getItemProps(value.id).maxDurability || ((value.id == ItemId::EMPTY) != (value.count == 0))) throw ProtocolError("Invalid entity item");
+    if (!isValidItemId(value.id) || !EnchantingRules::validComponents(value) ||
+        value.count > getItemProps(value.id).maxStack || value.damage > getItemProps(value.id).maxDurability || ((value.id == ItemId::EMPTY) != (value.count == 0))) throw ProtocolError("Invalid entity item id="+std::to_string(static_cast<uint16_t>(value.id))+" count="+std::to_string(value.count)+" damage="+std::to_string(value.damage));
     writer.u16(encodeItemId(value.id)); writer.u8(value.count); writer.u16(value.damage);
+    writeItemComponents(value.components, [&](uint8_t byte) { writer.u8(byte); });
 }
-ItemStack item(Reader& reader) { ItemStack result{decodeItemId(reader.u16()), reader.u8(), reader.u16()}; Writer check; item(check, result); return result; }
+ItemStack item(Reader& reader) { ItemStack result; result.id = decodeItemId(reader.u16()); result.count = reader.u8(); result.damage = reader.u16(); result.components = readItemComponents([&]() { return reader.u8(); }); Writer check; item(check, result); return result; }
 void position(Writer& writer, glm::dvec3 value) {
     for (int i = 0; i < 3; ++i) { if (!std::isfinite(value[i]) || std::abs(value[i]) > 30000000) throw ProtocolError("Invalid entity position"); writer.f64(value[i]); }
 }

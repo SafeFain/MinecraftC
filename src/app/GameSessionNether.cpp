@@ -81,7 +81,7 @@ GameSession::AnchorRespawnResult GameSession::consumeAnchorRespawn(const glm::iv
     return {missing?AnchorRespawnStatus::Pending:AnchorRespawnStatus::Invalid,{}};
 }
 
-std::optional<glm::dvec3> GameSession::netherPortalLanding(
+std::optional<glm::dvec3> GameSession::preparePortalLanding(
     DimensionId target,const glm::dvec3& desired) {
     auto& terrain=ensureDimension(target).world;
     struct RestoreInterests {std::function<void()> restore;~RestoreInterests(){restore();}} restore{[this]{updateLanInterests();}};
@@ -196,7 +196,7 @@ std::optional<glm::dvec3> GameSession::netherPortalLanding(
     return glm::dvec3(x+.5,floor+1.01,z+.5);
 }
 
-bool GameSession::updateNetherPortals(float dt,const Feedback& feedback) {
+bool GameSession::updatePortals(float dt,const Feedback& feedback) {
     if(lanJoining||!terrainGenerated)return false;
     bool hostMoved=false;
     auto update=[&](uint64_t id,Player& actor,DimensionId source,bool ready) {
@@ -222,7 +222,7 @@ bool GameSession::updateNetherPortals(float dt,const Feedback& feedback) {
         const auto delay=worldMetadata.gameRules.integer(actor.isSurvival()?GameRuleId::PlayersNetherPortalDefaultDelay:GameRuleId::PlayersNetherPortalCreativeDelay);
         if(state.inside<delay)return;
         const auto target=source==DimensionId::Nether?DimensionId::Overworld:DimensionId::Nether;
-        const auto landing=netherPortalLanding(target,NetherPortal::scaledDestination(p,source));
+        const auto landing=preparePortalLanding(target,NetherPortal::scaledDestination(p,source));
         if(!landing){state.retry=1;return;}
         bool moved=false;
         if(id==0) {
@@ -248,7 +248,7 @@ bool GameSession::updateNetherPortals(float dt,const Feedback& feedback) {
             const auto position=entity->position;
             const auto target=source==DimensionId::Overworld?DimensionId::Nether:DimensionId::Overworld;
             try {
-                const auto landing=netherPortalLanding(target,NetherPortal::scaledDestination(position,source));
+                const auto landing=preparePortalLanding(target,NetherPortal::scaledDestination(position,source));
                 if(!landing){origin.entities.deferPortal(id);continue;}
                 auto& destination=ensureDimension(target);destination.entities.syncChunks();
                 // Any legacy metadata-owned entities are first consolidated into

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "network/ChunkProtocol.h"
 #include "network/LodProtocol.h"
+#include "network/LodSubscriptions.h"
 #include "player/Player.h"
 #include "game/InventoryCommands.h"
 #include "game/FishingSystem.h"
@@ -11,6 +12,7 @@
 // A remote player's inventory, transient actions and dimension positions do not
 // alias the host player or another guest. World objects outlive these runtimes.
 struct LanPlayerRuntime {
+    uint64_t nextBlockTransaction=0;
     LanPlayerRuntime(World& world, EntityManager& entities, Lan::PlayerProfile saved)
         : profile(std::move(saved)), player(world) {
         if (!profile.cursor.empty() || std::any_of(profile.crafting.begin(), profile.crafting.end(), [](ItemStack item) { return !item.empty(); }))
@@ -19,10 +21,11 @@ struct LanPlayerRuntime {
         player.setPersistentIdentity(profile.identity.id.empty()?"local":profile.identity.id);
         player.configureRules(profile.mode, Difficulty::Normal);
         player.inventory() = profile.inventory;
+        window.recoveredWorkstationInputs = profile.workstationInputs;
         player.survivalStats().set(profile.health, profile.hunger, profile.saturation,
                                   profile.exhaustion, profile.foodTickTimer);
         player.statusEffects().restore(profile.effects);
-        player.experience()=profile.experience;
+        player.experience()=profile.experience; player.enchantmentSeed=profile.enchantmentSeed;
         player.setPosition(profile.positions[static_cast<size_t>(profile.dimension)]);
     }
     Lan::PlayerProfile profile;
@@ -50,8 +53,6 @@ struct LanPlayerRuntime {
     uint64_t appliedInputSequence = 0;
     uint64_t chunkEpoch = 1;
     std::map<std::pair<int, int>, uint64_t> sentChunkRevisions;
-    struct LodSubscription { uint64_t revision = 1, generation = 0; bool dirty = true, queued = false, notified = false; };
-    uint64_t nextLodSubscription = 1;
-    std::unordered_map<LodTileKey, LodSubscription, LodTileKeyHash> lodSubscriptions;
+    Lan::LodSubscriptions lodSubscriptions;
     int radius = 2, lodRadius = 0;
 };

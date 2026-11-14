@@ -33,8 +33,8 @@ BatchCapture captureBatch(VulkanRenderer& renderer,model::ModelHandle handle,int
         renderer.flushModels(vp);renderer.finishScene(PostProcessState{});renderer.endFrame();
     };
     for(int i=0;i<3;++i) frame();
-    VulkanGiSmokeProbe::requestCapture(renderer);frame();
-    return {VulkanGiSmokeProbe::readCapture(renderer),renderer.performanceStats()};
+    VulkanDiagnostics::requestCapture(renderer);frame();
+    return {VulkanDiagnostics::readCapture(renderer),renderer.performanceStats()};
 }
 
 void modelBatchCases(VulkanRenderer& renderer,const char* capturePath=nullptr) {

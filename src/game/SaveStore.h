@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <optional>
 #include <string>
@@ -22,6 +23,7 @@
 #include "game/VillagerTrade.h"
 #include "world/Block.h"
 #include "world/BlockEntity.h"
+#include "world/PistonMotion.h"
 
 // Recovery is an explicit decoding policy; ordinary reads remain strict.
 enum class SaveReadPolicy { Strict, RecoverPlugins };
@@ -89,6 +91,8 @@ struct WorldMetadata {
     std::vector<ActiveStatusEffect> effects;
     InventoryModel inventory;
     Experience experience;
+    uint32_t enchantmentSeed = 1;
+    std::array<ItemStack,12> heldItems{};
     // Durable entity partition shared with chunk persistence and transfers.
     // The record contract lives in entity/EntityRecord.h; this alias preserves
     // every existing WorldMetadata::PersistedEntity spelling and the save format.
@@ -151,6 +155,10 @@ public:
         int chunkX, int chunkZ, uint32_t generationVersion,uint64_t generationFingerprint=0) const;
     ChunkLoadBundle loadChunkLoadBundle(
         int chunkX, int chunkZ, uint32_t generationVersion,uint64_t generationFingerprint=0) const;
+    void savePistonMotion(const Redstone::PistonMotion&) const;
+    void erasePistonMotion(uint64_t id) const;
+    void savePistonMotions(const std::vector<Redstone::PistonMotion>& motions) const;
+    std::vector<Redstone::PistonMotion> loadPistonMotions() const;
     void saveBlockEntities(int chunkX, int chunkZ,
                            const std::vector<PersistedBlockEntity>& entities) const;
     std::vector<PersistedBlockEntity> loadBlockEntities(int chunkX, int chunkZ) const;
@@ -162,6 +170,9 @@ public:
     uint32_t loadChunkEntityPopulationVersion(int chunkX, int chunkZ) const;
 
 private:
+    std::shared_ptr<std::mutex> m_pistonMutex=std::make_shared<std::mutex>();
+    void writePistonJournal(const std::filesystem::path&,const std::vector<Redstone::PistonMotion>&) const;
+    std::vector<Redstone::PistonMotion> readPistonJournal(const std::filesystem::path&) const;
     std::filesystem::path m_worldDirectory;
     SaveReadPolicy m_policy;
     std::vector<PluginCompatibilityIssue>* m_issues;

@@ -83,6 +83,10 @@ public:
     bool flushModifiedChunks(size_t maxFiles);
 
     BlockEntity* getBlockEntity(const glm::ivec3& position);
+    const BlockEntity* getBlockEntityUnlocked(const glm::ivec3& position) const;
+    void setCircuitState(const glm::ivec3& position,const std::vector<uint8_t>& bytes);
+    void setCircuitStateUnlocked(const glm::ivec3&,const std::vector<uint8_t>&);
+    void setContainerChangeCallback(std::function<void(glm::ivec3)> callback) {m_containerChange=std::move(callback);}
     const BlockEntity* getBlockEntity(const glm::ivec3& position) const;
     std::vector<ItemStack> takeBlockEntityContents(const glm::ivec3& position);
 
@@ -158,6 +162,7 @@ private:
     using OverrideMap = std::unordered_map<uint32_t, BlockId>;
     using BlockEntityMap = std::unordered_map<uint32_t, BlockEntity>;
 
+    std::function<void(glm::ivec3)> m_containerChange;
     ChunkStore& m_chunks;
     SaveStore* m_saveStore = nullptr;
 

@@ -190,3 +190,8 @@ GPL-3.0-only license. No Minecraft texture files are used.
 The Nether palettes and generated pixel materials in `tools/nether_materials.py`
 are original MinecraftC procedural artwork. They reuse this project's licensed
 semantic material recipes and contain no Mojang textures or extracted assets.
+
+Equipment progression additions (lapis ores, books, enchanting table, anvils and frosted ice) are original deterministic pixel recipes authored for MinecraftC in tools/enchanting_materials.py and tools/texture_generator.py, provided under CC0-1.0. No Mojang textures are included.
+
+## Redstone circuit materials
+Original procedural circuit/device/ore materials in tools/redstone_materials.py and derived item icons are authored for MinecraftC and dedicated to CC0-1.0. No Minecraft texture files are copied. Host-rock vein layout reuses the existing original deterministic ore recipe.

@@ -7,7 +7,7 @@
 #include <cmath>
 
 namespace Lan {
-enum class EventKind : uint8_t { BlockBreak, Critical, Sweep, Combat, Damage, Defense, Fishing, Explosion, Lightning, Interaction };
+enum class EventKind : uint8_t { BlockBreak, Critical, Sweep, Combat, Damage, Defense, Fishing, Explosion, Lightning, Interaction, Workstation };
 struct GameEvent {
     EventKind kind = EventKind::Explosion;
     DimensionId dimension = DimensionId::Overworld;
@@ -18,9 +18,10 @@ struct GameEvent {
     uint8_t flags = 0;
 };
 inline Bytes encodeGameEvent(const GameEvent& event) {
-    if (event.kind > EventKind::Interaction || !Plugins::validDimension(event.dimension) || !event.epoch ||
+    if (event.kind > EventKind::Workstation || !Plugins::validDimension(event.dimension) || !event.epoch ||
         !Plugins::validBlock(event.block) || !std::isfinite(event.amount) || event.amount < 0 || event.amount > 100000 || event.flags > 7)
         throw ProtocolError("Invalid gameplay event");
+    if (event.kind == EventKind::Workstation && event.flags > 6) throw ProtocolError("Invalid workstation sound");
     for (int i = 0; i < 3; ++i) if (!std::isfinite(event.position[i]) || std::abs(event.position[i]) > 30000000) throw ProtocolError("Invalid event position");
     if ((event.kind == EventKind::Combat && event.flags > static_cast<uint8_t>(AttackKind::Sweep)) ||
         (event.kind == EventKind::Fishing && event.flags > static_cast<uint8_t>(FishingEventKind::Reel))) throw ProtocolError("Invalid event subtype");

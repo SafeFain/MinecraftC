@@ -2,9 +2,9 @@
 
 std::vector<ItemStack> takeDeathDrops(InventoryModel& inventory) {
     std::vector<ItemStack> result;
-    for (const auto& stack : inventory.storage()) if (!stack.empty()) result.push_back(stack);
-    for (const auto& stack : inventory.armor()) if (!stack.empty()) result.push_back(stack);
-    if (!inventory.offhand().empty()) result.push_back(inventory.offhand());
+    for (const auto& stack : inventory.storage()) if (!stack.empty() && !stack.enchantment(EnchantmentId::VanishingCurse)) result.push_back(stack);
+    for (const auto& stack : inventory.armor()) if (!stack.empty() && !stack.enchantment(EnchantmentId::VanishingCurse)) result.push_back(stack);
+    if (!inventory.offhand().empty() && !inventory.offhand().enchantment(EnchantmentId::VanishingCurse)) result.push_back(inventory.offhand());
     inventory.clear();
     return result;
 }

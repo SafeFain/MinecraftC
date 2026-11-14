@@ -1,0 +1,19 @@
+{
+  "key": "deepslate_redstone_ore",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 3005602717,
+    "images": [
+      "textures/materials/deepslate_redstone_ore-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/deepslate_redstone_ore-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/deepslate_redstone_ore-0-properties.png"
+    ]
+  }
+}

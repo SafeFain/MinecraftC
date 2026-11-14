@@ -261,6 +261,7 @@ void EntityManager::scheduleNavigation(const glm::dvec3& playerPosition) {
 void EntityManager::followNavigation(Entity& entity,float dt) {
     auto& ai=entity.ai;
     if (!ai.hasDestination || ai.speed<=0) return;
+    const float movementFactor = std::max(0.f,1.f-.15f*entity.effects.level(StatusEffectType::Slowness));
     const auto terrain=navigationTerrain(nullptr,entity.type==EntityType::Villager,entity.type==EntityType::Strider);
     const glm::vec3 size=entitySize(entity);
     if (GroundNavigation::reached(entity.position,ai.destination)) {
@@ -277,7 +278,7 @@ void EntityManager::followNavigation(Entity& entity,float dt) {
         const double horizontal=std::hypot(delta.x,delta.z);
         if (horizontal>.01) moveWithTerrain(entity,
             glm::vec3(delta.x/horizontal,0,delta.z/horizontal)*
-            std::min(ai.speed,static_cast<float>(horizontal/std::max(dt,.00001f))),dt);
+            std::min(ai.speed * movementFactor,static_cast<float>(horizontal/std::max(dt,.00001f))),dt);
         return;
     }
     requestNavigation(entity,ai.destination);
@@ -301,7 +302,7 @@ void EntityManager::followNavigation(Entity& entity,float dt) {
     }
     if (horizontal>.025)
         moveWithTerrain(entity,glm::vec3(delta.x/horizontal,0,delta.z/horizontal)*
-            std::min(ai.speed,static_cast<float>(horizontal/std::max(dt,.00001f))),dt);
+            std::min(ai.speed * movementFactor,static_cast<float>(horizontal/std::max(dt,.00001f))),dt);
     // Only actual progress counts. Zero movement on an unrequested axis cannot reset this timer.
     if (std::hypot(entity.position.x-ai.progressOrigin.x,
                    entity.position.z-ai.progressOrigin.z)>.08) {

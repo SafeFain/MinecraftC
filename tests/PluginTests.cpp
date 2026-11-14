@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "plugins/PluginManager.h"
 #include "plugins/ContentMutation.h"
 #include "plugins/ContentQueries.h"
@@ -23,7 +24,7 @@ Plugins::PluginInfo info(const std::string& id){Plugins::PluginInfo p;p.manifest
 }
 #include "ContentPackageIntegration.h"
 #include "NaturalTextureIntegration.h"
-int main(int argc,char** argv) {
+int main(int argc,char** argv) try {
     if(argc==2&&std::string(argv[1])=="--natural-textures")return NaturalTextureIntegration::run();
     if(argc==4&&std::string(argv[1])=="--content-package-tests")return ContentPackageIntegration::run(argv[2],argv[3]);
     try {
@@ -147,4 +148,6 @@ int main(int argc,char** argv) {
         safe.shutdown();
         std::filesystem::remove_all(root);std::cout<<"Plugin loader/content/native/events/persistence regression passed\n";
     }catch(const std::exception& error){std::cerr<<"Plugin regression failed: "<<error.what()<<'\n';return 1;}
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

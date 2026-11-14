@@ -5,6 +5,7 @@
 #include "world/Chunk.h"
 #include "world/ChunkStore.h"
 #include "world/World.h"
+#include "world/RedstoneBlocks.h"
 #include "world/WorldGenContext.h"
 #include "world/WorldPersistence.h"
 
@@ -46,7 +47,7 @@ void WorldSimulation::tickSurvival(const std::vector<glm::dvec3>& playerPosition
     std::map<std::tuple<int,int,int>, std::vector<Candidate>> sections;
     m_persistence.forEachOverride(
         [&](const std::pair<int,int>& key, uint32_t index, BlockId block) {
-            if (!isFarmland(block) && !isSapling(block) &&
+            if (!isFarmland(block) && !isSapling(block) && !Redstone::litOre(block) &&
                 !(block >= BlockId::WHEAT_0 && block < BlockId::WHEAT_7)&&!(isNetherWart(block)&&block!=BlockId::NETHER_WART)) return;
             if (!m_chunks.isGenerated(key.first, key.second)) return;
             const bool nearPlayer = std::any_of(m_playerPositions.begin(), m_playerPositions.end(),
@@ -86,7 +87,9 @@ void WorldSimulation::tickSurvival(const std::vector<glm::dvec3>& playerPosition
             if (found != section.second.end() && found->index == selected) {
                 const auto& p = found->position;
                 const BlockId block = m_world.getBlock(p.x, p.y, p.z);
-                if(isNetherWart(block)&&block!=BlockId::NETHER_WART) {
+                if(Redstone::litOre(block)) {
+                    m_world.setBlock(p.x,p.y,p.z,static_cast<BlockId>(unsigned(block)-2));
+                } else if(isNetherWart(block)&&block!=BlockId::NETHER_WART) {
                     if(m_world.getBlock(p.x,p.y-1,p.z)==BlockId::SOUL_SAND&&(random>>12)%10==0)
                         m_world.setBlock(p.x,p.y,p.z,block==BlockId::NETHER_WART_CROP_2?BlockId::NETHER_WART:static_cast<BlockId>(static_cast<uint16_t>(block)+1));
                 } else if (isFarmland(block)) {

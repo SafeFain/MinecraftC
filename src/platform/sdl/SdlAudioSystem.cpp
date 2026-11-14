@@ -182,6 +182,12 @@ struct AudioSystem::Impl {
             blockEnvelope=button?.12f:.22f;blockPhase=0;
             blockDecay=button?.994f:metal?.997f:.998f;
             blockNoise=button?.25f:metal?.3f:.58f;
+            if (requestedBlock >= 8) {
+                static constexpr float frequency[]{740,350,190,240,130,145,110};
+                static constexpr float decay[]{.9994f,.9987f,.9990f,.9980f,.9970f,.9986f,.9984f};
+                const auto kind = std::clamp(requestedBlock-8,0,6);
+                blockFrequency=frequency[kind];blockDecay=decay[kind];blockEnvelope=.28f;blockNoise=kind==0?.08f:kind==2?.75f:.4f;
+            }
         }
         const int requestedFishing = fishingTrigger.exchange(-1);
         if (requestedFishing >= 0) {
@@ -533,4 +539,9 @@ bool AudioSystem::available() const { return m_impl->initialized; }
 void AudioSystem::playBlockInteraction(bool metal,bool opening,bool button) {
     if(!m_impl->initialized)return;
     m_impl->blockTrigger=(metal?1:0)+(opening?2:0)+(button?4:0);
+}
+
+void AudioSystem::playWorkstation(uint8_t kind) {
+    if (!m_impl->initialized || kind > 6) return;
+    m_impl->blockTrigger = 8 + kind;
 }

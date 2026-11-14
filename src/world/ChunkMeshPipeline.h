@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <set>
+#include <utility>
 
 #include "Config.h"
 
@@ -35,6 +37,7 @@ public:
 
     // Synchronous build (for first frame or when thread pool unavailable).
     void buildMeshesSync(IGameRenderer* renderer, int maxCount = 16);
+    void buildAtomicMeshes(IGameRenderer*,const std::set<std::pair<int,int>>&);
 
     void invalidateGpuMeshes();
     void restoreGpuMeshes();

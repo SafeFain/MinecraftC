@@ -11,7 +11,7 @@ inline int run(VulkanRenderer& renderer,Window& window,const std::filesystem::pa
     std::filesystem::create_directories(output);
     constexpr int width=960,height=640;
     const auto capture=[&](const std::string& name) {
-        renderer.waitIdle();const auto pixels=VulkanGiSmokeProbe::readCapture(renderer);
+        renderer.waitIdle();const auto pixels=VulkanDiagnostics::readCapture(renderer);
         if(pixels.size()!=size_t(width*height*4))throw std::runtime_error("Invalid native capture");
         std::ofstream file(output/(name+".ppm"),std::ios::binary);file<<"P6\n"<<width<<' '<<height<<"\n255\n";
         for(size_t i=0;i<pixels.size();i+=4)file.write(reinterpret_cast<const char*>(pixels.data()+i),3);
@@ -111,9 +111,9 @@ inline int run(VulkanRenderer& renderer,Window& window,const std::filesystem::pa
             if(!renderer.voxelGiStatus().active)throw std::runtime_error("Native GI inactive");
         };
         for(int settle=0;settle<60;++settle)frame(false);
-        VulkanGiSmokeProbe::requestCapture(renderer);frame(false);capture("nether-"+name);
+        VulkanDiagnostics::requestCapture(renderer);frame(false);capture("nether-"+name);
         if(!top){for(int settle=0;settle<4;++settle)frame(true);
-        VulkanGiSmokeProbe::requestCapture(renderer);frame(true);capture("nether-lod-"+name);}
+        VulkanDiagnostics::requestCapture(renderer);frame(true);capture("nether-lod-"+name);}
         renderer.waitIdle();for(auto& mesh:meshes)renderer.releaseChunkMesh(mesh);renderer.releaseChunkMesh(lod);
         std::cout<<"PASS native Nether "<<name<<" native geometry, no sky light/bodies/clouds, GI and capture\n";
     }

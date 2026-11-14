@@ -81,52 +81,40 @@ Lan::Bytes buildColumns(Lan::LodUpdate update, std::map<ChunkKey, ColumnSource> 
 
 void GameSession::requestLanLod(LanPlayerRuntime& guest, const Lan::LodUpdate& request) {
     if (request.dimension != guest.profile.dimension || request.epoch != guest.chunkEpoch) return;
-    if (request.revision == std::numeric_limits<uint64_t>::max()) { guest.lodSubscriptions.erase(request.key); return; }
-    if (!inLodRange(guest, request.key)) return;
-    if (!guest.lodSubscriptions.count(request.key) && guest.lodSubscriptions.size() >= Lan::MAX_LOD_SUBSCRIPTIONS)
-        throw Lan::ProtocolError("LOD subscription limit exceeded");
-    auto inserted = guest.lodSubscriptions.try_emplace(request.key);
-    auto& subscription = inserted.first->second;
-    if (inserted.second) subscription.generation = guest.nextLodSubscription++;
-    subscription.dirty = true;
+    if (request.revision == std::numeric_limits<uint64_t>::max()) { guest.lodSubscriptions.cancel(request.key); return; }
+    if (inLodRange(guest, request.key)) guest.lodSubscriptions.request(request.key);
 }
 void GameSession::invalidateLanLod(DimensionId target, int x, int z) {
     for (auto& guest : guests) if (guest.second->profile.dimension == target)
-        for (auto& entry : guest.second->lodSubscriptions) if (Lan::lodContainsChunk(entry.first, x, z)) {
-            ++entry.second.revision; entry.second.dirty = true; entry.second.notified = false;
-        }
+        guest.second->lodSubscriptions.invalidateChunk(x,z);
 }
 void GameSession::sendLanLod() {
     for (auto it = lodJobs.begin(); it != lodJobs.end();) {
         if (it->result.wait_for(std::chrono::seconds(0)) != std::future_status::ready) { ++it; continue; }
         const auto peer = guests.find(it->peer);
         if (peer != guests.end() && peer->second->chunkEpoch == it->epoch && peer->second->profile.dimension == it->dimension) {
-            auto& subscriptions = peer->second->lodSubscriptions;
-            const auto subscription = subscriptions.find(it->key);
-            if (subscription != subscriptions.end() && subscription->second.generation == it->subscription) {
-                subscription->second.queued = false;
-                try {
-                    auto bytes = it->result.get();
-                    if (subscription->second.revision == it->revision &&
-                        lanHost.send(it->peer, {Lan::MessageType::LodColumns, 0, std::move(bytes)}, true)) subscription->second.dirty = false;
-                } catch (const std::exception& error) {
-                    LOG_WARN("LAN LOD read failed: " << error.what()); lanHost.disconnect(it->peer);
-                }
+            try {
+                peer->second->lodSubscriptions.finish({it->key,it->revision,it->subscription},[&](bool current) {
+                    auto bytes=it->result.get();
+                    return current&&lanHost.send(it->peer,{Lan::MessageType::LodColumns,0,std::move(bytes)},true);
+                });
+            } catch (const std::exception& error) {
+                LOG_WARN("LAN LOD read failed: " << error.what()); lanHost.disconnect(it->peer);
             }
         }
         it = lodJobs.erase(it);
     }
     size_t notices = 0;
     for (auto& guest : guests) {
-        for (auto it = guest.second->lodSubscriptions.begin(); it != guest.second->lodSubscriptions.end();) {
-            if (!inLodRange(*guest.second, it->first)) { it = guest.second->lodSubscriptions.erase(it); continue; }
-            auto& value = it->second;
-            if (!value.notified && value.revision > 1 && notices < 8) {
-                Lan::LodUpdate update; update.dimension = guest.second->profile.dimension; update.epoch = guest.second->chunkEpoch; update.key = it->first; update.revision = value.revision;
-                if (lanHost.send(guest.first, {Lan::MessageType::LodInvalidate, 0, Lan::encodeLodUpdate(update, false)})) { value.notified = true; ++notices; }
-            }
-            ++it;
-        }
+        guest.second->lodSubscriptions.notifyInvalidations(
+            [&](const LodTileKey& key){return inLodRange(*guest.second,key);},
+            [&](const LodTileKey& key,uint64_t revision) {
+                if(notices>=8)return false;
+                Lan::LodUpdate update;update.dimension=guest.second->profile.dimension;
+                update.epoch=guest.second->chunkEpoch;update.key=key;update.revision=revision;
+                if(!lanHost.send(guest.first,{Lan::MessageType::LodInvalidate,0,Lan::encodeLodUpdate(update,false)}))return false;
+                ++notices;return true;
+            });
     }
     // Rotate participants while keeping only two global jobs in flight.
     if (guests.empty()) return;
@@ -134,23 +122,21 @@ void GameSession::sendLanLod() {
     for (size_t count = 0; count < guests.size() && lodJobs.size() < 2; ++count) {
         if (peer == guests.end()) peer = guests.begin();
         auto& guest = *peer->second; lodLastPeer = peer->first;
-        auto chosen = guest.lodSubscriptions.end(); double nearest = std::numeric_limits<double>::max();
-        for (auto it = guest.lodSubscriptions.begin(); it != guest.lodSubscriptions.end(); ++it) {
-            if (!it->second.dirty || it->second.queued) continue;
-            const double side = 16 << it->first.level;
-            const double distance = std::hypot((it->first.x + .5) * side - guest.player.getPosition().x, (it->first.z + .5) * side - guest.player.getPosition().z);
-            if (distance < nearest) { nearest = distance; chosen = it; }
-        }
-        if (chosen != guest.lodSubscriptions.end()) {
-            auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
-            const auto* store = guest.profile.dimension == DimensionId::Overworld ? saveStore.get() : runtime.store.get();
-            if (store) {
-                Lan::LodUpdate update; update.dimension = guest.profile.dimension; update.epoch = guest.chunkEpoch; update.key = chosen->first; update.revision = chosen->second.revision;
+        auto& runtime = *simulations[static_cast<size_t>(guest.profile.dimension)];
+        const auto* store = guest.profile.dimension == DimensionId::Overworld ? saveStore.get() : runtime.store.get();
+        if(store) {
+            const auto work=guest.lodSubscriptions.claimNext([&](const LodTileKey& key) {
+                const double side=16<<key.level;
+                return std::hypot((key.x+.5)*side-guest.player.getPosition().x,
+                                  (key.z+.5)*side-guest.player.getPosition().z);
+            });
+            if(work) {
+                Lan::LodUpdate update;update.dimension=guest.profile.dimension;update.epoch=guest.chunkEpoch;
+                update.key=work->key;update.revision=work->revision;
                 auto sources = captureSources(runtime.world, update.key);
                 const auto root = store->worldDirectory(); const auto seed = worldMetadata.seed; const auto type = worldMetadata.worldType; const auto config=worldMetadata.generation[static_cast<size_t>(update.dimension)];
                 auto future = threadPool.enqueue([update, sources = std::move(sources), root, seed, type,config]() mutable { return buildColumns(update, std::move(sources), root, seed, type,config); });
-                lodJobs.push_back({peer->first, update.epoch, update.revision, chosen->second.generation, update.dimension, update.key, std::move(future)});
-                chosen->second.queued = true;
+                lodJobs.push_back({peer->first,update.epoch,update.revision,work->subscription,update.dimension,update.key,std::move(future)});
             }
         }
         ++peer;

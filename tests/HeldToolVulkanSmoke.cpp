@@ -1,3 +1,4 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "model/GltfLoader.h"
 #include <glm/gtc/matrix_transform.hpp>
@@ -13,7 +14,7 @@
 
 // Opt-in display-dependent scene harness. Capture mode pauses after each scene
 // so an external screen grab can inspect actual Vulkan output.
-int main(int argc,char** argv) {
+int main(int argc,char** argv) try {
     installHeavenFixture();
     if(argc<2 || argc>5)return 2;
     try {
@@ -156,4 +157,6 @@ int main(int argc,char** argv) {
         held.reset();renderer.waitIdle();
         std::cout<<"PASS held tool Vulkan scenes"<<std::endl;
     } catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

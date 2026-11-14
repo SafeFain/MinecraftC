@@ -181,8 +181,8 @@ ctest --test-dir build-local -C Release -R plugin_ --output-on-failure
 ctest --test-dir build-local -C Release --output-on-failure
 ```
 
-Render plugins additionally need actual Vulkan execution. Configure
-`-DMINECRAFTC_VULKAN_TESTS=ON`, build, then run `ctest --test-dir build-local
+Render plugins additionally need actual Vulkan execution. Ensure the desktop
+default `MINECRAFTC_VULKAN_TESTS=ON` is enabled, build, then run `ctest --test-dir build-local
 -C Release -L vulkan --output-on-failure`. Verify the plugin-specific readback
 tests in that configuration. A missing-display skip is not GPU validation.
 

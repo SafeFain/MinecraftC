@@ -1,7 +1,7 @@
 {
   "filter": "nearest",
   "generator_version": 5,
-  "grid_size": 24,
+  "grid_size": 25,
   "material_maps": {
     "height": "atlas_height.png",
     "normal": "atlas_normal.png",
@@ -1798,1622 +1798,1892 @@
     },
     {
       "frame": 0,
-      "material": "dirt",
+      "material": "lapis_ore",
       "slot": 298,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "dirt",
+      "material": "deepslate_lapis_ore",
       "slot": 299,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "dirt",
+      "material": "bookshelf",
       "slot": 300,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "stone",
+      "material": "iron_block",
       "slot": 301,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "stone",
+      "material": "enchanting_table",
       "slot": 302,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "stone",
+      "material": "anvil",
       "slot": 303,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "oak_log",
+      "material": "chipped_anvil",
       "slot": 304,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "oak_log",
+      "material": "damaged_anvil",
       "slot": 305,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "oak_log",
+      "material": "frosted_ice",
       "slot": 306,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "sand",
+      "material": "redstone_dust",
       "slot": 307,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "sand",
+      "material": "redstone_dust_on",
       "slot": 308,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "sand",
+      "material": "lever",
       "slot": 309,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "oak_planks",
+      "material": "redstone_torch",
       "slot": 310,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "oak_planks",
+      "material": "redstone_torch_off",
       "slot": 311,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "oak_planks",
+      "material": "redstone_repeater",
       "slot": 312,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "deepslate",
+      "material": "redstone_repeater_on",
       "slot": 313,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "deepslate",
+      "material": "redstone_comparator",
       "slot": 314,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "deepslate",
+      "material": "redstone_comparator_on",
       "slot": 315,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "coal_ore",
+      "material": "piston",
       "slot": 316,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "coal_ore",
+      "material": "piston_side",
       "slot": 317,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "coal_ore",
+      "material": "piston_top",
       "slot": 318,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "iron_ore",
+      "material": "sticky_piston_top",
       "slot": 319,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "iron_ore",
+      "material": "observer",
       "slot": 320,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "iron_ore",
+      "material": "observer_face",
       "slot": 321,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "gold_ore",
+      "material": "observer_back",
       "slot": 322,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "gold_ore",
+      "material": "observer_back_on",
       "slot": 323,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "gold_ore",
+      "material": "redstone_lamp",
       "slot": 324,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "diamond_ore",
+      "material": "redstone_lamp_on",
       "slot": 325,
-      "variant": 1
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "diamond_ore",
+      "material": "redstone_block",
       "slot": 326,
-      "variant": 2
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "diamond_ore",
+      "material": "redstone_ore",
       "slot": 327,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 1,
-      "material": "lava",
+      "frame": 0,
+      "material": "deepslate_redstone_ore",
       "slot": 328,
       "variant": 0
     },
     {
-      "frame": 2,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_1",
       "slot": 329,
       "variant": 0
     },
     {
-      "frame": 3,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_2",
       "slot": 330,
       "variant": 0
     },
     {
-      "frame": 4,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_3",
       "slot": 331,
       "variant": 0
     },
     {
-      "frame": 5,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_4",
       "slot": 332,
       "variant": 0
     },
     {
-      "frame": 6,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_5",
       "slot": 333,
       "variant": 0
     },
     {
-      "frame": 7,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_6",
       "slot": 334,
       "variant": 0
     },
     {
-      "frame": 8,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_7",
       "slot": 335,
       "variant": 0
     },
     {
-      "frame": 9,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_8",
       "slot": 336,
       "variant": 0
     },
     {
-      "frame": 10,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_9",
       "slot": 337,
       "variant": 0
     },
     {
-      "frame": 11,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_10",
       "slot": 338,
       "variant": 0
     },
     {
-      "frame": 12,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_11",
       "slot": 339,
       "variant": 0
     },
     {
-      "frame": 13,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_12",
       "slot": 340,
       "variant": 0
     },
     {
-      "frame": 14,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_13",
       "slot": 341,
       "variant": 0
     },
     {
-      "frame": 15,
-      "material": "lava",
+      "frame": 0,
+      "material": "redstone_dust_14",
       "slot": 342,
       "variant": 0
     },
     {
       "frame": 0,
-      "material": "gravel",
+      "material": "dirt",
       "slot": 343,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "gravel",
+      "material": "dirt",
       "slot": 344,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "gravel",
+      "material": "dirt",
       "slot": 345,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "clay",
+      "material": "stone",
       "slot": 346,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "clay",
+      "material": "stone",
       "slot": 347,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "clay",
+      "material": "stone",
       "slot": 348,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "red_sand",
+      "material": "oak_log",
       "slot": 349,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "red_sand",
+      "material": "oak_log",
       "slot": 350,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "red_sand",
+      "material": "oak_log",
       "slot": 351,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "birch_log",
+      "material": "sand",
       "slot": 352,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "birch_log",
+      "material": "sand",
       "slot": 353,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "birch_log",
+      "material": "sand",
       "slot": 354,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "spruce_log",
+      "material": "oak_planks",
       "slot": 355,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "spruce_log",
+      "material": "oak_planks",
       "slot": 356,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "spruce_log",
+      "material": "oak_planks",
       "slot": 357,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "jungle_log",
+      "material": "deepslate",
       "slot": 358,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "jungle_log",
+      "material": "deepslate",
       "slot": 359,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "jungle_log",
+      "material": "deepslate",
       "slot": 360,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "acacia_log",
+      "material": "coal_ore",
       "slot": 361,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "acacia_log",
+      "material": "coal_ore",
       "slot": 362,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "acacia_log",
+      "material": "coal_ore",
       "slot": 363,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "cobblestone",
+      "material": "iron_ore",
       "slot": 364,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "cobblestone",
+      "material": "iron_ore",
       "slot": 365,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "cobblestone",
+      "material": "iron_ore",
       "slot": 366,
       "variant": 3
     },
     {
-      "frame": 1,
-      "material": "fire",
+      "frame": 0,
+      "material": "gold_ore",
       "slot": 367,
-      "variant": 0
+      "variant": 1
     },
     {
-      "frame": 2,
-      "material": "fire",
+      "frame": 0,
+      "material": "gold_ore",
       "slot": 368,
-      "variant": 0
+      "variant": 2
     },
     {
-      "frame": 3,
-      "material": "fire",
+      "frame": 0,
+      "material": "gold_ore",
       "slot": 369,
-      "variant": 0
+      "variant": 3
     },
     {
-      "frame": 4,
-      "material": "fire",
+      "frame": 0,
+      "material": "diamond_ore",
       "slot": 370,
-      "variant": 0
+      "variant": 1
     },
     {
-      "frame": 5,
-      "material": "fire",
+      "frame": 0,
+      "material": "diamond_ore",
       "slot": 371,
-      "variant": 0
+      "variant": 2
     },
     {
-      "frame": 6,
-      "material": "fire",
+      "frame": 0,
+      "material": "diamond_ore",
       "slot": 372,
-      "variant": 0
+      "variant": 3
     },
     {
-      "frame": 7,
-      "material": "fire",
+      "frame": 1,
+      "material": "lava",
       "slot": 373,
       "variant": 0
     },
     {
-      "frame": 8,
-      "material": "fire",
+      "frame": 2,
+      "material": "lava",
       "slot": 374,
       "variant": 0
     },
     {
-      "frame": 9,
-      "material": "fire",
+      "frame": 3,
+      "material": "lava",
       "slot": 375,
       "variant": 0
     },
     {
-      "frame": 10,
-      "material": "fire",
+      "frame": 4,
+      "material": "lava",
       "slot": 376,
       "variant": 0
     },
     {
-      "frame": 11,
-      "material": "fire",
+      "frame": 5,
+      "material": "lava",
       "slot": 377,
       "variant": 0
     },
     {
-      "frame": 12,
-      "material": "fire",
+      "frame": 6,
+      "material": "lava",
       "slot": 378,
       "variant": 0
     },
     {
-      "frame": 13,
-      "material": "fire",
+      "frame": 7,
+      "material": "lava",
       "slot": 379,
       "variant": 0
     },
     {
-      "frame": 14,
-      "material": "fire",
+      "frame": 8,
+      "material": "lava",
       "slot": 380,
       "variant": 0
     },
     {
-      "frame": 15,
-      "material": "fire",
+      "frame": 9,
+      "material": "lava",
       "slot": 381,
       "variant": 0
     },
     {
-      "frame": 0,
-      "material": "limestone",
+      "frame": 10,
+      "material": "lava",
       "slot": 382,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "limestone",
+      "frame": 11,
+      "material": "lava",
       "slot": 383,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "limestone",
+      "frame": 12,
+      "material": "lava",
       "slot": 384,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "basalt",
+      "frame": 13,
+      "material": "lava",
       "slot": 385,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "basalt",
+      "frame": 14,
+      "material": "lava",
       "slot": 386,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "basalt",
+      "frame": 15,
+      "material": "lava",
       "slot": 387,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "tuff",
+      "material": "gravel",
       "slot": 388,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "tuff",
+      "material": "gravel",
       "slot": 389,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "tuff",
+      "material": "gravel",
       "slot": 390,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "coarse_dirt",
+      "material": "clay",
       "slot": 391,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "coarse_dirt",
+      "material": "clay",
       "slot": 392,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "coarse_dirt",
+      "material": "clay",
       "slot": 393,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "mud",
+      "material": "red_sand",
       "slot": 394,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "mud",
+      "material": "red_sand",
       "slot": 395,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "mud",
+      "material": "red_sand",
       "slot": 396,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "black_sand",
+      "material": "birch_log",
       "slot": 397,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "black_sand",
+      "material": "birch_log",
       "slot": 398,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "black_sand",
+      "material": "birch_log",
       "slot": 399,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "granite",
+      "material": "spruce_log",
       "slot": 400,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "granite",
+      "material": "spruce_log",
       "slot": 401,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "granite",
+      "material": "spruce_log",
       "slot": 402,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "aether_soil",
+      "material": "jungle_log",
       "slot": 403,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "aether_soil",
+      "material": "jungle_log",
       "slot": 404,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "aether_soil",
+      "material": "jungle_log",
       "slot": 405,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "cloudstone",
+      "material": "acacia_log",
       "slot": 406,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "cloudstone",
+      "material": "acacia_log",
       "slot": 407,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "cloudstone",
+      "material": "acacia_log",
       "slot": 408,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "skyroot_log",
+      "material": "cobblestone",
       "slot": 409,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "skyroot_log",
+      "material": "cobblestone",
       "slot": 410,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "skyroot_log",
+      "material": "cobblestone",
       "slot": 411,
       "variant": 3
     },
     {
       "frame": 1,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 412,
       "variant": 0
     },
     {
       "frame": 2,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 413,
       "variant": 0
     },
     {
       "frame": 3,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 414,
       "variant": 0
     },
     {
       "frame": 4,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 415,
       "variant": 0
     },
     {
       "frame": 5,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 416,
       "variant": 0
     },
     {
       "frame": 6,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 417,
       "variant": 0
     },
     {
       "frame": 7,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 418,
       "variant": 0
     },
     {
       "frame": 8,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 419,
       "variant": 0
     },
     {
       "frame": 9,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 420,
       "variant": 0
     },
     {
       "frame": 10,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 421,
       "variant": 0
     },
     {
       "frame": 11,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 422,
       "variant": 0
     },
     {
       "frame": 12,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 423,
       "variant": 0
     },
     {
       "frame": 13,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 424,
       "variant": 0
     },
     {
       "frame": 14,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 425,
       "variant": 0
     },
     {
       "frame": 15,
-      "material": "star_crystal",
+      "material": "fire",
       "slot": 426,
       "variant": 0
     },
     {
       "frame": 0,
-      "material": "dripstone_block",
+      "material": "limestone",
       "slot": 427,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "dripstone_block",
+      "material": "limestone",
       "slot": 428,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "dripstone_block",
+      "material": "limestone",
       "slot": 429,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "calcite",
+      "material": "basalt",
       "slot": 430,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "calcite",
+      "material": "basalt",
       "slot": 431,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "calcite",
+      "material": "basalt",
       "slot": 432,
       "variant": 3
     },
     {
-      "frame": 1,
-      "material": "resonant_crystal",
+      "frame": 0,
+      "material": "tuff",
       "slot": 433,
-      "variant": 0
-    },
-    {
-      "frame": 2,
-      "material": "resonant_crystal",
-      "slot": 434,
-      "variant": 0
-    },
-    {
-      "frame": 3,
-      "material": "resonant_crystal",
-      "slot": 435,
-      "variant": 0
-    },
-    {
-      "frame": 4,
-      "material": "resonant_crystal",
-      "slot": 436,
-      "variant": 0
-    },
-    {
-      "frame": 5,
-      "material": "resonant_crystal",
-      "slot": 437,
-      "variant": 0
-    },
-    {
-      "frame": 6,
-      "material": "resonant_crystal",
-      "slot": 438,
-      "variant": 0
-    },
-    {
-      "frame": 7,
-      "material": "resonant_crystal",
-      "slot": 439,
-      "variant": 0
-    },
-    {
-      "frame": 8,
-      "material": "resonant_crystal",
-      "slot": 440,
-      "variant": 0
-    },
-    {
-      "frame": 9,
-      "material": "resonant_crystal",
-      "slot": 441,
-      "variant": 0
-    },
-    {
-      "frame": 10,
-      "material": "resonant_crystal",
-      "slot": 442,
-      "variant": 0
-    },
-    {
-      "frame": 11,
-      "material": "resonant_crystal",
-      "slot": 443,
-      "variant": 0
-    },
-    {
-      "frame": 12,
-      "material": "resonant_crystal",
-      "slot": 444,
-      "variant": 0
-    },
-    {
-      "frame": 13,
-      "material": "resonant_crystal",
-      "slot": 445,
-      "variant": 0
-    },
-    {
-      "frame": 14,
-      "material": "resonant_crystal",
-      "slot": 446,
-      "variant": 0
-    },
-    {
-      "frame": 15,
-      "material": "resonant_crystal",
-      "slot": 447,
-      "variant": 0
+      "variant": 1
     },
     {
       "frame": 0,
-      "material": "sulfur_crust",
+      "material": "tuff",
+      "slot": 434,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "tuff",
+      "slot": 435,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "coarse_dirt",
+      "slot": 436,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "coarse_dirt",
+      "slot": 437,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "coarse_dirt",
+      "slot": 438,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "mud",
+      "slot": 439,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "mud",
+      "slot": 440,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "mud",
+      "slot": 441,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "black_sand",
+      "slot": 442,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "black_sand",
+      "slot": 443,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "black_sand",
+      "slot": 444,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "granite",
+      "slot": 445,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "granite",
+      "slot": 446,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "granite",
+      "slot": 447,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "aether_soil",
       "slot": 448,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "sulfur_crust",
+      "material": "aether_soil",
       "slot": 449,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "sulfur_crust",
+      "material": "aether_soil",
       "slot": 450,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "emerald_ore",
+      "material": "cloudstone",
       "slot": 451,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "emerald_ore",
+      "material": "cloudstone",
       "slot": 452,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "emerald_ore",
+      "material": "cloudstone",
       "slot": 453,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "deepslate_emerald_ore",
+      "material": "skyroot_log",
       "slot": 454,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "deepslate_emerald_ore",
+      "material": "skyroot_log",
       "slot": 455,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "deepslate_emerald_ore",
+      "material": "skyroot_log",
       "slot": 456,
       "variant": 3
     },
     {
-      "frame": 0,
-      "material": "copper_ore",
+      "frame": 1,
+      "material": "star_crystal",
       "slot": 457,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "copper_ore",
+      "frame": 2,
+      "material": "star_crystal",
       "slot": 458,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "copper_ore",
+      "frame": 3,
+      "material": "star_crystal",
       "slot": 459,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "rooted_dirt",
+      "frame": 4,
+      "material": "star_crystal",
       "slot": 460,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "rooted_dirt",
+      "frame": 5,
+      "material": "star_crystal",
       "slot": 461,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "rooted_dirt",
+      "frame": 6,
+      "material": "star_crystal",
       "slot": 462,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "leaf_litter_soil",
+      "frame": 7,
+      "material": "star_crystal",
       "slot": 463,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "leaf_litter_soil",
+      "frame": 8,
+      "material": "star_crystal",
       "slot": 464,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "leaf_litter_soil",
+      "frame": 9,
+      "material": "star_crystal",
       "slot": 465,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "peat",
+      "frame": 10,
+      "material": "star_crystal",
       "slot": 466,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "peat",
+      "frame": 11,
+      "material": "star_crystal",
       "slot": 467,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "peat",
+      "frame": 12,
+      "material": "star_crystal",
       "slot": 468,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "silt",
+      "frame": 13,
+      "material": "star_crystal",
       "slot": 469,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "silt",
+      "frame": 14,
+      "material": "star_crystal",
       "slot": 470,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "silt",
+      "frame": 15,
+      "material": "star_crystal",
       "slot": 471,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "permafrost",
+      "material": "dripstone_block",
       "slot": 472,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "permafrost",
+      "material": "dripstone_block",
       "slot": 473,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "permafrost",
+      "material": "dripstone_block",
       "slot": 474,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "shale",
+      "material": "calcite",
       "slot": 475,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "shale",
+      "material": "calcite",
       "slot": 476,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "shale",
+      "material": "calcite",
       "slot": 477,
       "variant": 3
     },
     {
-      "frame": 0,
-      "material": "red_sandstone",
+      "frame": 1,
+      "material": "resonant_crystal",
       "slot": 478,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "red_sandstone",
+      "frame": 2,
+      "material": "resonant_crystal",
       "slot": 479,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "red_sandstone",
+      "frame": 3,
+      "material": "resonant_crystal",
       "slot": 480,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "ochre_terracotta",
+      "frame": 4,
+      "material": "resonant_crystal",
       "slot": 481,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "ochre_terracotta",
+      "frame": 5,
+      "material": "resonant_crystal",
       "slot": 482,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "ochre_terracotta",
+      "frame": 6,
+      "material": "resonant_crystal",
       "slot": 483,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "white_terracotta",
+      "frame": 7,
+      "material": "resonant_crystal",
       "slot": 484,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "white_terracotta",
+      "frame": 8,
+      "material": "resonant_crystal",
       "slot": 485,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "white_terracotta",
+      "frame": 9,
+      "material": "resonant_crystal",
       "slot": 486,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "volcanic_ash",
+      "frame": 10,
+      "material": "resonant_crystal",
       "slot": 487,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "volcanic_ash",
+      "frame": 11,
+      "material": "resonant_crystal",
       "slot": 488,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "volcanic_ash",
+      "frame": 12,
+      "material": "resonant_crystal",
       "slot": 489,
-      "variant": 3
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "coral_rock",
+      "frame": 13,
+      "material": "resonant_crystal",
       "slot": 490,
-      "variant": 1
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "coral_rock",
+      "frame": 14,
+      "material": "resonant_crystal",
       "slot": 491,
-      "variant": 2
+      "variant": 0
     },
     {
-      "frame": 0,
-      "material": "coral_rock",
+      "frame": 15,
+      "material": "resonant_crystal",
       "slot": 492,
-      "variant": 3
+      "variant": 0
     },
     {
       "frame": 0,
-      "material": "andesite",
+      "material": "sulfur_crust",
       "slot": 493,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "andesite",
+      "material": "sulfur_crust",
       "slot": 494,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "andesite",
+      "material": "sulfur_crust",
       "slot": 495,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "diorite",
+      "material": "emerald_ore",
       "slot": 496,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "diorite",
+      "material": "emerald_ore",
       "slot": 497,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "diorite",
+      "material": "emerald_ore",
       "slot": 498,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "gneiss",
+      "material": "deepslate_emerald_ore",
       "slot": 499,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "gneiss",
+      "material": "deepslate_emerald_ore",
       "slot": 500,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "gneiss",
+      "material": "deepslate_emerald_ore",
       "slot": 501,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "marble",
+      "material": "copper_ore",
       "slot": 502,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "marble",
+      "material": "copper_ore",
       "slot": 503,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "marble",
+      "material": "copper_ore",
       "slot": 504,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "laterite",
+      "material": "rooted_dirt",
       "slot": 505,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "laterite",
+      "material": "rooted_dirt",
       "slot": 506,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "laterite",
+      "material": "rooted_dirt",
       "slot": 507,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "red_clay",
+      "material": "leaf_litter_soil",
       "slot": 508,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "red_clay",
+      "material": "leaf_litter_soil",
       "slot": 509,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "red_clay",
+      "material": "leaf_litter_soil",
       "slot": 510,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "cracked_mud",
+      "material": "peat",
       "slot": 511,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "cracked_mud",
+      "material": "peat",
       "slot": 512,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "cracked_mud",
+      "material": "peat",
       "slot": 513,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "salt_crust",
+      "material": "silt",
       "slot": 514,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "salt_crust",
+      "material": "silt",
       "slot": 515,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "salt_crust",
+      "material": "silt",
       "slot": 516,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "cave_moss",
+      "material": "permafrost",
       "slot": 517,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "cave_moss",
+      "material": "permafrost",
       "slot": 518,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "cave_moss",
+      "material": "permafrost",
       "slot": 519,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "wet_limestone",
+      "material": "shale",
       "slot": 520,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "wet_limestone",
+      "material": "shale",
       "slot": 521,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "wet_limestone",
+      "material": "shale",
       "slot": 522,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "gypsum",
+      "material": "red_sandstone",
       "slot": 523,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "gypsum",
+      "material": "red_sandstone",
       "slot": 524,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "gypsum",
+      "material": "red_sandstone",
       "slot": 525,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "amethyst_block",
+      "material": "ochre_terracotta",
       "slot": 526,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "amethyst_block",
+      "material": "ochre_terracotta",
       "slot": 527,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "amethyst_block",
+      "material": "ochre_terracotta",
       "slot": 528,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "quartz_block",
+      "material": "white_terracotta",
       "slot": 529,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "quartz_block",
+      "material": "white_terracotta",
       "slot": 530,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "quartz_block",
+      "material": "white_terracotta",
       "slot": 531,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "iron_stained_rock",
+      "material": "volcanic_ash",
       "slot": 532,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "iron_stained_rock",
+      "material": "volcanic_ash",
       "slot": 533,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "iron_stained_rock",
+      "material": "volcanic_ash",
       "slot": 534,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "sulfur_rock",
+      "material": "coral_rock",
       "slot": 535,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "sulfur_rock",
+      "material": "coral_rock",
       "slot": 536,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "sulfur_rock",
+      "material": "coral_rock",
       "slot": 537,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "moonstone",
+      "material": "andesite",
       "slot": 538,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "moonstone",
+      "material": "andesite",
       "slot": 539,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "moonstone",
+      "material": "andesite",
       "slot": 540,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "skystone",
+      "material": "diorite",
       "slot": 541,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "skystone",
+      "material": "diorite",
       "slot": 542,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "skystone",
+      "material": "diorite",
       "slot": 543,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "aether_moss",
+      "material": "gneiss",
       "slot": 544,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "aether_moss",
+      "material": "gneiss",
       "slot": 545,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "aether_moss",
+      "material": "gneiss",
       "slot": 546,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "glimmer_silt",
+      "material": "marble",
       "slot": 547,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "glimmer_silt",
+      "material": "marble",
       "slot": 548,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "glimmer_silt",
+      "material": "marble",
       "slot": 549,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "star_crystal_ore",
+      "material": "laterite",
       "slot": 550,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "star_crystal_ore",
+      "material": "laterite",
       "slot": 551,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "star_crystal_ore",
+      "material": "laterite",
       "slot": 552,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "skyroot_planks",
+      "material": "red_clay",
       "slot": 553,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "skyroot_planks",
+      "material": "red_clay",
       "slot": 554,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "skyroot_planks",
+      "material": "red_clay",
       "slot": 555,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "cloudstone_bricks",
+      "material": "cracked_mud",
       "slot": 556,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "cloudstone_bricks",
+      "material": "cracked_mud",
       "slot": 557,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "cloudstone_bricks",
+      "material": "cracked_mud",
       "slot": 558,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "sunstone_bricks",
+      "material": "salt_crust",
       "slot": 559,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "sunstone_bricks",
+      "material": "salt_crust",
       "slot": 560,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "sunstone_bricks",
+      "material": "salt_crust",
       "slot": 561,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "moonstone_bricks",
+      "material": "cave_moss",
       "slot": 562,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "moonstone_bricks",
+      "material": "cave_moss",
       "slot": 563,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "moonstone_bricks",
+      "material": "cave_moss",
       "slot": 564,
       "variant": 3
     },
     {
       "frame": 0,
-      "material": "star_crystal_lamp",
+      "material": "wet_limestone",
       "slot": 565,
       "variant": 1
     },
     {
       "frame": 0,
-      "material": "star_crystal_lamp",
+      "material": "wet_limestone",
       "slot": 566,
       "variant": 2
     },
     {
       "frame": 0,
-      "material": "star_crystal_lamp",
+      "material": "wet_limestone",
       "slot": 567,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "gypsum",
+      "slot": 568,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "gypsum",
+      "slot": 569,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "gypsum",
+      "slot": 570,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "amethyst_block",
+      "slot": 571,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "amethyst_block",
+      "slot": 572,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "amethyst_block",
+      "slot": 573,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "quartz_block",
+      "slot": 574,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "quartz_block",
+      "slot": 575,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "quartz_block",
+      "slot": 576,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "iron_stained_rock",
+      "slot": 577,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "iron_stained_rock",
+      "slot": 578,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "iron_stained_rock",
+      "slot": 579,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "sulfur_rock",
+      "slot": 580,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "sulfur_rock",
+      "slot": 581,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "sulfur_rock",
+      "slot": 582,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "moonstone",
+      "slot": 583,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "moonstone",
+      "slot": 584,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "moonstone",
+      "slot": 585,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "skystone",
+      "slot": 586,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "skystone",
+      "slot": 587,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "skystone",
+      "slot": 588,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "aether_moss",
+      "slot": 589,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "aether_moss",
+      "slot": 590,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "aether_moss",
+      "slot": 591,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "glimmer_silt",
+      "slot": 592,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "glimmer_silt",
+      "slot": 593,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "glimmer_silt",
+      "slot": 594,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "star_crystal_ore",
+      "slot": 595,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "star_crystal_ore",
+      "slot": 596,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "star_crystal_ore",
+      "slot": 597,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "skyroot_planks",
+      "slot": 598,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "skyroot_planks",
+      "slot": 599,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "skyroot_planks",
+      "slot": 600,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "cloudstone_bricks",
+      "slot": 601,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "cloudstone_bricks",
+      "slot": 602,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "cloudstone_bricks",
+      "slot": 603,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "sunstone_bricks",
+      "slot": 604,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "sunstone_bricks",
+      "slot": 605,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "sunstone_bricks",
+      "slot": 606,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "moonstone_bricks",
+      "slot": 607,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "moonstone_bricks",
+      "slot": 608,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "moonstone_bricks",
+      "slot": 609,
+      "variant": 3
+    },
+    {
+      "frame": 0,
+      "material": "star_crystal_lamp",
+      "slot": 610,
+      "variant": 1
+    },
+    {
+      "frame": 0,
+      "material": "star_crystal_lamp",
+      "slot": 611,
+      "variant": 2
+    },
+    {
+      "frame": 0,
+      "material": "star_crystal_lamp",
+      "slot": 612,
       "variant": 3
     }
   ],
@@ -3448,7 +3718,7 @@
       ],
       "source": "acacia_door_bottom.png",
       "variants": 1,
-      "x": 10,
+      "x": 0,
       "y": 10
     },
     "acacia_door_top": {
@@ -3472,7 +3742,7 @@
       ],
       "source": "acacia_door_top.png",
       "variants": 1,
-      "x": 11,
+      "x": 1,
       "y": 10
     },
     "acacia_leaves": {
@@ -3496,7 +3766,7 @@
       ],
       "source": "acacia_leaves.png",
       "variants": 1,
-      "x": 13,
+      "x": 12,
       "y": 1
     },
     "acacia_log": {
@@ -3517,13 +3787,13 @@
       "sha256": "e6dc653d0c398a2d52ca20dbd84868baf91fb3b55319c54bfcd52d610f0ec83b",
       "slots": [
         36,
-        361,
-        362,
-        363
+        406,
+        407,
+        408
       ],
       "source": "acacia_log.png",
       "variants": 4,
-      "x": 12,
+      "x": 11,
       "y": 1
     },
     "acacia_log_top": {
@@ -3547,7 +3817,7 @@
       ],
       "source": "acacia_log_top.png",
       "variants": 1,
-      "x": 11,
+      "x": 7,
       "y": 4
     },
     "acacia_planks": {
@@ -3571,8 +3841,8 @@
       ],
       "source": "acacia_planks.png",
       "variants": 1,
-      "x": 1,
-      "y": 10
+      "x": 16,
+      "y": 9
     },
     "acacia_sapling": {
       "effective_seed": 213785369,
@@ -3595,7 +3865,7 @@
       ],
       "source": "acacia_sapling.png",
       "variants": 1,
-      "x": 6,
+      "x": 4,
       "y": 2
     },
     "aether_grass_side": {
@@ -3619,7 +3889,7 @@
       ],
       "source": "aether_grass_side.png",
       "variants": 1,
-      "x": 4,
+      "x": 1,
       "y": 3
     },
     "aether_grass_top": {
@@ -3643,7 +3913,7 @@
       ],
       "source": "aether_grass_top.png",
       "variants": 1,
-      "x": 3,
+      "x": 0,
       "y": 3
     },
     "aether_moss": {
@@ -3664,14 +3934,14 @@
       "sha256": "8001a6ffd067b250bf788d8688cfbeb51a76ad10e1108c78cb3d8aa7e5883737",
       "slots": [
         218,
-        544,
-        545,
-        546
+        589,
+        590,
+        591
       ],
       "source": "aether_moss.png",
       "variants": 4,
-      "x": 2,
-      "y": 9
+      "x": 18,
+      "y": 8
     },
     "aether_soil": {
       "effective_seed": 213785369,
@@ -3691,13 +3961,13 @@
       "sha256": "86c42eb8aab5e0bb06ab8d1df89e12f4e4870818ab674f4e613f6018a2940e6c",
       "slots": [
         77,
-        403,
-        404,
-        405
+        448,
+        449,
+        450
       ],
       "source": "aether_soil.png",
       "variants": 4,
-      "x": 5,
+      "x": 2,
       "y": 3
     },
     "allium": {
@@ -3721,7 +3991,7 @@
       ],
       "source": "allium.png",
       "variants": 1,
-      "x": 14,
+      "x": 12,
       "y": 2
     },
     "alpine_flower": {
@@ -3745,7 +4015,7 @@
       ],
       "source": "alpine_flower.png",
       "variants": 1,
-      "x": 14,
+      "x": 7,
       "y": 7
     },
     "amethyst_block": {
@@ -3766,13 +4036,13 @@
       "sha256": "059ee5e3984066d90566cd85ae8a7bbbd3c35b4f094fff42ce2e19ada070f492",
       "slots": [
         209,
-        526,
-        527,
-        528
+        571,
+        572,
+        573
       ],
       "source": "amethyst_block.png",
       "variants": 4,
-      "x": 17,
+      "x": 9,
       "y": 8
     },
     "amethyst_cluster": {
@@ -3796,7 +4066,7 @@
       ],
       "source": "amethyst_cluster.png",
       "variants": 1,
-      "x": 21,
+      "x": 13,
       "y": 8
     },
     "ancient_debris": {
@@ -3820,8 +4090,8 @@
       ],
       "source": "ancient_debris.png",
       "variants": 1,
-      "x": 8,
-      "y": 11
+      "x": 22,
+      "y": 10
     },
     "andesite": {
       "effective_seed": 213785369,
@@ -3841,14 +4111,38 @@
       "sha256": "13504a92a103b863bbd9a156cacdc221564a6bc81e5046e60269a23914ae5248",
       "slots": [
         188,
-        493,
-        494,
-        495
+        538,
+        539,
+        540
       ],
       "source": "andesite.png",
       "variants": 4,
-      "x": 20,
+      "x": 13,
       "y": 7
+    },
+    "anvil": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "constructed",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.22,
+      "index": 303,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "panels",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.8,
+      "selection_seed": 2438659637,
+      "sha256": "cb93154c07214c6d00e347b3ec49153dfb77b0951054c9697cd1a7e70923474a",
+      "slots": [
+        303
+      ],
+      "source": "anvil.png",
+      "variants": 1,
+      "x": 3,
+      "y": 12
     },
     "barrel": {
       "effective_seed": 213785369,
@@ -3871,7 +4165,7 @@
       ],
       "source": "barrel.png",
       "variants": 1,
-      "x": 16,
+      "x": 7,
       "y": 9
     },
     "basalt": {
@@ -3892,13 +4186,13 @@
       "sha256": "b2bd14d8c846a11b12fd3a53d8aad334fde470ac31aaba0b81f453398e694369",
       "slots": [
         68,
-        385,
-        386,
-        387
+        430,
+        431,
+        432
       ],
       "source": "basalt.png",
       "variants": 4,
-      "x": 20,
+      "x": 18,
       "y": 2
     },
     "beach_grass": {
@@ -3922,7 +4216,7 @@
       ],
       "source": "beach_grass.png",
       "variants": 1,
-      "x": 17,
+      "x": 10,
       "y": 7
     },
     "bedrock": {
@@ -3970,7 +4264,7 @@
       ],
       "source": "bellflower.png",
       "variants": 1,
-      "x": 13,
+      "x": 6,
       "y": 7
     },
     "birch_door_bottom": {
@@ -3994,8 +4288,8 @@
       ],
       "source": "birch_door_bottom.png",
       "variants": 1,
-      "x": 4,
-      "y": 10
+      "x": 19,
+      "y": 9
     },
     "birch_door_top": {
       "effective_seed": 213785369,
@@ -4018,8 +4312,8 @@
       ],
       "source": "birch_door_top.png",
       "variants": 1,
-      "x": 5,
-      "y": 10
+      "x": 20,
+      "y": 9
     },
     "birch_leaves": {
       "effective_seed": 213785369,
@@ -4042,7 +4336,7 @@
       ],
       "source": "birch_leaves.png",
       "variants": 1,
-      "x": 7,
+      "x": 6,
       "y": 1
     },
     "birch_log": {
@@ -4063,13 +4357,13 @@
       "sha256": "0942159ae1622db26e6d0efc43649c33b3904e164c70fd880daaa0517175de46",
       "slots": [
         30,
-        352,
-        353,
-        354
+        397,
+        398,
+        399
       ],
       "source": "birch_log.png",
       "variants": 4,
-      "x": 6,
+      "x": 5,
       "y": 1
     },
     "birch_log_top": {
@@ -4093,7 +4387,7 @@
       ],
       "source": "birch_log_top.png",
       "variants": 1,
-      "x": 8,
+      "x": 4,
       "y": 4
     },
     "birch_planks": {
@@ -4117,7 +4411,7 @@
       ],
       "source": "birch_planks.png",
       "variants": 1,
-      "x": 22,
+      "x": 13,
       "y": 9
     },
     "birch_sapling": {
@@ -4141,7 +4435,7 @@
       ],
       "source": "birch_sapling.png",
       "variants": 1,
-      "x": 3,
+      "x": 1,
       "y": 2
     },
     "black_sand": {
@@ -4162,14 +4456,14 @@
       "sha256": "739dda138f4a9ddf7e62bb2540ee98e7b3f5b84f816a816f9909696e3df8671a",
       "slots": [
         73,
-        397,
-        398,
-        399
+        442,
+        443,
+        444
       ],
       "source": "black_sand.png",
       "variants": 4,
-      "x": 1,
-      "y": 3
+      "x": 23,
+      "y": 2
     },
     "black_wool": {
       "effective_seed": 213785369,
@@ -4192,7 +4486,7 @@
       ],
       "source": "black_wool.png",
       "variants": 1,
-      "x": 17,
+      "x": 11,
       "y": 6
     },
     "blackstone": {
@@ -4216,7 +4510,7 @@
       ],
       "source": "blackstone.png",
       "variants": 1,
-      "x": 19,
+      "x": 9,
       "y": 10
     },
     "blackstone_bricks": {
@@ -4240,7 +4534,7 @@
       ],
       "source": "blackstone_bricks.png",
       "variants": 1,
-      "x": 12,
+      "x": 1,
       "y": 11
     },
     "blast_furnace": {
@@ -4264,7 +4558,7 @@
       ],
       "source": "blast_furnace.png",
       "variants": 1,
-      "x": 4,
+      "x": 0,
       "y": 4
     },
     "blast_furnace_bottom": {
@@ -4288,7 +4582,7 @@
       ],
       "source": "blast_furnace_bottom.png",
       "variants": 1,
-      "x": 11,
+      "x": 6,
       "y": 5
     },
     "blast_furnace_side": {
@@ -4312,7 +4606,7 @@
       ],
       "source": "blast_furnace_side.png",
       "variants": 1,
-      "x": 10,
+      "x": 5,
       "y": 5
     },
     "blast_furnace_top": {
@@ -4336,7 +4630,7 @@
       ],
       "source": "blast_furnace_top.png",
       "variants": 1,
-      "x": 9,
+      "x": 4,
       "y": 5
     },
     "blaze_spawner": {
@@ -4360,8 +4654,8 @@
       ],
       "source": "blaze_spawner.png",
       "variants": 1,
-      "x": 3,
-      "y": 12
+      "x": 16,
+      "y": 11
     },
     "blue_ice": {
       "effective_seed": 213785369,
@@ -4384,8 +4678,8 @@
       ],
       "source": "blue_ice.png",
       "variants": 1,
-      "x": 0,
-      "y": 7
+      "x": 18,
+      "y": 6
     },
     "blue_orchid": {
       "effective_seed": 213785369,
@@ -4408,7 +4702,7 @@
       ],
       "source": "blue_orchid.png",
       "variants": 1,
-      "x": 13,
+      "x": 11,
       "y": 2
     },
     "blue_wool": {
@@ -4432,7 +4726,7 @@
       ],
       "source": "blue_wool.png",
       "variants": 1,
-      "x": 15,
+      "x": 9,
       "y": 6
     },
     "bone_block": {
@@ -4456,7 +4750,31 @@
       ],
       "source": "bone_block.png",
       "variants": 1,
-      "x": 5,
+      "x": 18,
+      "y": 11
+    },
+    "bookshelf": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "constructed",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.22,
+      "index": 300,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "panels",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.8,
+      "selection_seed": 3437533486,
+      "sha256": "ce9f4867e65d490db5092ae85b59be73f8beaf89a23a8d5f305ab165963b71b2",
+      "slots": [
+        300
+      ],
+      "source": "bookshelf.png",
+      "variants": 1,
+      "x": 0,
       "y": 12
     },
     "brewing_stand": {
@@ -4480,7 +4798,7 @@
       ],
       "source": "brewing_stand.png",
       "variants": 1,
-      "x": 19,
+      "x": 10,
       "y": 9
     },
     "bricks": {
@@ -4504,8 +4822,8 @@
       ],
       "source": "bricks.png",
       "variants": 1,
-      "x": 4,
-      "y": 6
+      "x": 23,
+      "y": 5
     },
     "brown_mushroom": {
       "effective_seed": 213785369,
@@ -4528,7 +4846,7 @@
       ],
       "source": "brown_mushroom.png",
       "variants": 1,
-      "x": 10,
+      "x": 3,
       "y": 7
     },
     "cactus_side": {
@@ -4597,13 +4915,13 @@
       "sha256": "a075ceec95945ebf8b27f96a58a5b0ea0a8a825ed73af0d4708c877e9cfa6adc",
       "slots": [
         89,
-        430,
-        431,
-        432
+        475,
+        476,
+        477
       ],
       "source": "calcite.png",
       "variants": 4,
-      "x": 17,
+      "x": 14,
       "y": 3
     },
     "cartography_table": {
@@ -4627,7 +4945,7 @@
       ],
       "source": "cartography_table.png",
       "variants": 1,
-      "x": 18,
+      "x": 9,
       "y": 9
     },
     "cattail": {
@@ -4651,7 +4969,7 @@
       ],
       "source": "cattail.png",
       "variants": 1,
-      "x": 16,
+      "x": 9,
       "y": 7
     },
     "cauldron": {
@@ -4675,8 +4993,8 @@
       ],
       "source": "cauldron.png",
       "variants": 1,
-      "x": 3,
-      "y": 4
+      "x": 24,
+      "y": 3
     },
     "cauldron_bottom": {
       "effective_seed": 213785369,
@@ -4699,7 +5017,7 @@
       ],
       "source": "cauldron_bottom.png",
       "variants": 1,
-      "x": 8,
+      "x": 3,
       "y": 5
     },
     "cauldron_side": {
@@ -4723,7 +5041,7 @@
       ],
       "source": "cauldron_side.png",
       "variants": 1,
-      "x": 7,
+      "x": 2,
       "y": 5
     },
     "cauldron_top": {
@@ -4747,7 +5065,7 @@
       ],
       "source": "cauldron_top.png",
       "variants": 1,
-      "x": 6,
+      "x": 1,
       "y": 5
     },
     "cave_glowshroom": {
@@ -4771,7 +5089,7 @@
       ],
       "source": "cave_glowshroom.png",
       "variants": 1,
-      "x": 23,
+      "x": 15,
       "y": 8
     },
     "cave_moss": {
@@ -4792,13 +5110,13 @@
       "sha256": "3fc0f71a766c33c6b50a17e6faf5d686c1e544a0f91fd912def5e0f32dbc440f",
       "slots": [
         206,
-        517,
-        518,
-        519
+        562,
+        563,
+        564
       ],
       "source": "cave_moss.png",
       "variants": 4,
-      "x": 14,
+      "x": 6,
       "y": 8
     },
     "chest": {
@@ -4822,7 +5140,7 @@
       ],
       "source": "chest.png",
       "variants": 1,
-      "x": 17,
+      "x": 16,
       "y": 1
     },
     "chest_bottom": {
@@ -4846,7 +5164,7 @@
       ],
       "source": "chest_bottom.png",
       "variants": 1,
-      "x": 20,
+      "x": 16,
       "y": 4
     },
     "chest_side": {
@@ -4870,7 +5188,7 @@
       ],
       "source": "chest_side.png",
       "variants": 1,
-      "x": 19,
+      "x": 15,
       "y": 4
     },
     "chest_top": {
@@ -4894,8 +5212,32 @@
       ],
       "source": "chest_top.png",
       "variants": 1,
-      "x": 18,
+      "x": 14,
       "y": 4
+    },
+    "chipped_anvil": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "constructed",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.22,
+      "index": 304,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "panels",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.8,
+      "selection_seed": 4042274615,
+      "sha256": "daf9a4a82242368d0a7382cdc0832aff77991ae241fbcc6d594ac03c5fd7fae2",
+      "slots": [
+        304
+      ],
+      "source": "chipped_anvil.png",
+      "variants": 1,
+      "x": 4,
+      "y": 12
     },
     "chiseled_stone_bricks": {
       "effective_seed": 213785369,
@@ -4918,8 +5260,8 @@
       ],
       "source": "chiseled_stone_bricks.png",
       "variants": 1,
-      "x": 3,
-      "y": 6
+      "x": 22,
+      "y": 5
     },
     "clay": {
       "effective_seed": 213785369,
@@ -4939,9 +5281,9 @@
       "sha256": "1db84d0c1dda4d6986b1d036846fc8ad185452e03373d5df6816bdbfb873bb12",
       "slots": [
         22,
-        346,
-        347,
-        348
+        391,
+        392,
+        393
       ],
       "source": "clay.png",
       "variants": 4,
@@ -4969,7 +5311,7 @@
       ],
       "source": "cloud.png",
       "variants": 1,
-      "x": 18,
+      "x": 16,
       "y": 2
     },
     "cloud_bloom": {
@@ -4993,7 +5335,7 @@
       ],
       "source": "cloud_bloom.png",
       "variants": 1,
-      "x": 13,
+      "x": 10,
       "y": 3
     },
     "cloudberry_bush": {
@@ -5017,7 +5359,7 @@
       ],
       "source": "cloudberry_bush.png",
       "variants": 1,
-      "x": 14,
+      "x": 5,
       "y": 9
     },
     "cloudstone": {
@@ -5038,13 +5380,13 @@
       "sha256": "1f15cf40382f1546619714995330a59b54827c1bcc88b38ed3cccf00c54d92b6",
       "slots": [
         78,
-        406,
-        407,
-        408
+        451,
+        452,
+        453
       ],
       "source": "cloudstone.png",
       "variants": 4,
-      "x": 6,
+      "x": 3,
       "y": 3
     },
     "cloudstone_bricks": {
@@ -5065,14 +5407,14 @@
       "sha256": "a61e47110a0aa9fa865333184bbd462fb7b6fd9e40282f19003aeb4c82d18280",
       "slots": [
         222,
-        556,
-        557,
-        558
+        601,
+        602,
+        603
       ],
       "source": "cloudstone_bricks.png",
       "variants": 4,
-      "x": 6,
-      "y": 9
+      "x": 22,
+      "y": 8
     },
     "clover": {
       "effective_seed": 213785369,
@@ -5095,8 +5437,8 @@
       ],
       "source": "clover.png",
       "variants": 1,
-      "x": 4,
-      "y": 8
+      "x": 21,
+      "y": 7
     },
     "coal_ore": {
       "effective_seed": 213785369,
@@ -5116,9 +5458,9 @@
       "sha256": "c8ce8a42446272d27e8c170f1e740b7a142d99a8336cf715b949b2fe941c1af4",
       "slots": [
         15,
-        316,
-        317,
-        318
+        361,
+        362,
+        363
       ],
       "source": "coal_ore.png",
       "variants": 4,
@@ -5143,13 +5485,13 @@
       "sha256": "12fcab3b852c9546dc60522e281f14f21a526d1f39ba8e1790ea25dab1e9bdc3",
       "slots": [
         70,
-        391,
-        392,
-        393
+        436,
+        437,
+        438
       ],
       "source": "coarse_dirt.png",
       "variants": 4,
-      "x": 22,
+      "x": 20,
       "y": 2
     },
     "cobblestone": {
@@ -5170,13 +5512,13 @@
       "sha256": "2f746aa6b4e7923e547c30482f30aa4cf56aa7511d6153b93af5ec78ffe2ba87",
       "slots": [
         38,
-        364,
-        365,
-        366
+        409,
+        410,
+        411
       ],
       "source": "cobblestone.png",
       "variants": 4,
-      "x": 14,
+      "x": 13,
       "y": 1
     },
     "composter": {
@@ -5200,8 +5542,8 @@
       ],
       "source": "composter.png",
       "variants": 1,
-      "x": 0,
-      "y": 4
+      "x": 21,
+      "y": 3
     },
     "composter_bottom": {
       "effective_seed": 213785369,
@@ -5224,7 +5566,7 @@
       ],
       "source": "composter_bottom.png",
       "variants": 1,
-      "x": 23,
+      "x": 19,
       "y": 4
     },
     "composter_side": {
@@ -5248,7 +5590,7 @@
       ],
       "source": "composter_side.png",
       "variants": 1,
-      "x": 22,
+      "x": 18,
       "y": 4
     },
     "composter_top": {
@@ -5272,7 +5614,7 @@
       ],
       "source": "composter_top.png",
       "variants": 1,
-      "x": 21,
+      "x": 17,
       "y": 4
     },
     "copper_ore": {
@@ -5293,13 +5635,13 @@
       "sha256": "ef34cdba6629407a32e56ed24b707824f56e079254e2af64a4e5f994645e44e3",
       "slots": [
         103,
-        457,
-        458,
-        459
+        502,
+        503,
+        504
       ],
       "source": "copper_ore.png",
       "variants": 4,
-      "x": 7,
+      "x": 3,
       "y": 4
     },
     "coral_rock": {
@@ -5320,14 +5662,14 @@
       "sha256": "e51c4993bf8c673a29e474b52025633a453a7ff4caddd6c8778fd0fd9038ee54",
       "slots": [
         174,
-        490,
-        491,
-        492
+        535,
+        536,
+        537
       ],
       "source": "coral_rock.png",
       "variants": 4,
-      "x": 6,
-      "y": 7
+      "x": 24,
+      "y": 6
     },
     "cracked_mud": {
       "effective_seed": 213785369,
@@ -5347,14 +5689,14 @@
       "sha256": "b1d7e6ede7f5f9269bcf7b08ca4ee32b7800f78ac3efb63a91bb0b24d29ba830",
       "slots": [
         194,
-        511,
-        512,
-        513
+        556,
+        557,
+        558
       ],
       "source": "cracked_mud.png",
       "variants": 4,
-      "x": 2,
-      "y": 8
+      "x": 19,
+      "y": 7
     },
     "cracked_stone_bricks": {
       "effective_seed": 213785369,
@@ -5377,8 +5719,8 @@
       ],
       "source": "cracked_stone_bricks.png",
       "variants": 1,
-      "x": 2,
-      "y": 6
+      "x": 21,
+      "y": 5
     },
     "crafting_table": {
       "effective_seed": 213785369,
@@ -5401,7 +5743,7 @@
       ],
       "source": "crafting_table.png",
       "variants": 1,
-      "x": 15,
+      "x": 14,
       "y": 1
     },
     "crafting_table_bottom": {
@@ -5425,7 +5767,7 @@
       ],
       "source": "crafting_table_bottom.png",
       "variants": 1,
-      "x": 14,
+      "x": 10,
       "y": 4
     },
     "crafting_table_side": {
@@ -5449,7 +5791,7 @@
       ],
       "source": "crafting_table_side.png",
       "variants": 1,
-      "x": 13,
+      "x": 9,
       "y": 4
     },
     "crafting_table_top": {
@@ -5473,7 +5815,7 @@
       ],
       "source": "crafting_table_top.png",
       "variants": 1,
-      "x": 12,
+      "x": 8,
       "y": 4
     },
     "crimson_door_bottom": {
@@ -5497,8 +5839,8 @@
       ],
       "source": "crimson_door_bottom.png",
       "variants": 1,
-      "x": 6,
-      "y": 12
+      "x": 19,
+      "y": 11
     },
     "crimson_door_top": {
       "effective_seed": 213785369,
@@ -5521,8 +5863,8 @@
       ],
       "source": "crimson_door_top.png",
       "variants": 1,
-      "x": 7,
-      "y": 12
+      "x": 20,
+      "y": 11
     },
     "crimson_fungus": {
       "effective_seed": 213785369,
@@ -5545,7 +5887,7 @@
       ],
       "source": "crimson_fungus.png",
       "variants": 1,
-      "x": 15,
+      "x": 4,
       "y": 11
     },
     "crimson_nylium": {
@@ -5569,7 +5911,7 @@
       ],
       "source": "crimson_nylium.png",
       "variants": 1,
-      "x": 20,
+      "x": 10,
       "y": 10
     },
     "crimson_planks": {
@@ -5593,8 +5935,8 @@
       ],
       "source": "crimson_planks.png",
       "variants": 1,
-      "x": 0,
-      "y": 11
+      "x": 14,
+      "y": 10
     },
     "crimson_roots": {
       "effective_seed": 213785369,
@@ -5617,7 +5959,7 @@
       ],
       "source": "crimson_roots.png",
       "variants": 1,
-      "x": 17,
+      "x": 6,
       "y": 11
     },
     "crimson_stem": {
@@ -5641,7 +5983,7 @@
       ],
       "source": "crimson_stem.png",
       "variants": 1,
-      "x": 22,
+      "x": 12,
       "y": 10
     },
     "crying_obsidian": {
@@ -5665,7 +6007,7 @@
       ],
       "source": "crying_obsidian.png",
       "variants": 1,
-      "x": 13,
+      "x": 2,
       "y": 11
     },
     "cut_sandstone": {
@@ -5689,8 +6031,32 @@
       ],
       "source": "cut_sandstone.png",
       "variants": 1,
-      "x": 11,
+      "x": 5,
       "y": 6
+    },
+    "damaged_anvil": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "constructed",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.22,
+      "index": 305,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "panels",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.8,
+      "selection_seed": 4255535512,
+      "sha256": "8e506f15c6cc49906f2bc762817c914dcb7489f8308f72af04fed077d717808f",
+      "slots": [
+        305
+      ],
+      "source": "damaged_anvil.png",
+      "variants": 1,
+      "x": 5,
+      "y": 12
     },
     "dandelion": {
       "effective_seed": 213785369,
@@ -5713,7 +6079,7 @@
       ],
       "source": "dandelion.png",
       "variants": 1,
-      "x": 12,
+      "x": 10,
       "y": 2
     },
     "dawn_bell": {
@@ -5737,7 +6103,7 @@
       ],
       "source": "dawn_bell.png",
       "variants": 1,
-      "x": 11,
+      "x": 2,
       "y": 9
     },
     "dead_bush": {
@@ -5761,7 +6127,7 @@
       ],
       "source": "dead_bush.png",
       "variants": 1,
-      "x": 8,
+      "x": 1,
       "y": 7
     },
     "deepslate": {
@@ -5782,9 +6148,9 @@
       "sha256": "1a24935a511c81166cd9ad80d487af029da76cdbf5d70d468394d814d05092dc",
       "slots": [
         12,
-        313,
-        314,
-        315
+        358,
+        359,
+        360
       ],
       "source": "deepslate.png",
       "variants": 4,
@@ -5812,7 +6178,7 @@
       ],
       "source": "deepslate_bricks.png",
       "variants": 1,
-      "x": 9,
+      "x": 3,
       "y": 6
     },
     "deepslate_emerald_ore": {
@@ -5833,14 +6199,62 @@
       "sha256": "2503532d1e24ffe62926929fdb2807336c93ac84332f51ff41b441765a00234d",
       "slots": [
         95,
-        454,
-        455,
-        456
+        499,
+        500,
+        501
       ],
       "source": "deepslate_emerald_ore.png",
       "variants": 4,
-      "x": 23,
+      "x": 20,
       "y": 3
+    },
+    "deepslate_lapis_ore": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "ore",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.3,
+      "index": 299,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "mineral",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.56,
+      "selection_seed": 2197377024,
+      "sha256": "c8a0beca2440756cb525a67ee57f649d3776654853d35b526462474b9ca462f9",
+      "slots": [
+        299
+      ],
+      "source": "deepslate_lapis_ore.png",
+      "variants": 1,
+      "x": 24,
+      "y": 11
+    },
+    "deepslate_redstone_ore": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "ore",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.3,
+      "index": 328,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "mineral",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.56,
+      "selection_seed": 3005602717,
+      "sha256": "a10b8aca7095f853c22ae427f0f27b7175944cf35d4653b84d2f1dc6b62d39a8",
+      "slots": [
+        328
+      ],
+      "source": "deepslate_redstone_ore.png",
+      "variants": 1,
+      "x": 3,
+      "y": 13
     },
     "desert_flower": {
       "effective_seed": 213785369,
@@ -5863,7 +6277,7 @@
       ],
       "source": "desert_flower.png",
       "variants": 1,
-      "x": 8,
+      "x": 0,
       "y": 8
     },
     "diamond_ore": {
@@ -5884,9 +6298,9 @@
       "sha256": "36d2ea76f2f4751c9918e8ebaa766c1ded8f7ce21055fb3294d44152572736be",
       "slots": [
         18,
-        325,
-        326,
-        327
+        370,
+        371,
+        372
       ],
       "source": "diamond_ore.png",
       "variants": 4,
@@ -5911,13 +6325,13 @@
       "sha256": "d25ccc7f28a12a5a6d05c9a75e4dab6bd3b72c7d468bd1bf5f9db6f4a94fb8ee",
       "slots": [
         189,
-        496,
-        497,
-        498
+        541,
+        542,
+        543
       ],
       "source": "diorite.png",
       "variants": 4,
-      "x": 21,
+      "x": 14,
       "y": 7
     },
     "dirt": {
@@ -5938,9 +6352,9 @@
       "sha256": "7b3e8fd9b4c6d56ad4ad8e186f9bdb4b784a4f48cb01261422ff6d9ebea2c05f",
       "slots": [
         0,
-        298,
-        299,
-        300
+        343,
+        344,
+        345
       ],
       "source": "dirt.png",
       "variants": 4,
@@ -5965,13 +6379,13 @@
       "sha256": "c2f7b126887f0ea7c8e08539830175b8a440246008786c6d796b72639307a32b",
       "slots": [
         87,
-        427,
-        428,
-        429
+        472,
+        473,
+        474
       ],
       "source": "dripstone_block.png",
       "variants": 4,
-      "x": 15,
+      "x": 12,
       "y": 3
     },
     "dry_grass": {
@@ -5995,7 +6409,7 @@
       ],
       "source": "dry_grass.png",
       "variants": 1,
-      "x": 9,
+      "x": 2,
       "y": 7
     },
     "dry_grass_block": {
@@ -6019,7 +6433,7 @@
       ],
       "source": "dry_grass_block.png",
       "variants": 1,
-      "x": 22,
+      "x": 16,
       "y": 6
     },
     "dry_grass_side": {
@@ -6043,7 +6457,7 @@
       ],
       "source": "dry_grass_side.png",
       "variants": 1,
-      "x": 18,
+      "x": 11,
       "y": 7
     },
     "emerald_ore": {
@@ -6064,14 +6478,38 @@
       "sha256": "dafa7806a175ca951e91f305035e5c27b6e908d2432e6c2de79c6c804780e682",
       "slots": [
         94,
-        451,
-        452,
-        453
+        496,
+        497,
+        498
       ],
       "source": "emerald_ore.png",
       "variants": 4,
-      "x": 22,
+      "x": 19,
       "y": 3
+    },
+    "enchanting_table": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "constructed",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.22,
+      "index": 302,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "panels",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.8,
+      "selection_seed": 2141548591,
+      "sha256": "d51b620636e749f34632310a3e2d55c1380a973f16c81466cf98dd3b6e800031",
+      "slots": [
+        302
+      ],
+      "source": "enchanting_table.png",
+      "variants": 1,
+      "x": 2,
+      "y": 12
     },
     "fallen_twigs": {
       "effective_seed": 213785369,
@@ -6094,7 +6532,7 @@
       ],
       "source": "fallen_twigs.png",
       "variants": 1,
-      "x": 12,
+      "x": 4,
       "y": 8
     },
     "farmland": {
@@ -6118,7 +6556,7 @@
       ],
       "source": "farmland.png",
       "variants": 1,
-      "x": 21,
+      "x": 20,
       "y": 1
     },
     "fern": {
@@ -6142,7 +6580,7 @@
       ],
       "source": "fern.png",
       "variants": 1,
-      "x": 7,
+      "x": 0,
       "y": 7
     },
     "fire": {
@@ -6163,25 +6601,25 @@
       "sha256": "67d5d365d46f85cad303ed092619d885a8fb8808747fe2c0f5d86d17a48a2060",
       "slots": [
         56,
-        367,
-        368,
-        369,
-        370,
-        371,
-        372,
-        373,
-        374,
-        375,
-        376,
-        377,
-        378,
-        379,
-        380,
-        381
+        412,
+        413,
+        414,
+        415,
+        416,
+        417,
+        418,
+        419,
+        420,
+        421,
+        422,
+        423,
+        424,
+        425,
+        426
       ],
       "source": "fire.png",
       "variants": 1,
-      "x": 8,
+      "x": 6,
       "y": 2
     },
     "fletching_table": {
@@ -6205,8 +6643,8 @@
       ],
       "source": "fletching_table.png",
       "variants": 1,
-      "x": 1,
-      "y": 4
+      "x": 22,
+      "y": 3
     },
     "fletching_table_bottom": {
       "effective_seed": 213785369,
@@ -6229,8 +6667,8 @@
       ],
       "source": "fletching_table_bottom.png",
       "variants": 1,
-      "x": 2,
-      "y": 5
+      "x": 22,
+      "y": 4
     },
     "fletching_table_side": {
       "effective_seed": 213785369,
@@ -6253,8 +6691,8 @@
       ],
       "source": "fletching_table_side.png",
       "variants": 1,
-      "x": 1,
-      "y": 5
+      "x": 21,
+      "y": 4
     },
     "fletching_table_top": {
       "effective_seed": 213785369,
@@ -6277,8 +6715,8 @@
       ],
       "source": "fletching_table_top.png",
       "variants": 1,
-      "x": 0,
-      "y": 5
+      "x": 20,
+      "y": 4
     },
     "flower": {
       "effective_seed": 213785369,
@@ -6301,8 +6739,32 @@
       ],
       "source": "flower.png",
       "variants": 1,
-      "x": 4,
+      "x": 3,
       "y": 1
+    },
+    "frosted_ice": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "sand_ice",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.12,
+      "index": 306,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "grains",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.88,
+      "selection_seed": 3577445331,
+      "sha256": "6972672f2a6012aedcf5af8325f070e9abaa8f4bd371eff5e09679be298bd0c6",
+      "slots": [
+        306
+      ],
+      "source": "frosted_ice.png",
+      "variants": 1,
+      "x": 6,
+      "y": 12
     },
     "furnace": {
       "effective_seed": 213785369,
@@ -6325,7 +6787,7 @@
       ],
       "source": "furnace.png",
       "variants": 1,
-      "x": 16,
+      "x": 15,
       "y": 1
     },
     "furnace_bottom": {
@@ -6349,7 +6811,7 @@
       ],
       "source": "furnace_bottom.png",
       "variants": 1,
-      "x": 17,
+      "x": 13,
       "y": 4
     },
     "furnace_side": {
@@ -6373,7 +6835,7 @@
       ],
       "source": "furnace_side.png",
       "variants": 1,
-      "x": 16,
+      "x": 12,
       "y": 4
     },
     "furnace_top": {
@@ -6397,7 +6859,7 @@
       ],
       "source": "furnace_top.png",
       "variants": 1,
-      "x": 15,
+      "x": 11,
       "y": 4
     },
     "glass": {
@@ -6421,7 +6883,7 @@
       ],
       "source": "glass.png",
       "variants": 1,
-      "x": 9,
+      "x": 7,
       "y": 2
     },
     "glimmer_reed": {
@@ -6445,7 +6907,7 @@
       ],
       "source": "glimmer_reed.png",
       "variants": 1,
-      "x": 13,
+      "x": 4,
       "y": 9
     },
     "glimmer_silt": {
@@ -6466,14 +6928,14 @@
       "sha256": "5d19b976bf1f699240d671c8cf7693c3fd43ae589f0203a0c4708c7976da0c82",
       "slots": [
         219,
-        547,
-        548,
-        549
+        592,
+        593,
+        594
       ],
       "source": "glimmer_silt.png",
       "variants": 4,
-      "x": 3,
-      "y": 9
+      "x": 19,
+      "y": 8
     },
     "glow_fern": {
       "effective_seed": 213785369,
@@ -6496,7 +6958,7 @@
       ],
       "source": "glow_fern.png",
       "variants": 1,
-      "x": 19,
+      "x": 16,
       "y": 3
     },
     "glowshroom": {
@@ -6520,7 +6982,7 @@
       ],
       "source": "glowshroom.png",
       "variants": 1,
-      "x": 14,
+      "x": 11,
       "y": 3
     },
     "glowstone": {
@@ -6544,8 +7006,8 @@
       ],
       "source": "glowstone.png",
       "variants": 1,
-      "x": 5,
-      "y": 11
+      "x": 19,
+      "y": 10
     },
     "gneiss": {
       "effective_seed": 213785369,
@@ -6565,13 +7027,13 @@
       "sha256": "4d548b94d45eace46188f5df1c2f204bc32e0ec8dc17fec622bfbda4101b08c5",
       "slots": [
         190,
-        499,
-        500,
-        501
+        544,
+        545,
+        546
       ],
       "source": "gneiss.png",
       "variants": 4,
-      "x": 22,
+      "x": 15,
       "y": 7
     },
     "gold_ore": {
@@ -6592,9 +7054,9 @@
       "sha256": "e512181829ceb33578873e4f361bc29f4dafe02e5bf8fb55bf66f1cd40d75729",
       "slots": [
         17,
-        322,
-        323,
-        324
+        367,
+        368,
+        369
       ],
       "source": "gold_ore.png",
       "variants": 4,
@@ -6619,14 +7081,14 @@
       "sha256": "d3e834a452695a3143ea0823f5c4afe1b06e1589458965f3bc8ca47b69b9c520",
       "slots": [
         74,
-        400,
-        401,
-        402
+        445,
+        446,
+        447
       ],
       "source": "granite.png",
       "variants": 4,
-      "x": 2,
-      "y": 3
+      "x": 24,
+      "y": 2
     },
     "grass_side": {
       "effective_seed": 213785369,
@@ -6694,9 +7156,9 @@
       "sha256": "cee04fc8c2a1c1a4f709ce269df6a0596cd949a786cb6189bc00442a6d115644",
       "slots": [
         21,
-        343,
-        344,
-        345
+        388,
+        389,
+        390
       ],
       "source": "gravel.png",
       "variants": 4,
@@ -6724,7 +7186,7 @@
       ],
       "source": "green_wool.png",
       "variants": 1,
-      "x": 16,
+      "x": 10,
       "y": 6
     },
     "grindstone": {
@@ -6748,7 +7210,7 @@
       ],
       "source": "grindstone.png",
       "variants": 1,
-      "x": 6,
+      "x": 2,
       "y": 4
     },
     "grindstone_bottom": {
@@ -6772,7 +7234,7 @@
       ],
       "source": "grindstone_bottom.png",
       "variants": 1,
-      "x": 17,
+      "x": 12,
       "y": 5
     },
     "grindstone_side": {
@@ -6796,7 +7258,7 @@
       ],
       "source": "grindstone_side.png",
       "variants": 1,
-      "x": 16,
+      "x": 11,
       "y": 5
     },
     "grindstone_top": {
@@ -6820,7 +7282,7 @@
       ],
       "source": "grindstone_top.png",
       "variants": 1,
-      "x": 15,
+      "x": 10,
       "y": 5
     },
     "gypsum": {
@@ -6841,13 +7303,13 @@
       "sha256": "e12082ba384bf4d7f8d6744b8274fffede16ce7b7a334c023090fa9414c7f429",
       "slots": [
         208,
-        523,
-        524,
-        525
+        568,
+        569,
+        570
       ],
       "source": "gypsum.png",
       "variants": 4,
-      "x": 16,
+      "x": 8,
       "y": 8
     },
     "hanging_cloud_vine": {
@@ -6876,7 +7338,7 @@
       ],
       "source": "hanging_cloud_vine.png",
       "variants": 1,
-      "x": 15,
+      "x": 6,
       "y": 9
     },
     "hanging_roots": {
@@ -6900,7 +7362,7 @@
       ],
       "source": "hanging_roots.png",
       "variants": 1,
-      "x": 18,
+      "x": 15,
       "y": 3
     },
     "heather": {
@@ -6924,8 +7386,8 @@
       ],
       "source": "heather.png",
       "variants": 1,
-      "x": 5,
-      "y": 8
+      "x": 22,
+      "y": 7
     },
     "ice": {
       "effective_seed": 213785369,
@@ -6951,6 +7413,30 @@
       "x": 20,
       "y": 0
     },
+    "iron_block": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "constructed",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.22,
+      "index": 301,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "panels",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.8,
+      "selection_seed": 1920988924,
+      "sha256": "70f12728919a6345af9ca522b6d097544d61e779cbafd6f5308a2538eb8e3aa2",
+      "slots": [
+        301
+      ],
+      "source": "iron_block.png",
+      "variants": 1,
+      "x": 1,
+      "y": 12
+    },
     "iron_door_bottom": {
       "effective_seed": 213785369,
       "emission": 0.0,
@@ -6972,7 +7458,7 @@
       ],
       "source": "iron_door_bottom.png",
       "variants": 1,
-      "x": 14,
+      "x": 4,
       "y": 10
     },
     "iron_door_top": {
@@ -6996,7 +7482,7 @@
       ],
       "source": "iron_door_top.png",
       "variants": 1,
-      "x": 15,
+      "x": 5,
       "y": 10
     },
     "iron_ore": {
@@ -7017,9 +7503,9 @@
       "sha256": "e88bdc2ab86d54a048a673b80fa22c60f4236416216f6fcca2c12939eeb8434d",
       "slots": [
         16,
-        319,
-        320,
-        321
+        364,
+        365,
+        366
       ],
       "source": "iron_ore.png",
       "variants": 4,
@@ -7044,13 +7530,13 @@
       "sha256": "ac40c4bbdb62b923e60ca2b918ff549f3214336ae6d136cddac0da19640debde",
       "slots": [
         211,
-        532,
-        533,
-        534
+        577,
+        578,
+        579
       ],
       "source": "iron_stained_rock.png",
       "variants": 4,
-      "x": 19,
+      "x": 11,
       "y": 8
     },
     "jungle_door_bottom": {
@@ -7074,8 +7560,8 @@
       ],
       "source": "jungle_door_bottom.png",
       "variants": 1,
-      "x": 8,
-      "y": 10
+      "x": 23,
+      "y": 9
     },
     "jungle_door_top": {
       "effective_seed": 213785369,
@@ -7098,8 +7584,8 @@
       ],
       "source": "jungle_door_top.png",
       "variants": 1,
-      "x": 9,
-      "y": 10
+      "x": 24,
+      "y": 9
     },
     "jungle_fern": {
       "effective_seed": 213785369,
@@ -7122,7 +7608,7 @@
       ],
       "source": "jungle_fern.png",
       "variants": 1,
-      "x": 13,
+      "x": 5,
       "y": 8
     },
     "jungle_leaves": {
@@ -7146,7 +7632,7 @@
       ],
       "source": "jungle_leaves.png",
       "variants": 1,
-      "x": 11,
+      "x": 10,
       "y": 1
     },
     "jungle_log": {
@@ -7167,13 +7653,13 @@
       "sha256": "fdd90a5dc0cc8a976eb326e8f365346edf9a825f0325ef3eb03fafd548e2e97c",
       "slots": [
         34,
-        358,
-        359,
-        360
+        403,
+        404,
+        405
       ],
       "source": "jungle_log.png",
       "variants": 4,
-      "x": 10,
+      "x": 9,
       "y": 1
     },
     "jungle_log_top": {
@@ -7197,7 +7683,7 @@
       ],
       "source": "jungle_log_top.png",
       "variants": 1,
-      "x": 10,
+      "x": 6,
       "y": 4
     },
     "jungle_planks": {
@@ -7221,8 +7707,8 @@
       ],
       "source": "jungle_planks.png",
       "variants": 1,
-      "x": 0,
-      "y": 10
+      "x": 15,
+      "y": 9
     },
     "jungle_sapling": {
       "effective_seed": 213785369,
@@ -7245,8 +7731,32 @@
       ],
       "source": "jungle_sapling.png",
       "variants": 1,
-      "x": 5,
+      "x": 3,
       "y": 2
+    },
+    "lapis_ore": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "ore",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.3,
+      "index": 298,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "mineral",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.56,
+      "selection_seed": 1396569808,
+      "sha256": "7de73cbf49eecb709bd0fbfd6269f0c3e5008dd09a1899df6d0c9769c8fe265c",
+      "slots": [
+        298
+      ],
+      "source": "lapis_ore.png",
+      "variants": 1,
+      "x": 23,
+      "y": 11
     },
     "laterite": {
       "effective_seed": 213785369,
@@ -7266,14 +7776,14 @@
       "sha256": "c1c4953cea42a368a29378b621ca696ca499345186365c338a5cea780d620de1",
       "slots": [
         192,
-        505,
-        506,
-        507
+        550,
+        551,
+        552
       ],
       "source": "laterite.png",
       "variants": 4,
-      "x": 0,
-      "y": 8
+      "x": 17,
+      "y": 7
     },
     "lava": {
       "effective_seed": 213785369,
@@ -7293,21 +7803,21 @@
       "sha256": "a13520176ce0ddab28e6d3f5d3b1c8a9b2756c9ce1e78171eaee6d87f4443967",
       "slots": [
         19,
-        328,
-        329,
-        330,
-        331,
-        332,
-        333,
-        334,
-        335,
-        336,
-        337,
-        338,
-        339,
-        340,
-        341,
-        342
+        373,
+        374,
+        375,
+        376,
+        377,
+        378,
+        379,
+        380,
+        381,
+        382,
+        383,
+        384,
+        385,
+        386,
+        387
       ],
       "source": "lava.png",
       "variants": 1,
@@ -7335,7 +7845,7 @@
       ],
       "source": "lavender.png",
       "variants": 1,
-      "x": 12,
+      "x": 5,
       "y": 7
     },
     "leaf_litter_side": {
@@ -7359,7 +7869,7 @@
       ],
       "source": "leaf_litter_side.png",
       "variants": 1,
-      "x": 19,
+      "x": 12,
       "y": 7
     },
     "leaf_litter_soil": {
@@ -7380,13 +7890,13 @@
       "sha256": "d76b98010ef2fb6b0dd35c62a31dde5a0096287f1854ed51c48d663fe29d54c5",
       "slots": [
         163,
-        463,
-        464,
-        465
+        508,
+        509,
+        510
       ],
       "source": "leaf_litter_soil.png",
       "variants": 4,
-      "x": 19,
+      "x": 13,
       "y": 6
     },
     "leaves": {
@@ -7434,8 +7944,32 @@
       ],
       "source": "lectern.png",
       "variants": 1,
-      "x": 17,
+      "x": 8,
       "y": 9
+    },
+    "lever": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 309,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 2684015238,
+      "sha256": "e0404318d16187dd3dececa798347de14f6a63084174e08b35b2548e12e7ff27",
+      "slots": [
+        309
+      ],
+      "source": "lever.png",
+      "variants": 1,
+      "x": 9,
+      "y": 12
     },
     "limestone": {
       "effective_seed": 213785369,
@@ -7455,13 +7989,13 @@
       "sha256": "4254febee4d73be5836d5f4aa337cc760713f187ee2090d71da3b945f1a78102",
       "slots": [
         67,
-        382,
-        383,
-        384
+        427,
+        428,
+        429
       ],
       "source": "limestone.png",
       "variants": 4,
-      "x": 19,
+      "x": 17,
       "y": 2
     },
     "loom": {
@@ -7485,8 +8019,8 @@
       ],
       "source": "loom.png",
       "variants": 1,
-      "x": 2,
-      "y": 4
+      "x": 23,
+      "y": 3
     },
     "loom_bottom": {
       "effective_seed": 213785369,
@@ -7509,7 +8043,7 @@
       ],
       "source": "loom_bottom.png",
       "variants": 1,
-      "x": 5,
+      "x": 0,
       "y": 5
     },
     "loom_side": {
@@ -7533,8 +8067,8 @@
       ],
       "source": "loom_side.png",
       "variants": 1,
-      "x": 4,
-      "y": 5
+      "x": 24,
+      "y": 4
     },
     "loom_top": {
       "effective_seed": 213785369,
@@ -7557,8 +8091,8 @@
       ],
       "source": "loom_top.png",
       "variants": 1,
-      "x": 3,
-      "y": 5
+      "x": 23,
+      "y": 4
     },
     "magma_block": {
       "effective_seed": 213785369,
@@ -7581,7 +8115,7 @@
       ],
       "source": "magma_block.png",
       "variants": 1,
-      "x": 14,
+      "x": 3,
       "y": 11
     },
     "magma_spawner": {
@@ -7605,8 +8139,8 @@
       ],
       "source": "magma_spawner.png",
       "variants": 1,
-      "x": 4,
-      "y": 12
+      "x": 17,
+      "y": 11
     },
     "marble": {
       "effective_seed": 213785369,
@@ -7626,13 +8160,13 @@
       "sha256": "ead8c53cecc6bfb638ab0f9bcbb6742a7ca748ada2cc904ecdbcca8d684939da",
       "slots": [
         191,
-        502,
-        503,
-        504
+        547,
+        548,
+        549
       ],
       "source": "marble.png",
       "variants": 4,
-      "x": 23,
+      "x": 16,
       "y": 7
     },
     "moonflower": {
@@ -7656,7 +8190,7 @@
       ],
       "source": "moonflower.png",
       "variants": 1,
-      "x": 12,
+      "x": 3,
       "y": 9
     },
     "moonstone": {
@@ -7677,14 +8211,14 @@
       "sha256": "884126ab2fb0c48db24acefbeede4199b2ff90f9391ab6f111a36a072de8f04d",
       "slots": [
         216,
-        538,
-        539,
-        540
+        583,
+        584,
+        585
       ],
       "source": "moonstone.png",
       "variants": 4,
-      "x": 0,
-      "y": 9
+      "x": 16,
+      "y": 8
     },
     "moonstone_bricks": {
       "effective_seed": 213785369,
@@ -7704,14 +8238,14 @@
       "sha256": "a46596d066c9e08cfccafef49f251797156460d27245435af5a4581429d0c7cb",
       "slots": [
         224,
-        562,
-        563,
-        564
+        607,
+        608,
+        609
       ],
       "source": "moonstone_bricks.png",
       "variants": 4,
-      "x": 8,
-      "y": 9
+      "x": 24,
+      "y": 8
     },
     "moss": {
       "effective_seed": 213785369,
@@ -7734,7 +8268,7 @@
       ],
       "source": "moss.png",
       "variants": 1,
-      "x": 2,
+      "x": 1,
       "y": 1
     },
     "mossy_stone_bricks": {
@@ -7758,8 +8292,8 @@
       ],
       "source": "mossy_stone_bricks.png",
       "variants": 1,
-      "x": 1,
-      "y": 6
+      "x": 20,
+      "y": 5
     },
     "mud": {
       "effective_seed": 213785369,
@@ -7779,13 +8313,13 @@
       "sha256": "7415b6a75afa8c39de4992c891d90d2e817949583046b297597eb2d0778e9230",
       "slots": [
         71,
-        394,
-        395,
-        396
+        439,
+        440,
+        441
       ],
       "source": "mud.png",
       "variants": 4,
-      "x": 23,
+      "x": 21,
       "y": 2
     },
     "nether_bricks": {
@@ -7809,8 +8343,8 @@
       ],
       "source": "nether_bricks.png",
       "variants": 1,
-      "x": 9,
-      "y": 11
+      "x": 23,
+      "y": 10
     },
     "nether_gold_ore": {
       "effective_seed": 213785369,
@@ -7833,8 +8367,8 @@
       ],
       "source": "nether_gold_ore.png",
       "variants": 1,
-      "x": 7,
-      "y": 11
+      "x": 21,
+      "y": 10
     },
     "nether_portal_x": {
       "effective_seed": 213785369,
@@ -7857,8 +8391,8 @@
       ],
       "source": "nether_portal_x.png",
       "variants": 1,
-      "x": 0,
-      "y": 12
+      "x": 13,
+      "y": 11
     },
     "nether_portal_z": {
       "effective_seed": 213785369,
@@ -7881,8 +8415,8 @@
       ],
       "source": "nether_portal_z.png",
       "variants": 1,
-      "x": 1,
-      "y": 12
+      "x": 14,
+      "y": 11
     },
     "nether_quartz_ore": {
       "effective_seed": 213785369,
@@ -7905,8 +8439,8 @@
       ],
       "source": "nether_quartz_ore.png",
       "variants": 1,
-      "x": 6,
-      "y": 11
+      "x": 20,
+      "y": 10
     },
     "nether_sprouts": {
       "effective_seed": 213785369,
@@ -7929,7 +8463,7 @@
       ],
       "source": "nether_sprouts.png",
       "variants": 1,
-      "x": 19,
+      "x": 8,
       "y": 11
     },
     "nether_wart": {
@@ -7953,7 +8487,7 @@
       ],
       "source": "nether_wart.png",
       "variants": 1,
-      "x": 22,
+      "x": 11,
       "y": 11
     },
     "nether_wart_block": {
@@ -7977,8 +8511,8 @@
       ],
       "source": "nether_wart_block.png",
       "variants": 1,
-      "x": 2,
-      "y": 11
+      "x": 16,
+      "y": 10
     },
     "netherrack": {
       "effective_seed": 213785369,
@@ -8001,7 +8535,7 @@
       ],
       "source": "netherrack.png",
       "variants": 1,
-      "x": 16,
+      "x": 6,
       "y": 10
     },
     "nettle": {
@@ -8025,8 +8559,8 @@
       ],
       "source": "nettle.png",
       "variants": 1,
-      "x": 7,
-      "y": 8
+      "x": 24,
+      "y": 7
     },
     "oak_door_bottom": {
       "effective_seed": 213785369,
@@ -8049,8 +8583,8 @@
       ],
       "source": "oak_door_bottom.png",
       "variants": 1,
-      "x": 2,
-      "y": 10
+      "x": 17,
+      "y": 9
     },
     "oak_door_top": {
       "effective_seed": 213785369,
@@ -8073,8 +8607,8 @@
       ],
       "source": "oak_door_top.png",
       "variants": 1,
-      "x": 3,
-      "y": 10
+      "x": 18,
+      "y": 9
     },
     "oak_log": {
       "effective_seed": 213785369,
@@ -8094,9 +8628,9 @@
       "sha256": "a200bbcd2934d8b237528d15b9ca3864f08f49ad746bcfc331bbb4873f27b23d",
       "slots": [
         4,
-        304,
-        305,
-        306
+        349,
+        350,
+        351
       ],
       "source": "oak_log.png",
       "variants": 4,
@@ -8145,9 +8679,9 @@
       "sha256": "841e6c09216e2e129a30e84c38f799fa1318de90d752e04d12ba1300f292279e",
       "slots": [
         11,
-        310,
-        311,
-        312
+        355,
+        356,
+        357
       ],
       "source": "oak_planks.png",
       "variants": 4,
@@ -8175,8 +8709,104 @@
       ],
       "source": "oak_sapling.png",
       "variants": 1,
-      "x": 2,
+      "x": 0,
       "y": 2
+    },
+    "observer": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 320,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 3261774268,
+      "sha256": "cad58e49cb0bd1fc1279cbf4c18ddf136a2966a39b42c798af35cb449d263ed6",
+      "slots": [
+        320
+      ],
+      "source": "observer.png",
+      "variants": 1,
+      "x": 20,
+      "y": 12
+    },
+    "observer_back": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 322,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 4203737432,
+      "sha256": "6da2dde4c722f0af67f8dd403a0760282294264c04368a5b801f28f70a0d1861",
+      "slots": [
+        322
+      ],
+      "source": "observer_back.png",
+      "variants": 1,
+      "x": 22,
+      "y": 12
+    },
+    "observer_back_on": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 323,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 2153166801,
+      "sha256": "79be53f97f1c5fdca9fc95086d5574b14d6f3fdaca9ed79cb37cf5ea6dd55177",
+      "slots": [
+        323
+      ],
+      "source": "observer_back_on.png",
+      "variants": 1,
+      "x": 23,
+      "y": 12
+    },
+    "observer_face": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 321,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 2342973291,
+      "sha256": "8b5f02a367f2d260c561cfa7a80ff9e034cc15d41d4824328c5df4539d837dba",
+      "slots": [
+        321
+      ],
+      "source": "observer_face.png",
+      "variants": 1,
+      "x": 21,
+      "y": 12
     },
     "obsidian": {
       "effective_seed": 213785369,
@@ -8199,7 +8829,7 @@
       ],
       "source": "obsidian.png",
       "variants": 1,
-      "x": 11,
+      "x": 9,
       "y": 2
     },
     "ochre_terracotta": {
@@ -8220,14 +8850,14 @@
       "sha256": "18ea80bbcfa187dc4c5cea436c96125105a75fd662fbf4504737e427ebb413f4",
       "slots": [
         171,
-        481,
-        482,
-        483
+        526,
+        527,
+        528
       ],
       "source": "ochre_terracotta.png",
       "variants": 4,
-      "x": 3,
-      "y": 7
+      "x": 21,
+      "y": 6
     },
     "oxeye_daisy": {
       "effective_seed": 213785369,
@@ -8250,7 +8880,7 @@
       ],
       "source": "oxeye_daisy.png",
       "variants": 1,
-      "x": 15,
+      "x": 13,
       "y": 2
     },
     "packed_ice": {
@@ -8274,8 +8904,8 @@
       ],
       "source": "packed_ice.png",
       "variants": 1,
-      "x": 0,
-      "y": 3
+      "x": 22,
+      "y": 2
     },
     "peat": {
       "effective_seed": 213785369,
@@ -8295,13 +8925,13 @@
       "sha256": "de472951ee506d61a6ae3a60e4c259714f3f7b50d791b051269a8a9f501c596f",
       "slots": [
         164,
-        466,
-        467,
-        468
+        511,
+        512,
+        513
       ],
       "source": "peat.png",
       "variants": 4,
-      "x": 20,
+      "x": 14,
       "y": 6
     },
     "permafrost": {
@@ -8322,14 +8952,86 @@
       "sha256": "2fd61d2c5fe1ccd2d5684e76427cc67772cd02b8c47520e9d6d5900129e12da4",
       "slots": [
         167,
-        472,
-        473,
-        474
+        517,
+        518,
+        519
       ],
       "source": "permafrost.png",
       "variants": 4,
-      "x": 23,
+      "x": 17,
       "y": 6
+    },
+    "piston": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 316,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 1138026600,
+      "sha256": "50e5bd781d467405746cfabcb26083c1bf35de2f22ef4de2cc9abd138ed3ecc4",
+      "slots": [
+        316
+      ],
+      "source": "piston.png",
+      "variants": 1,
+      "x": 16,
+      "y": 12
+    },
+    "piston_side": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 317,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 2665660940,
+      "sha256": "ea82479b8679c44eedd6f86c106c99192289643aa169f04b05cb423672831606",
+      "slots": [
+        317
+      ],
+      "source": "piston_side.png",
+      "variants": 1,
+      "x": 17,
+      "y": 12
+    },
+    "piston_top": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 318,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 4241760818,
+      "sha256": "3d2e14930ac38f40dbb8a63331fd0cfe15589f2147e3f12e7f2b608d507ea639",
+      "slots": [
+        318
+      ],
+      "source": "piston_top.png",
+      "variants": 1,
+      "x": 18,
+      "y": 12
     },
     "podzol_top": {
       "effective_seed": 213785369,
@@ -8352,7 +9054,7 @@
       ],
       "source": "podzol_top.png",
       "variants": 1,
-      "x": 1,
+      "x": 0,
       "y": 1
     },
     "pointed_dripstone": {
@@ -8376,7 +9078,7 @@
       ],
       "source": "pointed_dripstone.png",
       "variants": 1,
-      "x": 16,
+      "x": 13,
       "y": 3
     },
     "polished_basalt": {
@@ -8400,7 +9102,7 @@
       ],
       "source": "polished_basalt.png",
       "variants": 1,
-      "x": 6,
+      "x": 0,
       "y": 6
     },
     "polished_blackstone": {
@@ -8424,7 +9126,7 @@
       ],
       "source": "polished_blackstone.png",
       "variants": 1,
-      "x": 11,
+      "x": 0,
       "y": 11
     },
     "polished_granite": {
@@ -8448,8 +9150,8 @@
       ],
       "source": "polished_granite.png",
       "variants": 1,
-      "x": 5,
-      "y": 6
+      "x": 24,
+      "y": 5
     },
     "polished_limestone": {
       "effective_seed": 213785369,
@@ -8472,7 +9174,7 @@
       ],
       "source": "polished_limestone.png",
       "variants": 1,
-      "x": 7,
+      "x": 1,
       "y": 6
     },
     "polished_tuff": {
@@ -8496,7 +9198,7 @@
       ],
       "source": "polished_tuff.png",
       "variants": 1,
-      "x": 8,
+      "x": 2,
       "y": 6
     },
     "quartz_block": {
@@ -8517,13 +9219,13 @@
       "sha256": "b4da641c7f5cbe23ee12625d2b20fc8d5ef27ae65b86f62f7150ed9fa389ad72",
       "slots": [
         210,
-        529,
-        530,
-        531
+        574,
+        575,
+        576
       ],
       "source": "quartz_block.png",
       "variants": 4,
-      "x": 18,
+      "x": 10,
       "y": 8
     },
     "quartz_cluster": {
@@ -8547,7 +9249,7 @@
       ],
       "source": "quartz_cluster.png",
       "variants": 1,
-      "x": 22,
+      "x": 14,
       "y": 8
     },
     "red_clay": {
@@ -8568,14 +9270,14 @@
       "sha256": "7219910d3b41662310dd9c549845bcf86c71eb80cdcebbffe3d34afe044a931e",
       "slots": [
         193,
-        508,
-        509,
-        510
+        553,
+        554,
+        555
       ],
       "source": "red_clay.png",
       "variants": 4,
-      "x": 1,
-      "y": 8
+      "x": 18,
+      "y": 7
     },
     "red_mushroom": {
       "effective_seed": 213785369,
@@ -8598,7 +9300,7 @@
       ],
       "source": "red_mushroom.png",
       "variants": 1,
-      "x": 11,
+      "x": 4,
       "y": 7
     },
     "red_nether_bricks": {
@@ -8622,8 +9324,8 @@
       ],
       "source": "red_nether_bricks.png",
       "variants": 1,
-      "x": 10,
-      "y": 11
+      "x": 24,
+      "y": 10
     },
     "red_sand": {
       "effective_seed": 213785369,
@@ -8643,9 +9345,9 @@
       "sha256": "4db3507389a4dd1ce5031495a9388832e75d570ea7936e8679ff0481b4c6ff72",
       "slots": [
         23,
-        349,
-        350,
-        351
+        394,
+        395,
+        396
       ],
       "source": "red_sand.png",
       "variants": 4,
@@ -8670,14 +9372,14 @@
       "sha256": "e36ce43dc343e0c9c2f322085a29953b3dd342d109f54088c9288b9b07589504",
       "slots": [
         170,
-        478,
-        479,
-        480
+        523,
+        524,
+        525
       ],
       "source": "red_sandstone.png",
       "variants": 4,
-      "x": 2,
-      "y": 7
+      "x": 20,
+      "y": 6
     },
     "red_wool": {
       "effective_seed": 213785369,
@@ -8700,8 +9402,632 @@
       ],
       "source": "red_wool.png",
       "variants": 1,
-      "x": 13,
+      "x": 7,
       "y": 6
+    },
+    "redstone_block": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 326,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 909588147,
+      "sha256": "c2e448c9921c96bf3c8e064dcd503d9f6a666dcabf649173a3a2b75f44b5c9c6",
+      "slots": [
+        326
+      ],
+      "source": "redstone_block.png",
+      "variants": 1,
+      "x": 1,
+      "y": 13
+    },
+    "redstone_comparator": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 314,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 124918451,
+      "sha256": "6b8e69b652d95489c64f84b46f1536eb3a7f008ffa45977234b30dfd2db4344a",
+      "slots": [
+        314
+      ],
+      "source": "redstone_comparator.png",
+      "variants": 1,
+      "x": 14,
+      "y": 12
+    },
+    "redstone_comparator_on": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 315,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 220260463,
+      "sha256": "ba8f0d2bd1970f8eab0707d9eb1e8dbb038f663fd1102f8963ff55e2427aa40c",
+      "slots": [
+        315
+      ],
+      "source": "redstone_comparator_on.png",
+      "variants": 1,
+      "x": 15,
+      "y": 12
+    },
+    "redstone_dust": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 307,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 1380947224,
+      "sha256": "acf6911cc04860caa2cf66f6d7441758adc4c13fbf6d8fb121eaadb906538004",
+      "slots": [
+        307
+      ],
+      "source": "redstone_dust.png",
+      "variants": 1,
+      "x": 7,
+      "y": 12
+    },
+    "redstone_dust_1": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 329,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 1043199589,
+      "sha256": "069b5e57f255d36944e8e55df8dbdaac72e3938ee6c3427992d996f18dacf6f0",
+      "slots": [
+        329
+      ],
+      "source": "redstone_dust_1.png",
+      "variants": 1,
+      "x": 4,
+      "y": 13
+    },
+    "redstone_dust_10": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 338,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 526819541,
+      "sha256": "3a4b920e13feab2961605175181846e42c18ab309cecaf55af8ffc6c859bc538",
+      "slots": [
+        338
+      ],
+      "source": "redstone_dust_10.png",
+      "variants": 1,
+      "x": 13,
+      "y": 13
+    },
+    "redstone_dust_11": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 339,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 748623670,
+      "sha256": "2030e04b9fa8590389d64ce2e692bd2d2cf7afea98dee64757701d28ba58551d",
+      "slots": [
+        339
+      ],
+      "source": "redstone_dust_11.png",
+      "variants": 1,
+      "x": 14,
+      "y": 13
+    },
+    "redstone_dust_12": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 340,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 4278336499,
+      "sha256": "1f9d601462d12297298f3f91b0ab398173f9e5e1e34638e391a6f01c0125abe0",
+      "slots": [
+        340
+      ],
+      "source": "redstone_dust_12.png",
+      "variants": 1,
+      "x": 15,
+      "y": 13
+    },
+    "redstone_dust_13": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 341,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 838676692,
+      "sha256": "0701ba2569c98d5b24f99e20f2cdec4fbc81bb0c47940ef9e10a05f69454d319",
+      "slots": [
+        341
+      ],
+      "source": "redstone_dust_13.png",
+      "variants": 1,
+      "x": 16,
+      "y": 13
+    },
+    "redstone_dust_14": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 342,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 1459017537,
+      "sha256": "95879d5b6c3bb50677bb29f41ebcdd652057c1cce754d048e338aa1873ee5f95",
+      "slots": [
+        342
+      ],
+      "source": "redstone_dust_14.png",
+      "variants": 1,
+      "x": 17,
+      "y": 13
+    },
+    "redstone_dust_2": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 330,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 3502245750,
+      "sha256": "d206be4e19a7965de545cac95fd2cabafe9706b68c77fb220675198dbc11f005",
+      "slots": [
+        330
+      ],
+      "source": "redstone_dust_2.png",
+      "variants": 1,
+      "x": 5,
+      "y": 13
+    },
+    "redstone_dust_3": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 331,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 79201885,
+      "sha256": "e42ccf5cf86ed771620123b53e593c7c960966e5f637009e11ae513c30a54565",
+      "slots": [
+        331
+      ],
+      "source": "redstone_dust_3.png",
+      "variants": 1,
+      "x": 6,
+      "y": 13
+    },
+    "redstone_dust_4": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 332,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 4065243473,
+      "sha256": "a347d3a574ffea7821eaa951169a7fca9f171c56c2b78053e4e9470e222e7802",
+      "slots": [
+        332
+      ],
+      "source": "redstone_dust_4.png",
+      "variants": 1,
+      "x": 7,
+      "y": 13
+    },
+    "redstone_dust_5": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 333,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 3140280855,
+      "sha256": "73147ed1a7d6efcc68d82fe9df982e98a29b901af880aaa7b4fae7bd1493fc03",
+      "slots": [
+        333
+      ],
+      "source": "redstone_dust_5.png",
+      "variants": 1,
+      "x": 8,
+      "y": 13
+    },
+    "redstone_dust_6": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 334,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 3296540171,
+      "sha256": "c4e1b5c30f13811650979d371010ecd55bdf6b4ca3b94df1bf6ba88b78d22715",
+      "slots": [
+        334
+      ],
+      "source": "redstone_dust_6.png",
+      "variants": 1,
+      "x": 9,
+      "y": 13
+    },
+    "redstone_dust_7": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 335,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 2958832238,
+      "sha256": "3bad0537adcb1894d0c764125bfdc260d7740d43d7c7afe33e506218c67f557e",
+      "slots": [
+        335
+      ],
+      "source": "redstone_dust_7.png",
+      "variants": 1,
+      "x": 10,
+      "y": 13
+    },
+    "redstone_dust_8": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 336,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 1561950904,
+      "sha256": "ff9d5ee8df300d100a5e6987db43cb2ecc79ffc1ab4f50d7e75118631c0be16e",
+      "slots": [
+        336
+      ],
+      "source": "redstone_dust_8.png",
+      "variants": 1,
+      "x": 11,
+      "y": 13
+    },
+    "redstone_dust_9": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 337,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 76112589,
+      "sha256": "2fdfbe680ab466d6af0cb95486dfe0652c4ed5188079ae01d256b1521080e5e7",
+      "slots": [
+        337
+      ],
+      "source": "redstone_dust_9.png",
+      "variants": 1,
+      "x": 12,
+      "y": 13
+    },
+    "redstone_dust_on": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 308,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 2943951157,
+      "sha256": "28dd8561035d364fbf737904da64c08f4664dcc887ce0311e8dda5f754ce38b8",
+      "slots": [
+        308
+      ],
+      "source": "redstone_dust_on.png",
+      "variants": 1,
+      "x": 8,
+      "y": 12
+    },
+    "redstone_lamp": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 324,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 1604323458,
+      "sha256": "019a8274e5a1ef42c58b0d9217becfc5d449d5b80451b20f48494921d42ba5d6",
+      "slots": [
+        324
+      ],
+      "source": "redstone_lamp.png",
+      "variants": 1,
+      "x": 24,
+      "y": 12
+    },
+    "redstone_lamp_on": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 325,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 2765961400,
+      "sha256": "c5c943d952b8d2db9626ba098887ca7863a94631815bc67f325d7127aa74a92b",
+      "slots": [
+        325
+      ],
+      "source": "redstone_lamp_on.png",
+      "variants": 1,
+      "x": 0,
+      "y": 13
+    },
+    "redstone_ore": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "ore",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.3,
+      "index": 327,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "mineral",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.56,
+      "selection_seed": 1492144449,
+      "sha256": "b93c17ccd622e7e07551aa8e8b0a46505e9c94cf8ddc39ca2012f02c3d5a182b",
+      "slots": [
+        327
+      ],
+      "source": "redstone_ore.png",
+      "variants": 1,
+      "x": 2,
+      "y": 13
+    },
+    "redstone_repeater": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 312,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 1498943400,
+      "sha256": "fa0f8f57c8e4ace707cd07bcb08ea86f5fbdbf8f0934ae856397232b4ce2baef",
+      "slots": [
+        312
+      ],
+      "source": "redstone_repeater.png",
+      "variants": 1,
+      "x": 12,
+      "y": 12
+    },
+    "redstone_repeater_on": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 313,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 1754237590,
+      "sha256": "858c41b019da9a20ff39d05970bce28e3ca1357c64f2030db1e9e73fed84f837",
+      "slots": [
+        313
+      ],
+      "source": "redstone_repeater_on.png",
+      "variants": 1,
+      "x": 13,
+      "y": 12
+    },
+    "redstone_torch": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 310,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 3369311826,
+      "sha256": "97ebf8643d43b10879b17255bb8567972802722bbbeffec4e8eeca7378bb669d",
+      "slots": [
+        310
+      ],
+      "source": "redstone_torch.png",
+      "variants": 1,
+      "x": 10,
+      "y": 12
+    },
+    "redstone_torch_off": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 311,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 3088179481,
+      "sha256": "c17ca3cd8a6d153a6e116752f7357a6ccafca0442296be9399bcb1134d4be352",
+      "slots": [
+        311
+      ],
+      "source": "redstone_torch_off.png",
+      "variants": 1,
+      "x": 11,
+      "y": 12
     },
     "reed_flower": {
       "effective_seed": 213785369,
@@ -8724,7 +10050,7 @@
       ],
       "source": "reed_flower.png",
       "variants": 1,
-      "x": 10,
+      "x": 2,
       "y": 8
     },
     "reeds": {
@@ -8748,7 +10074,7 @@
       ],
       "source": "reeds.png",
       "variants": 1,
-      "x": 5,
+      "x": 4,
       "y": 1
     },
     "resonant_crystal": {
@@ -8769,25 +10095,25 @@
       "sha256": "9b648ebd1f9177a456f8dc1f002bc97889ebaa14fb98e704964db2f4097c5094",
       "slots": [
         92,
-        433,
-        434,
-        435,
-        436,
-        437,
-        438,
-        439,
-        440,
-        441,
-        442,
-        443,
-        444,
-        445,
-        446,
-        447
+        478,
+        479,
+        480,
+        481,
+        482,
+        483,
+        484,
+        485,
+        486,
+        487,
+        488,
+        489,
+        490,
+        491,
+        492
       ],
       "source": "resonant_crystal.png",
       "variants": 1,
-      "x": 20,
+      "x": 17,
       "y": 3
     },
     "respawn_anchor": {
@@ -8811,8 +10137,8 @@
       ],
       "source": "respawn_anchor.png",
       "variants": 1,
-      "x": 2,
-      "y": 12
+      "x": 15,
+      "y": 11
     },
     "rooted_dirt": {
       "effective_seed": 213785369,
@@ -8832,13 +10158,13 @@
       "sha256": "cc9a7d8f75fcbf8ec58f355dda06791b04eea4d0643a6e61399c9102b91bb364",
       "slots": [
         162,
-        460,
-        461,
-        462
+        505,
+        506,
+        507
       ],
       "source": "rooted_dirt.png",
       "variants": 4,
-      "x": 18,
+      "x": 12,
       "y": 6
     },
     "salt_crust": {
@@ -8859,14 +10185,14 @@
       "sha256": "f0e48f08271134182051abeedef858e59255fc500319c0dad214176fca4577e6",
       "slots": [
         195,
-        514,
-        515,
-        516
+        559,
+        560,
+        561
       ],
       "source": "salt_crust.png",
       "variants": 4,
-      "x": 3,
-      "y": 8
+      "x": 20,
+      "y": 7
     },
     "sand": {
       "effective_seed": 213785369,
@@ -8886,9 +10212,9 @@
       "sha256": "7f42773627254f8f60b6eacac609af8b645070d4abe0a66383dab76d4a33ce2b",
       "slots": [
         7,
-        307,
-        308,
-        309
+        352,
+        353,
+        354
       ],
       "source": "sand.png",
       "variants": 4,
@@ -8916,7 +10242,7 @@
       ],
       "source": "sandstone.png",
       "variants": 1,
-      "x": 10,
+      "x": 4,
       "y": 6
     },
     "shale": {
@@ -8937,14 +10263,14 @@
       "sha256": "a0c2f73bb2bd87dd5fac9d1284818117011f03a4009114db28c31d74e4f1eaeb",
       "slots": [
         169,
-        475,
-        476,
-        477
+        520,
+        521,
+        522
       ],
       "source": "shale.png",
       "variants": 4,
-      "x": 1,
-      "y": 7
+      "x": 19,
+      "y": 6
     },
     "shroomlight": {
       "effective_seed": 213785369,
@@ -8967,8 +10293,8 @@
       ],
       "source": "shroomlight.png",
       "variants": 1,
-      "x": 4,
-      "y": 11
+      "x": 18,
+      "y": 10
     },
     "silt": {
       "effective_seed": 213785369,
@@ -8988,13 +10314,13 @@
       "sha256": "61e8bb91a166a21704154f903035598488147042018c51254e4b380f7e5bc19c",
       "slots": [
         165,
-        469,
-        470,
-        471
+        514,
+        515,
+        516
       ],
       "source": "silt.png",
       "variants": 4,
-      "x": 21,
+      "x": 15,
       "y": 6
     },
     "sky_fern": {
@@ -9018,7 +10344,7 @@
       ],
       "source": "sky_fern.png",
       "variants": 1,
-      "x": 10,
+      "x": 1,
       "y": 9
     },
     "skyroot_door_bottom": {
@@ -9042,7 +10368,7 @@
       ],
       "source": "skyroot_door_bottom.png",
       "variants": 1,
-      "x": 12,
+      "x": 2,
       "y": 10
     },
     "skyroot_door_top": {
@@ -9066,7 +10392,7 @@
       ],
       "source": "skyroot_door_top.png",
       "variants": 1,
-      "x": 13,
+      "x": 3,
       "y": 10
     },
     "skyroot_leaves": {
@@ -9090,7 +10416,7 @@
       ],
       "source": "skyroot_leaves.png",
       "variants": 1,
-      "x": 10,
+      "x": 7,
       "y": 3
     },
     "skyroot_log": {
@@ -9111,13 +10437,13 @@
       "sha256": "4fde18d850b5df95c5e09e14a625ed6e0ece7e2bf237104a63d596141fc436d1",
       "slots": [
         80,
-        409,
-        410,
-        411
+        454,
+        455,
+        456
       ],
       "source": "skyroot_log.png",
       "variants": 4,
-      "x": 8,
+      "x": 5,
       "y": 3
     },
     "skyroot_log_top": {
@@ -9141,7 +10467,7 @@
       ],
       "source": "skyroot_log_top.png",
       "variants": 1,
-      "x": 9,
+      "x": 6,
       "y": 3
     },
     "skyroot_planks": {
@@ -9162,14 +10488,14 @@
       "sha256": "a23c737ebd6ce4d92ac470152e0aead77e40915f269983993d833ef558498fff",
       "slots": [
         221,
-        553,
-        554,
-        555
+        598,
+        599,
+        600
       ],
       "source": "skyroot_planks.png",
       "variants": 4,
-      "x": 5,
-      "y": 9
+      "x": 21,
+      "y": 8
     },
     "skystone": {
       "effective_seed": 213785369,
@@ -9189,14 +10515,14 @@
       "sha256": "ba914867ff0f72b4fd280c335eea6590432f9cdec54955598e45cf762af88cbe",
       "slots": [
         217,
-        541,
-        542,
-        543
+        586,
+        587,
+        588
       ],
       "source": "skystone.png",
       "variants": 4,
-      "x": 1,
-      "y": 9
+      "x": 17,
+      "y": 8
     },
     "small_cactus": {
       "effective_seed": 213785369,
@@ -9219,7 +10545,7 @@
       ],
       "source": "small_cactus.png",
       "variants": 1,
-      "x": 9,
+      "x": 1,
       "y": 8
     },
     "smithing_table": {
@@ -9243,7 +10569,7 @@
       ],
       "source": "smithing_table.png",
       "variants": 1,
-      "x": 5,
+      "x": 1,
       "y": 4
     },
     "smithing_table_bottom": {
@@ -9267,7 +10593,7 @@
       ],
       "source": "smithing_table_bottom.png",
       "variants": 1,
-      "x": 14,
+      "x": 9,
       "y": 5
     },
     "smithing_table_side": {
@@ -9291,7 +10617,7 @@
       ],
       "source": "smithing_table_side.png",
       "variants": 1,
-      "x": 13,
+      "x": 8,
       "y": 5
     },
     "smithing_table_top": {
@@ -9315,7 +10641,7 @@
       ],
       "source": "smithing_table_top.png",
       "variants": 1,
-      "x": 12,
+      "x": 7,
       "y": 5
     },
     "smoker": {
@@ -9339,7 +10665,7 @@
       ],
       "source": "smoker.png",
       "variants": 1,
-      "x": 20,
+      "x": 11,
       "y": 9
     },
     "smooth_sandstone": {
@@ -9363,7 +10689,7 @@
       ],
       "source": "smooth_sandstone.png",
       "variants": 1,
-      "x": 12,
+      "x": 6,
       "y": 6
     },
     "snow": {
@@ -9411,7 +10737,7 @@
       ],
       "source": "snow_layer.png",
       "variants": 1,
-      "x": 7,
+      "x": 5,
       "y": 2
     },
     "soul_fire": {
@@ -9435,7 +10761,7 @@
       ],
       "source": "soul_fire.png",
       "variants": 1,
-      "x": 23,
+      "x": 12,
       "y": 11
     },
     "soul_sand": {
@@ -9459,7 +10785,7 @@
       ],
       "source": "soul_sand.png",
       "variants": 1,
-      "x": 17,
+      "x": 7,
       "y": 10
     },
     "soul_soil": {
@@ -9483,7 +10809,7 @@
       ],
       "source": "soul_soil.png",
       "variants": 1,
-      "x": 18,
+      "x": 8,
       "y": 10
     },
     "spruce_door_bottom": {
@@ -9507,8 +10833,8 @@
       ],
       "source": "spruce_door_bottom.png",
       "variants": 1,
-      "x": 6,
-      "y": 10
+      "x": 21,
+      "y": 9
     },
     "spruce_door_top": {
       "effective_seed": 213785369,
@@ -9531,8 +10857,8 @@
       ],
       "source": "spruce_door_top.png",
       "variants": 1,
-      "x": 7,
-      "y": 10
+      "x": 22,
+      "y": 9
     },
     "spruce_leaves": {
       "effective_seed": 213785369,
@@ -9555,7 +10881,7 @@
       ],
       "source": "spruce_leaves.png",
       "variants": 1,
-      "x": 9,
+      "x": 8,
       "y": 1
     },
     "spruce_log": {
@@ -9576,13 +10902,13 @@
       "sha256": "d9345b63266535ddf9ddedca15f5a77ca19631aded4b98a27665d1d19638192e",
       "slots": [
         32,
-        355,
-        356,
-        357
+        400,
+        401,
+        402
       ],
       "source": "spruce_log.png",
       "variants": 4,
-      "x": 8,
+      "x": 7,
       "y": 1
     },
     "spruce_log_top": {
@@ -9606,7 +10932,7 @@
       ],
       "source": "spruce_log_top.png",
       "variants": 1,
-      "x": 9,
+      "x": 5,
       "y": 4
     },
     "spruce_planks": {
@@ -9630,7 +10956,7 @@
       ],
       "source": "spruce_planks.png",
       "variants": 1,
-      "x": 23,
+      "x": 14,
       "y": 9
     },
     "spruce_sapling": {
@@ -9654,7 +10980,7 @@
       ],
       "source": "spruce_sapling.png",
       "variants": 1,
-      "x": 4,
+      "x": 2,
       "y": 2
     },
     "star_crystal": {
@@ -9675,25 +11001,25 @@
       "sha256": "04757a555332b09d1c53b8ff27933fde5d20e79480fc9672f39106afc2f656a3",
       "slots": [
         83,
-        412,
-        413,
-        414,
-        415,
-        416,
-        417,
-        418,
-        419,
-        420,
-        421,
-        422,
-        423,
-        424,
-        425,
-        426
+        457,
+        458,
+        459,
+        460,
+        461,
+        462,
+        463,
+        464,
+        465,
+        466,
+        467,
+        468,
+        469,
+        470,
+        471
       ],
       "source": "star_crystal.png",
       "variants": 1,
-      "x": 11,
+      "x": 8,
       "y": 3
     },
     "star_crystal_lamp": {
@@ -9714,13 +11040,13 @@
       "sha256": "c1ba1a7ed2f0b53d97e27e9e7daf6c8085a5b8e1c441fa86565f16d9baa8a840",
       "slots": [
         225,
-        565,
-        566,
-        567
+        610,
+        611,
+        612
       ],
       "source": "star_crystal_lamp.png",
       "variants": 4,
-      "x": 9,
+      "x": 0,
       "y": 9
     },
     "star_crystal_ore": {
@@ -9741,14 +11067,14 @@
       "sha256": "fa581e81fc94eac1ce121718dbcb0ab4bef2eb6d147cc6f64796e57f0f292253",
       "slots": [
         220,
-        550,
-        551,
-        552
+        595,
+        596,
+        597
       ],
       "source": "star_crystal_ore.png",
       "variants": 4,
-      "x": 4,
-      "y": 9
+      "x": 20,
+      "y": 8
     },
     "starflower": {
       "effective_seed": 213785369,
@@ -9771,8 +11097,32 @@
       ],
       "source": "starflower.png",
       "variants": 1,
-      "x": 12,
+      "x": 9,
       "y": 3
+    },
+    "sticky_piston_top": {
+      "effective_seed": 213785369,
+      "emission": 0.0,
+      "family": "stone",
+      "fps": 0,
+      "frames": 1,
+      "generated": true,
+      "height_strength": 0.32,
+      "index": 319,
+      "loop": "repeat",
+      "metallic": 0.0,
+      "pattern": "flakes",
+      "recipe_sha256": "77ba47520e5b12b202960bcbf6823d24c61a2ade8ad5022594c41510683883fb",
+      "roughness": 0.79,
+      "selection_seed": 939122711,
+      "sha256": "fff44ea7b33c1575e4a20ac52b98893ee5f208487e6e103f05a3438bbc6436c6",
+      "slots": [
+        319
+      ],
+      "source": "sticky_piston_top.png",
+      "variants": 1,
+      "x": 19,
+      "y": 12
     },
     "stone": {
       "effective_seed": 213785369,
@@ -9792,9 +11142,9 @@
       "sha256": "f19d8e93f10d6a642296dd124a4e9188b80ee95c3195ac7531b5d22f8062e7d9",
       "slots": [
         3,
-        301,
-        302,
-        303
+        346,
+        347,
+        348
       ],
       "source": "stone.png",
       "variants": 4,
@@ -9822,8 +11172,8 @@
       ],
       "source": "stone_bricks.png",
       "variants": 1,
-      "x": 0,
-      "y": 6
+      "x": 19,
+      "y": 5
     },
     "stonecutter": {
       "effective_seed": 213785369,
@@ -9846,7 +11196,7 @@
       ],
       "source": "stonecutter.png",
       "variants": 1,
-      "x": 21,
+      "x": 12,
       "y": 9
     },
     "sulfur_crust": {
@@ -9867,13 +11217,13 @@
       "sha256": "b9782949ed9b8d16be645d6dda700f6f9ac2140317aa1c5298632fde0856a44a",
       "slots": [
         93,
-        448,
-        449,
-        450
+        493,
+        494,
+        495
       ],
       "source": "sulfur_crust.png",
       "variants": 4,
-      "x": 21,
+      "x": 18,
       "y": 3
     },
     "sulfur_rock": {
@@ -9894,13 +11244,13 @@
       "sha256": "f6f44e7ce438786a796f08d32141390e3710b035bf1fd0e58e1fb086c8ba3ac3",
       "slots": [
         212,
-        535,
-        536,
-        537
+        580,
+        581,
+        582
       ],
       "source": "sulfur_rock.png",
       "variants": 4,
-      "x": 20,
+      "x": 12,
       "y": 8
     },
     "sunflower_bottom": {
@@ -9924,7 +11274,7 @@
       ],
       "source": "sunflower_bottom.png",
       "variants": 1,
-      "x": 16,
+      "x": 14,
       "y": 2
     },
     "sunflower_top": {
@@ -9948,7 +11298,7 @@
       ],
       "source": "sunflower_top.png",
       "variants": 1,
-      "x": 17,
+      "x": 15,
       "y": 2
     },
     "sunstone": {
@@ -9972,7 +11322,7 @@
       ],
       "source": "sunstone.png",
       "variants": 1,
-      "x": 7,
+      "x": 4,
       "y": 3
     },
     "sunstone_bricks": {
@@ -9993,14 +11343,14 @@
       "sha256": "ab0f4a9f7e39543997cc0561dddccc9c922cf789f7550d9ea4ebb39bf1143d46",
       "slots": [
         223,
-        559,
-        560,
-        561
+        604,
+        605,
+        606
       ],
       "source": "sunstone_bricks.png",
       "variants": 4,
-      "x": 7,
-      "y": 9
+      "x": 23,
+      "y": 8
     },
     "tall_grass": {
       "effective_seed": 213785369,
@@ -10023,7 +11373,7 @@
       ],
       "source": "tall_grass.png",
       "variants": 1,
-      "x": 3,
+      "x": 2,
       "y": 1
     },
     "terracotta": {
@@ -10047,8 +11397,8 @@
       ],
       "source": "terracotta.png",
       "variants": 1,
-      "x": 0,
-      "y": 1
+      "x": 24,
+      "y": 0
     },
     "tnt": {
       "effective_seed": 213785369,
@@ -10071,7 +11421,7 @@
       ],
       "source": "tnt.png",
       "variants": 1,
-      "x": 10,
+      "x": 8,
       "y": 2
     },
     "tnt_bottom": {
@@ -10095,7 +11445,7 @@
       ],
       "source": "tnt_bottom.png",
       "variants": 1,
-      "x": 23,
+      "x": 18,
       "y": 5
     },
     "tnt_side": {
@@ -10119,7 +11469,7 @@
       ],
       "source": "tnt_side.png",
       "variants": 1,
-      "x": 22,
+      "x": 17,
       "y": 5
     },
     "tnt_top": {
@@ -10143,7 +11493,7 @@
       ],
       "source": "tnt_top.png",
       "variants": 1,
-      "x": 21,
+      "x": 16,
       "y": 5
     },
     "torch": {
@@ -10167,7 +11517,7 @@
       ],
       "source": "torch.png",
       "variants": 1,
-      "x": 18,
+      "x": 17,
       "y": 1
     },
     "tropical_flower": {
@@ -10191,7 +11541,7 @@
       ],
       "source": "tropical_flower.png",
       "variants": 1,
-      "x": 15,
+      "x": 8,
       "y": 7
     },
     "tuff": {
@@ -10212,13 +11562,13 @@
       "sha256": "553fb6ed76b66c1279ca7a4e75d0c44133e6b28695aeae73fb56c0e3c5e63463",
       "slots": [
         69,
-        388,
-        389,
-        390
+        433,
+        434,
+        435
       ],
       "source": "tuff.png",
       "variants": 4,
-      "x": 21,
+      "x": 19,
       "y": 2
     },
     "tundra_moss": {
@@ -10242,7 +11592,7 @@
       ],
       "source": "tundra_moss.png",
       "variants": 1,
-      "x": 11,
+      "x": 3,
       "y": 8
     },
     "twisting_vines": {
@@ -10266,7 +11616,7 @@
       ],
       "source": "twisting_vines.png",
       "variants": 1,
-      "x": 21,
+      "x": 10,
       "y": 11
     },
     "volcanic_ash": {
@@ -10287,14 +11637,14 @@
       "sha256": "83020f992df2c209e44c73ee9ebc8f0c4df373e67574764b2f30edebf7d2df09",
       "slots": [
         173,
-        487,
-        488,
-        489
+        532,
+        533,
+        534
       ],
       "source": "volcanic_ash.png",
       "variants": 4,
-      "x": 5,
-      "y": 7
+      "x": 23,
+      "y": 6
     },
     "warped_door_bottom": {
       "effective_seed": 213785369,
@@ -10317,8 +11667,8 @@
       ],
       "source": "warped_door_bottom.png",
       "variants": 1,
-      "x": 8,
-      "y": 12
+      "x": 21,
+      "y": 11
     },
     "warped_door_top": {
       "effective_seed": 213785369,
@@ -10341,8 +11691,8 @@
       ],
       "source": "warped_door_top.png",
       "variants": 1,
-      "x": 9,
-      "y": 12
+      "x": 22,
+      "y": 11
     },
     "warped_fungus": {
       "effective_seed": 213785369,
@@ -10365,7 +11715,7 @@
       ],
       "source": "warped_fungus.png",
       "variants": 1,
-      "x": 16,
+      "x": 5,
       "y": 11
     },
     "warped_nylium": {
@@ -10389,7 +11739,7 @@
       ],
       "source": "warped_nylium.png",
       "variants": 1,
-      "x": 21,
+      "x": 11,
       "y": 10
     },
     "warped_planks": {
@@ -10413,8 +11763,8 @@
       ],
       "source": "warped_planks.png",
       "variants": 1,
-      "x": 1,
-      "y": 11
+      "x": 15,
+      "y": 10
     },
     "warped_roots": {
       "effective_seed": 213785369,
@@ -10437,7 +11787,7 @@
       ],
       "source": "warped_roots.png",
       "variants": 1,
-      "x": 18,
+      "x": 7,
       "y": 11
     },
     "warped_stem": {
@@ -10461,7 +11811,7 @@
       ],
       "source": "warped_stem.png",
       "variants": 1,
-      "x": 23,
+      "x": 13,
       "y": 10
     },
     "warped_wart_block": {
@@ -10485,8 +11835,8 @@
       ],
       "source": "warped_wart_block.png",
       "variants": 1,
-      "x": 3,
-      "y": 11
+      "x": 17,
+      "y": 10
     },
     "water": {
       "effective_seed": 213785369,
@@ -10533,7 +11883,7 @@
       ],
       "source": "weeping_vines.png",
       "variants": 1,
-      "x": 20,
+      "x": 9,
       "y": 11
     },
     "wet_farmland": {
@@ -10557,7 +11907,7 @@
       ],
       "source": "wet_farmland.png",
       "variants": 1,
-      "x": 22,
+      "x": 21,
       "y": 1
     },
     "wet_limestone": {
@@ -10578,13 +11928,13 @@
       "sha256": "299ba78295f01c291de4bd3cf60c50dea0d8734df118d81cd471f00507bfcdfb",
       "slots": [
         207,
-        520,
-        521,
-        522
+        565,
+        566,
+        567
       ],
       "source": "wet_limestone.png",
       "variants": 4,
-      "x": 15,
+      "x": 7,
       "y": 8
     },
     "wheat_mature": {
@@ -10608,8 +11958,8 @@
       ],
       "source": "wheat_mature.png",
       "variants": 1,
-      "x": 1,
-      "y": 2
+      "x": 24,
+      "y": 1
     },
     "wheat_middle": {
       "effective_seed": 213785369,
@@ -10632,8 +11982,8 @@
       ],
       "source": "wheat_middle.png",
       "variants": 1,
-      "x": 0,
-      "y": 2
+      "x": 23,
+      "y": 1
     },
     "wheat_young": {
       "effective_seed": 213785369,
@@ -10656,7 +12006,7 @@
       ],
       "source": "wheat_young.png",
       "variants": 1,
-      "x": 23,
+      "x": 22,
       "y": 1
     },
     "white_bed": {
@@ -10680,7 +12030,7 @@
       ],
       "source": "white_bed.png",
       "variants": 1,
-      "x": 20,
+      "x": 19,
       "y": 1
     },
     "white_bed_bottom": {
@@ -10704,7 +12054,7 @@
       ],
       "source": "white_bed_bottom.png",
       "variants": 1,
-      "x": 20,
+      "x": 15,
       "y": 5
     },
     "white_bed_side": {
@@ -10728,7 +12078,7 @@
       ],
       "source": "white_bed_side.png",
       "variants": 1,
-      "x": 19,
+      "x": 14,
       "y": 5
     },
     "white_bed_top": {
@@ -10752,7 +12102,7 @@
       ],
       "source": "white_bed_top.png",
       "variants": 1,
-      "x": 18,
+      "x": 13,
       "y": 5
     },
     "white_terracotta": {
@@ -10773,14 +12123,14 @@
       "sha256": "55b43e4427fa4f7985e623344c5c8203b6bd6085f5a95d60e916e7f4fcd280dc",
       "slots": [
         172,
-        484,
-        485,
-        486
+        529,
+        530,
+        531
       ],
       "source": "white_terracotta.png",
       "variants": 4,
-      "x": 4,
-      "y": 7
+      "x": 22,
+      "y": 6
     },
     "white_wool": {
       "effective_seed": 213785369,
@@ -10803,7 +12153,7 @@
       ],
       "source": "white_wool.png",
       "variants": 1,
-      "x": 19,
+      "x": 18,
       "y": 1
     },
     "wild_mint": {
@@ -10827,8 +12177,8 @@
       ],
       "source": "wild_mint.png",
       "variants": 1,
-      "x": 6,
-      "y": 8
+      "x": 23,
+      "y": 7
     },
     "yellow_wool": {
       "effective_seed": 213785369,
@@ -10851,7 +12201,7 @@
       ],
       "source": "yellow_wool.png",
       "variants": 1,
-      "x": 14,
+      "x": 8,
       "y": 6
     }
   },

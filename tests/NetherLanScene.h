@@ -1,10 +1,13 @@
 #pragma once
 // Used only by the real two-process Vulkan LAN fixture.
-inline bool GameSessionTestAccess::netherTravel(GameSession& session) {
-        if(session.guests.empty())return false;
-        auto& guest=*session.guests.begin()->second;
+inline bool LanSmokeScenario::netherTravel(GameSession& session) {
+        const auto roster=session.roomRoster();
+        const auto peer=std::find_if(roster.begin(),roster.end(),[](const auto& entry){return entry.id!=0;});
+        if(peer==roster.end())return false;
+        auto& guest=SessionScenario::guest(session,peer->id);
         if(guest.loading)return false;
-        auto& runtime=session.ensureDimension(DimensionId::Nether);
+        auto& runtime=SessionScenario::runtime(session,DimensionId::Nether);
+        SessionScenario::context(session)->workers.waitIdle();
         runtime.world.setThreadPool(nullptr);runtime.entities.setNaturalSpawningEnabled(false);
         runtime.world.setAdditionalStreamingInterests({{0,0,2}});
         for(int z=-2;z<=2;++z)for(int x=-2;x<=2;++x) {
@@ -17,5 +20,6 @@ inline bool GameSessionTestAccess::netherTravel(GameSession& session) {
         runtime.entities.loadEntities({piglin});runtime.entities.spawnItem({2.5,1.3,6.5},{ItemId::NETHERITE_INGOT,2,0});
         guest.player.inventory().slot(0)={ItemId::NETHERITE_SWORD,1,17};
         guest.player.statusEffects().apply(StatusEffectType::FireResistance,0,6000);
-        return session.travelLanPlayer(guest,DimensionId::Nether,false,glm::dvec3(.5,1.01,8.5));
+        guest.profile.positions[2]={.5,1.01,8.5};guest.profile.positioned[2]=true;
+        return session.pluginTravel(peer->id,uint32_t(DimensionId::Nether));
 }

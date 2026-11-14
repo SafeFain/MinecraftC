@@ -14,6 +14,7 @@
 
 #include "Config.h"
 #include "world/Block.h"
+#include "world/RedstoneWiring.h"
 #include "world/BlockLightLogic.h"
 #include "world/ChunkMesh.h"
 #include "world/FluidLogic.h"
@@ -389,7 +390,15 @@
                         shape != RenderShape::Spike && shape != RenderShape::Door &&
                         shape != RenderShape::Button && shape != RenderShape::Boxes)
                         continue;
-                    const BlockCollisionBoxes geometry = blockModelBoxes(id);
+                    BlockCollisionBoxes geometry = blockModelBoxes(id);
+                    if(const auto state=Redstone::blockState(id);state && state->kind==Redstone::Kind::Dust) {
+                        const auto connections=Redstone::connections({chunkWorldX+x,y,chunkWorldZ+z},state->alternate,[&](Redstone::Position p){
+                            const int lx=p.x-chunkWorldX,lz=p.z-chunkWorldZ;
+                            if(lx>=0 && lx<Config::CHUNK_SIZE_X && lz>=0 && lz<Config::CHUNK_SIZE_Z && Config::isValidWorldY(p.y))return static_cast<BlockId>(blocks[localIdx(lx,p.y,lz)]);
+                            return getNeighbor(p.x,p.y,p.z);
+                        });
+                        geometry=Redstone::wireGeometry(connections);
+                    }
                     ArchitecturalBlockState architecture;
                     decodeArchitecturalBlock(id, architecture);
                     const glm::vec2 sampled = normalizedLight(x, y, z);

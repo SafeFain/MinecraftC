@@ -8,6 +8,7 @@
 #include "game/InventoryModel.h"
 #include "game/InventoryCommands.h"
 #include "core/InputCodes.h"
+#include "core/TextEditBuffer.h"
 #include "ui/UILayout.h"
 
 class UIRenderer;
@@ -18,6 +19,10 @@ public:
     explicit ContainerScreen(InventoryModel& inventory) : m_inventory(inventory) {}
     bool open(IContainerAccess& access, const glm::ivec3& position);
     bool valid() const;
+    void setClipboard(platform::Clipboard* clipboard) { m_name.setClipboard(clipboard); }
+    bool wantsTextInput() const { return m_naming; }
+    void onText(std::string_view text);
+    bool onKey(int key, int mods);
     void render(UIRenderer& ui, int width, int height, int mouseX, int mouseY);
     void onMouseButton(int button, ButtonAction action, int mouseX, int mouseY, int mods = 0);
     void onMouseMove(int mouseX, int mouseY);
@@ -33,12 +38,17 @@ void setInventoryCommands(IInventoryCommands* commands) { m_commands = commands;
 
 private:
     IInventoryCommands* m_commands = nullptr;
+    TextEditBuffer m_name{"", 50};
+    bool m_naming = false;
+
     bool commandsEnabled() const { return m_commands && m_commands->usesInventoryCommands(); }
     void syncCommands();
     std::optional<InventorySlot> logicalSlot(const ItemStack* stack) const;
     bool command(InventoryOperation operation, ItemStack* stack, uint16_t argument = 0, bool alternate = false);
     void gesture(InventoryOperation operation, const std::vector<ItemStack*>& targets, bool alternate = false);
     struct Rect { float x = 0, y = 0, w = 44, h = 44; };
+    std::array<Rect, 3> m_offerRects{};
+    Rect m_nameRect;
     InventoryModel& m_inventory;
     IContainerAccess* m_access = nullptr;
     glm::ivec3 m_position{0};

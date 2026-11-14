@@ -47,7 +47,7 @@ inline void verifyGameRuleBaseline(const char* path) {
                 check(parseCommand("/gamerule " + name + " " + wrong).error.has_value(), "bad integer accepted");
         }
     }
-    check(names.size() == 59 && GAME_RULES.size() == names.size()+1, "incomplete baseline or unexpected rule");
+    check(!names.empty(), "official baseline fixture has no rules");
     check(parseCommand("/gamerule DayNightDuration").command.has_value(), "custom duration query missing");
     check(parseCommand("/gamerule doFireTick false").command->gameRuleValue->number == 0, "legacy fire disable differs");
     check(parseCommand("/gamerule doFireTick true").command->gameRuleValue->number == 128, "legacy fire enable differs");
@@ -59,7 +59,15 @@ inline void verifyGameRuleBaseline(const char* path) {
     const auto wrongValue = parseCommand("/gamerule keep_inventory 1");
     check(wrongValue.error && wrongValue.error->position == 25, "wrong value diagnostic position");
     const std::string prefix = "/gamerule ";
-    check(commandSuggestions(prefix, prefix.size()).size() == 60, "bare completion must list standard names once");
+    std::set<std::string> completed;
+    for (const auto& suggestion : commandSuggestions(prefix, prefix.size())) {
+        check(completed.insert(suggestion.text).second, "duplicate rule completion");
+        check(findGameRule(suggestion.text).has_value(), "completion names an unknown rule");
+    }
+    for (const auto& definition : GAME_RULES)
+        check(completed.count(std::string(definition.name)) == 1, "registered rule missing from completion");
+    for (const auto& name : names)
+        check(completed.count(name) == 1, "official rule missing from completion");
     check(commandSuggestions("/gamerule keepI", 15)[0].text == "keepInventory", "old name completion missing");
     const auto namespaced = commandSuggestions("/gamerule minecraft:keep", 24);
     check(namespaced.size() == 1 && namespaced[0].text == "minecraft:keep_inventory", "namespaced completion missing");

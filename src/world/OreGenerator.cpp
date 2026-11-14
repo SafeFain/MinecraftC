@@ -1,3 +1,4 @@
+#include "world/RedstoneBlocks.h"
 #include "world/OreGenerator.h"
 #include "world/Noise.h"
 
@@ -97,6 +98,81 @@ const std::unordered_set<uint32_t>& emeraldCandidates(
 }
 }
 
+
+// Java placement parameters: two size-seven veins with triangular -32..32
+// anchors, and four size-seven buried veins with uniform -64..64 anchors.
+struct LapisCacheEntry {
+    uint64_t seed; int x, z;
+    std::unordered_set<uint32_t> ordinary, buried;
+};
+static const LapisCacheEntry& lapisCandidates(uint64_t seed, int chunkX, int chunkZ) {
+    thread_local std::deque<LapisCacheEntry> cache;
+    for (const auto& entry : cache) if (entry.seed == seed && entry.x == chunkX && entry.z == chunkZ) return entry;
+    LapisCacheEntry entry{seed, chunkX, chunkZ, {}, {}};
+    for (int sourceZ = chunkZ - 1; sourceZ <= chunkZ + 1; ++sourceZ)
+        for (int sourceX = chunkX - 1; sourceX <= chunkX + 1; ++sourceX)
+            for (int attempt = 0; attempt < 6; ++attempt) {
+                uint64_t random = WorldGenContext::hashPosition(seed ^ 0x4c415049535f3232ULL, sourceX, attempt, sourceZ);
+                const auto draw = [&random](unsigned bound) { random = WorldGenContext::mix(random); return static_cast<unsigned>(random % bound); };
+                const double originX = double(sourceX * 16) + draw(16), originZ = double(sourceZ * 16) + draw(16);
+                const double originY = attempt < 2 ? -32. + draw(33) + draw(33) : -64. + draw(129);
+                const double angle = double(draw(1u << 24)) / (1u << 24) * 3.141592653589793;
+                const double dx = std::sin(angle) * 7 / 8, dz = std::cos(angle) * 7 / 8;
+                const double y0 = originY + draw(3) - 2, y1 = originY + draw(3) - 2;
+                for (int segment = 0; segment < 7; ++segment) {
+                    const double t = segment / 7.;
+                    const double x = originX + dx * (1 - 2 * t), z = originZ + dz * (1 - 2 * t), y = y0 + (y1 - y0) * t;
+                    const double radius = ((std::sin(3.141592653589793 * t) + 1) * (double(draw(1u << 24)) / (1u << 24)) * 7 / 16 + 1) / 2;
+                    for (int bz = int(std::floor(z-radius)); bz <= int(std::floor(z+radius)); ++bz)
+                        for (int bx = int(std::floor(x-radius)); bx <= int(std::floor(x+radius)); ++bx)
+                            for (int by = std::max(-64, int(std::floor(y-radius))); by <= std::min(319, int(std::floor(y+radius))); ++by) {
+                                if (floorDiv16(bx) != chunkX || floorDiv16(bz) != chunkZ) continue;
+                                const double nx = (bx + .5 - x) / radius, ny = (by + .5 - y) / radius, nz = (bz + .5 - z) / radius;
+                                if (nx*nx + ny*ny + nz*nz < 1) (attempt < 2 ? entry.ordinary : entry.buried).insert(localOreIndex(bx-chunkX*16, by, bz-chunkZ*16));
+                            }
+                }
+            }
+    if (cache.size() >= 24) cache.pop_back();
+    cache.push_front(std::move(entry)); return cache.front();
+}
+
+// Java-style size-eight veins: four uniform -64..15 attempts and eight
+// triangular -96..-32 attempts (peak -64). Independent from prior ore domains.
+struct RedstoneCacheEntry {
+    uint64_t seed; int x, z;
+    std::unordered_set<uint32_t> blocks;
+};
+static const RedstoneCacheEntry& redstoneCandidates(uint64_t seed, int chunkX, int chunkZ) {
+    thread_local std::deque<RedstoneCacheEntry> cache;
+    for (const auto& entry : cache) if (entry.seed == seed && entry.x == chunkX && entry.z == chunkZ) return entry;
+    RedstoneCacheEntry entry{seed, chunkX, chunkZ, {}};
+    for (int sourceZ = chunkZ - 1; sourceZ <= chunkZ + 1; ++sourceZ)
+        for (int sourceX = chunkX - 1; sourceX <= chunkX + 1; ++sourceX)
+            for (int attempt = 0; attempt < 12; ++attempt) {
+                uint64_t random = WorldGenContext::hashPosition(seed ^ 0x52454453544f4e45ULL, sourceX, attempt, sourceZ);
+                const auto draw = [&random](unsigned bound) { random = WorldGenContext::mix(random); return static_cast<unsigned>(random % bound); };
+                const double originX = double(sourceX * 16) + draw(16), originZ = double(sourceZ * 16) + draw(16);
+                const double originY = attempt < 4 ? -64. + draw(80) : -96. + draw(33) + draw(33);
+                const double angle = double(draw(1u << 24)) / (1u << 24) * 3.141592653589793;
+                const double dx = std::sin(angle) * 8 / 8, dz = std::cos(angle) * 8 / 8;
+                const double y0 = originY + draw(3) - 2, y1 = originY + draw(3) - 2;
+                for (int segment = 0; segment < 8; ++segment) {
+                    const double t = segment / 8.;
+                    const double x = originX + dx * (1 - 2 * t), z = originZ + dz * (1 - 2 * t), y = y0 + (y1 - y0) * t;
+                    const double radius = ((std::sin(3.141592653589793 * t) + 1) * (double(draw(1u << 24)) / (1u << 24)) * 8 / 16 + 1) / 2;
+                    for (int bz = int(std::floor(z-radius)); bz <= int(std::floor(z+radius)); ++bz)
+                        for (int bx = int(std::floor(x-radius)); bx <= int(std::floor(x+radius)); ++bx)
+                            for (int by = std::max(-64, int(std::floor(y-radius))); by <= std::min(319, int(std::floor(y+radius))); ++by) {
+                                if (floorDiv16(bx) != chunkX || floorDiv16(bz) != chunkZ) continue;
+                                const double nx = (bx + .5 - x) / radius, ny = (by + .5 - y) / radius, nz = (bz + .5 - z) / radius;
+                                if (nx*nx + ny*ny + nz*nz < 1) entry.blocks.insert(localOreIndex(bx-chunkX*16, by, bz-chunkZ*16));
+                            }
+                }
+            }
+    if (cache.size() >= 24) cache.pop_back();
+    cache.push_front(std::move(entry)); return cache.front();
+}
+
 void OreGenerator::configure(FastNoiseLite& noise, int seed, float frequency) {
     noise.SetSeed(seed);
     noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
@@ -134,7 +210,7 @@ bool OreGenerator::emeraldBiome(Biome biome) {
 }
 
 BlockId OreGenerator::getOre(float x, float y, float z, BlockId existing,
-                             Biome biome) const {
+                             Biome biome, const std::function<bool()>& exposed) const {
     const int worldX = static_cast<int>(std::floor(x));
     const int worldY = static_cast<int>(std::floor(y));
     const int worldZ = static_cast<int>(std::floor(z));
@@ -177,5 +253,11 @@ BlockId OreGenerator::getOre(float x, float y, float z, BlockId existing,
     if (coalY > 0.0f && score(m_coal) > 0.956f - coalY * 0.024f)
         return BlockId::COAL_ORE;
 
+    const auto& lapis = lapisCandidates(m_context.seed(), floorDiv16(worldX), floorDiv16(worldZ));
+    const auto index = localOreIndex(worldX - floorDiv16(worldX) * 16, worldY, worldZ - floorDiv16(worldZ) * 16);
+    if (lapis.ordinary.count(index) || (lapis.buried.count(index) && exposed && !exposed()))
+        return existing == BlockId::DEEPSLATE ? BlockId::DEEPSLATE_LAPIS_ORE : BlockId::LAPIS_ORE;
+    if(worldY<=15 && redstoneCandidates(m_context.seed(),floorDiv16(worldX),floorDiv16(worldZ)).blocks.count(index))
+        return Redstone::worldBlock(existing==BlockId::DEEPSLATE?Redstone::NativeBlock::DEEPSLATE_REDSTONE_ORE:Redstone::NativeBlock::REDSTONE_ORE);
     return BlockId::AIR;
 }

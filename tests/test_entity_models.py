@@ -89,35 +89,43 @@ def verify_joint_pivots(doc,binary,name):
 
 def main():
     files = list(MODEL_DIR.glob("*.glb"))
-    native={"ghast","blaze","wither_skeleton","magma_cube","piglin","piglin_brute","zombified_piglin","hoglin","zoglin","strider","enderman","ghast_fireball","blaze_fireball","thrown_potion","ender_pearl"}
-    assert {path.stem for path in files} == NAMES|native, "expected eleven original and fifteen appended native entity GLBs"
+    native={"ghast","blaze","wither_skeleton","magma_cube","piglin","piglin_brute","zombified_piglin","hoglin","zoglin","strider","enderman","ghast_fireball","blaze_fireball","thrown_potion","ender_pearl","slime"}
+    assert NAMES|native <= {path.stem for path in files}, "required native entity GLB missing"
     graphs = list(MODEL_DIR.glob("*.anim.json"))
-    assert {path.name[:-len(".anim.json")] for path in graphs} == NAMES|native, \
-        "expected matching original and native entity action graphs"
+    assert {path.name[:-len(".anim.json")] for path in graphs} == {path.stem for path in files}, \
+        "each entity model needs a matching action graph"
     native_files=[p for p in files if p.stem in native]
     files=[p for p in files if p.stem in NAMES]
     for path in native_files:
         doc,binary=document(path)
         assert {a["name"] for a in doc["animations"]}>={"idle","walk","hurt","death","attack"}
         assert doc["skins"] and max(len(s["joints"]) for s in doc["skins"])<=256
-        primitive=doc["meshes"][0]["primitives"][0]
-        assert {"POSITION","NORMAL","TEXCOORD_0","JOINTS_0","WEIGHTS_0"}<=set(primitive["attributes"])
-        assert doc["accessors"][primitive["attributes"]["POSITION"]]["count"]<=4096
+        primitives=doc["meshes"][0]["primitives"]
+        assert sum(doc["accessors"][p["attributes"]["POSITION"]]["count"] for p in primitives)<=4096
+        if path.stem=="slime":
+            assert len(primitives)==2,"slime needs gel shell and opaque core"
+            assert {doc["materials"][p["material"]].get("alphaMode","OPAQUE") for p in primitives}=={"BLEND","OPAQUE"}
         assert doc["materials"][0].get("doubleSided") is True
         image_view=doc["bufferViews"][doc["images"][0]["bufferView"]]
         image=binary[image_view.get("byteOffset",0):image_view.get("byteOffset",0)+image_view["byteLength"]]
         assert png_dimensions(image)==(64,64)
         assert len(image)<20*1024,"native embedded skin exceeds budget"
         graph=json.loads((MODEL_DIR/(path.stem+".anim.json")).read_text())
-        assert graph["actions"]["attack"]["events"]==[{"name":"melee","time":.30}]
-        positions=vec3_accessor(doc,binary,primitive["attributes"]["POSITION"])
-        normals=vec3_accessor(doc,binary,primitive["attributes"]["NORMAL"])
-        indices=index_accessor(doc,binary,primitive["indices"])
-        for offset in range(0,len(indices),3):
-            ia,ib,ic=indices[offset:offset+3];a,b,c=positions[ia],positions[ib],positions[ic]
-            ab=tuple(b[i]-a[i] for i in range(3));ac=tuple(c[i]-a[i] for i in range(3))
-            cross=(ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0])
-            assert sum(cross[i]*normals[ia][i] for i in range(3))>0,f"{path.name} inward winding"
+        attack=graph["actions"]["attack"]
+        events=attack["events"]
+        assert any(event["name"]=="melee" for event in events), "native attack lacks its presentation event"
+        assert all(0<=event["time"]<=attack["duration"] for event in events), "event outside attack duration"
+        assert [event["time"] for event in events]==sorted(event["time"] for event in events)
+        for primitive in primitives:
+            assert {"POSITION","NORMAL","TEXCOORD_0","JOINTS_0","WEIGHTS_0"}<=set(primitive["attributes"])
+            positions=vec3_accessor(doc,binary,primitive["attributes"]["POSITION"])
+            normals=vec3_accessor(doc,binary,primitive["attributes"]["NORMAL"])
+            indices=index_accessor(doc,binary,primitive["indices"])
+            for offset in range(0,len(indices),3):
+                ia,ib,ic=indices[offset:offset+3];a,b,c=positions[ia],positions[ib],positions[ic]
+                ab=tuple(b[i]-a[i] for i in range(3));ac=tuple(c[i]-a[i] for i in range(3))
+                cross=(ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0])
+                assert sum(cross[i]*normals[ia][i] for i in range(3))>0,f"{path.name} inward winding"
     for path in files:
         doc, binary = document(path)
         assert {a["name"] for a in doc["animations"]} >= {"idle", "walk", "hurt", "death"}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world/ChunkMeshBuilder.h"
+#include "world/RedstoneBlocks.h"
 
 // Behavioral integration: power follows local geometry and survives disk/streaming.
 void testDoorsAndButtons() {
@@ -125,4 +126,178 @@ void testDoorsAndButtons() {
     }
     Config::RENDER_DISTANCE=oldDistance;
     std::filesystem::remove_all(root);
+}
+
+void testRedstoneCircuits() {
+    const int oldDistance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=1;
+    const auto root=std::filesystem::temp_directory_path()/("minecraftc-redstone-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    {
+        SaveStore store(root);ThreadPool pool(2);World world;world.setThreadPool(&pool);world.setSaveStore(&store);
+        world.resetForNewSeed(1001);loadTarget(world);generateTarget(world,pool);
+        for(int x=-12;x<=12;++x)for(int z=5;z<=11;++z) {
+            world.setBlock(x,210,z,BlockId::STONE);
+            for(int y=211;y<=214;++y)world.setBlock(x,y,z,BlockId::AIR);
+        }
+        Redstone::State lever;lever.kind=Redstone::Kind::Lever;lever.facing=Redstone::Face::Up;
+        require(world.placeRedstone({-9,211,8},Redstone::block(lever)),"lever placement");
+        Redstone::State dust;
+        for(int x=-8;x<=6;++x)require(world.placeRedstone({x,211,8},Redstone::block(dust)),"dust placement");
+        DoorState door;door.material=DoorMaterial::Iron;
+        require(world.placeDoor({7,211,8},door),"wired door placement");
+        const auto tick=[&](int count){for(int i=0;i<count;++i)world.tickInteractiveBlocks([](const auto&){return false;});};
+        require(world.interactRedstone({-9,211,8}),"lever interaction");tick(2);
+        require(decodeDoor(world.getBlock(7,211,8),door)&&door.open,"fifteen-wire door did not open");
+        for(int x=-8;x<=6;++x) {
+            const auto state=Redstone::blockState(world.getBlock(x,211,8));
+            require(state && state->power==15-(x+8),"world dust attenuation");
+        }
+        world.setBlock(0,211,8,BlockId::AIR);tick(2);
+        require(decodeDoor(world.getBlock(7,211,8),door)&&!door.open,"cut wire retained power");
+        require(world.placeRedstone({0,211,8},Redstone::block(dust)),"wire reconnect");tick(2);
+        require(decodeDoor(world.getBlock(7,211,8),door)&&door.open,"reconnected wire did not power door");
+        Redstone::State repeater;repeater.kind=Redstone::Kind::Repeater;repeater.facing=Redstone::Face::East;repeater.delay=2;
+        world.setBlock(0,211,8,Redstone::block(repeater));tick(5);
+        require(Redstone::blockState(world.getBlock(0,211,8))->power==15,"world repeater failed");
+        require(Redstone::blockState(world.getBlock(1,211,8))->power==15,"repeater did not restore wire strength");
+        world.interactRedstone({-9,211,8});tick(6);
+        require(decodeDoor(world.getBlock(7,211,8),door)&&!door.open,"wired door did not depower");
+        Redstone::State observer;observer.kind=Redstone::Kind::Observer;observer.facing=Redstone::Face::East;
+        world.setBlock(0,211,10,Redstone::block(observer));tick(1);
+        world.setBlock(-1,211,10,BlockId::STONE);tick(1);
+        require(Redstone::blockState(world.getBlock(0,211,10))->power==0,"observer world pulse early");
+        tick(1);require(Redstone::blockState(world.getBlock(0,211,10))->power==15,"observer world pulse missing");
+        tick(2);require(Redstone::blockState(world.getBlock(0,211,10))->power==0,"observer world pulse stuck");
+        world.setBlock(-9,210,8,BlockId::AIR);
+        require(world.getBlock(-9,211,8)==BlockId::AIR,"unsupported lever survived");
+        world.setBlock(-9,210,8,BlockId::STONE);
+        require(world.placeRedstone({-9,211,8},Redstone::block(lever)),"restore lever after support loss");
+        world.interactRedstone({-9,211,8});tick(1);
+        require(Redstone::blockState(world.getBlock(0,211,8))->power==0,"saved repeater fixture already fired");
+        world.beginModifiedChunkAutosave();while(!world.flushModifiedChunks(32)){}
+        drainWorkers(world,pool);world.resetForNewSeed(1001);loadTarget(world);generateTarget(world,pool);
+        tick(2);require(Redstone::blockState(world.getBlock(0,211,8))->power==0,"saved repeater delay expired early");
+        tick(1);require(Redstone::blockState(world.getBlock(0,211,8))->power==15,"saved repeater delay restarted or was lost");
+        world.interactRedstone({-9,211,8});tick(1);
+        world.interactRedstone({-9,211,8});
+        for(int i=0;i<6;++i) {
+            tick(1);require(Redstone::blockState(world.getBlock(0,211,8))->power==15,"world repeater passed short off-pulse");
+        }
+        // Compare an eight-strength inventory input with eligible and ineligible
+        // side sources. Inventory mutations must not trigger an observer.
+        for(int x=-4;x<=4;++x)for(int z=6;z<=10;++z) {
+            world.setBlock(x,220,z,BlockId::STONE);
+            for(int y=221;y<=223;++y)world.setBlock(x,y,z,BlockId::AIR);
+        }
+        Redstone::State compare;compare.kind=Redstone::Kind::Comparator;compare.facing=Redstone::Face::East;
+        world.setBlock(-1,221,8,BlockId::CHEST);
+        auto* chest=world.getBlockEntity({-1,221,8});require(chest!=nullptr,"comparator chest fixture");
+        for(int i=0;i<14;++i)chest->chest[i]={ItemId::STONE,64,0};
+        world.setBlock(0,221,8,Redstone::block(compare));
+        lever.alternate=true;world.setBlock(0,221,7,Redstone::block(lever));tick(3);
+        const auto comparePower=[&](){return Redstone::blockState(world.getBlock(0,221,8))->power;};
+        require(comparePower()==8,"lever incorrectly supplied comparator side input");
+        Redstone::State torch;torch.kind=Redstone::Kind::Torch;torch.facing=Redstone::Face::Up;torch.power=15;
+        world.setBlock(0,221,7,Redstone::block(torch));tick(4);
+        require(comparePower()==8,"torch incorrectly supplied comparator side input");
+        Redstone::State constant;constant.kind=Redstone::Kind::Block;constant.power=15;
+        world.setBlock(0,221,7,Redstone::block(constant));tick(3);
+        require(comparePower()==0,"redstone block failed comparator side input");
+        // A side diode contributes its actual output face and analog strength.
+        Redstone::State side;side.kind=Redstone::Kind::Comparator;side.facing=Redstone::Face::South;
+        world.setBlock(0,221,6,BlockId::CHEST);
+        auto* sideChest=world.getBlockEntity({0,221,6});require(sideChest!=nullptr,"side comparator chest fixture");
+        for(int i=0;i<6;++i)sideChest->chest[i]={ItemId::STONE,64,0};
+        world.setBlock(0,221,7,Redstone::block(side));tick(6);
+        require(comparePower()==8,"comparison mode rejected weaker side diode");
+        require(world.interactRedstone({0,221,8}),"switch comparator mode");tick(3);
+        require(comparePower()==4,"world comparator subtraction");
+        world.setBlock(0,221,7,BlockId::AIR);world.setBlock(0,221,6,BlockId::AIR);
+        world.interactRedstone({0,221,8});
+        // The rear solid block's strength fifteen takes precedence over a
+        // container beyond it; weaker power must yield to the container read.
+        world.setBlock(-2,221,8,BlockId::CHEST);
+        auto* farChest=world.getBlockEntity({-2,221,8});require(farChest!=nullptr,"far comparator chest fixture");
+        farChest->chest[0]={ItemId::STONE,1,0};
+        world.setBlock(-1,221,8,BlockId::STONE);tick(3);
+        require(comparePower()==1,"comparator failed to read through conductive block");
+        auto wallLever=lever;wallLever.facing=Redstone::Face::North;
+        world.setBlock(-1,221,7,Redstone::block(wallLever));tick(3);
+        require(comparePower()==15,"strength fifteen did not override distant container");
+        world.setBlock(-1,221,7,BlockId::AIR);tick(3);
+        require(comparePower()==1,"container did not resume after rear block depowered");
+        observer.facing=Redstone::Face::West;
+        world.setBlock(-3,221,8,Redstone::block(observer));tick(4);
+        farChest=world.getBlockEntity({-2,221,8});
+        for(int i=0;i<14;++i)farChest->chest[i]={ItemId::STONE,64,0};
+        for(int i=0;i<8;++i) {
+            tick(1);require(Redstone::blockState(world.getBlock(-3,221,8))->power==0,"inventory mutation triggered observer");
+        }
+        require(comparePower()==8,"inventory change failed to update comparator");
+        for(int x=-4;x<=3;++x)for(int z=6;z<=11;++z) {
+            world.setBlock(x,230,z,BlockId::STONE);
+            for(int y=231;y<=233;++y)world.setBlock(x,y,z,BlockId::AIR);
+        }
+        compare.alternate=false;
+        world.setBlock(0,231,8,Redstone::block(compare));world.setBlock(-1,231,8,BlockId::STONE);
+        wallLever.facing=Redstone::Face::West;
+        world.setBlock(-2,231,8,Redstone::block(wallLever));tick(3);
+        const auto conductedPower=[&](){return Redstone::blockState(world.getBlock(0,231,8))->power;};
+        require(conductedPower()==15,"rear strongly charged block failed to power comparator");
+        world.setBlock(-2,231,8,BlockId::STONE);
+        world.setBlock(-3,231,8,Redstone::block(wallLever));tick(3);
+        require(conductedPower()==0,"conductors relayed power through two solid blocks");
+        world.setBlock(-2,231,8,Redstone::block(constant));tick(3);
+        require(conductedPower()==0,"redstone block incorrectly charged adjacent conductor");
+        world.setBlock(-1,231,8,Redstone::block(constant));tick(3);
+        require(conductedPower()==15,"direct redstone block failed to power comparator");
+        world.setBlock(0,231,10,Redstone::block(torch));
+        world.setBlock(1,230,10,Redstone::block(constant));tick(3);
+        require(Redstone::blockState(world.getBlock(0,231,10))->power==15,"redstone block incorrectly inverted torch through support");
+        wallLever.facing=Redstone::Face::East;
+        world.setBlock(1,230,10,Redstone::block(wallLever));tick(3);
+        require(Redstone::blockState(world.getBlock(0,231,10))->power==0,"attached lever failed to invert torch");
+        world.setBlock(0,230,10,BlockId::GLASS);tick(3);
+        require(Redstone::blockState(world.getBlock(0,231,10))->power==15,"transparent support conducted power into torch");
+        world.setBlock(0,230,10,Redstone::block(constant));tick(3);
+        require(Redstone::blockState(world.getBlock(0,231,10))->power==0,"redstone block failed to invert attached torch");
+        drainWorkers(world,pool);
+    }
+    // Warm chunks remain in CPU memory but are outside the active simulation.
+    // Neither button release time nor component delay may elapse there.
+    Config::RENDER_DISTANCE=0;
+    {
+        SaveStore store(root/"warm");ThreadPool pool(2);World world;
+        world.setThreadPool(&pool);world.setSaveStore(&store);world.resetForNewSeed(1001);
+        loadTarget(world);generateTarget(world,pool);
+        for(int x=5;x<=11;++x)for(int z=6;z<=11;++z) {
+            world.setBlock(x,220,z,BlockId::STONE);
+            for(int y=221;y<=223;++y)world.setBlock(x,y,z,BlockId::AIR);
+        }
+        Redstone::State source;source.kind=Redstone::Kind::Lever;source.facing=Redstone::Face::Up;source.alternate=true;
+        world.setBlock(7,221,8,Redstone::block(source));
+        Redstone::State delayed;delayed.kind=Redstone::Kind::Repeater;delayed.facing=Redstone::Face::East;delayed.delay=4;
+        world.setBlock(8,221,8,Redstone::block(delayed));
+        ButtonState button;button.material=DoorMaterial::Iron;button.attachment=FaceDir::TOP;
+        require(world.placeButton({8,221,10},button),"warm button placement");
+        require(world.activateButton({8,221,10}),"warm button activation");
+        const auto tick=[&](int count){for(int i=0;i<count;++i)world.tickInteractiveBlocks([](const auto&){return false;});};
+        tick(2);
+        auto* origin=world.getChunk(0,0);
+        for(int i=0;i<400 && origin->lifecycle.load()!=Chunk::LifecycleState::Warm;++i) {
+            world.update({16.5,64.0,.5},1);world.enqueueGeneration();world.processCompletedGenerations(false);
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+        require(origin->lifecycle.load()==Chunk::LifecycleState::Warm,"circuit fixture did not retire warm");
+        tick(40);
+        require(world.getBlockEntity({8,221,10})->buttonRemaining==18,"warm button consumed release time");
+        world.update({.5,64.0,.5},1);world.enqueueGeneration();world.processCompletedGenerations(false);
+        require(world.getChunk(0,0)==origin && origin->lifecycle.load()!=Chunk::LifecycleState::Warm,"warm circuit promotion");
+        tick(5);require(Redstone::blockState(world.getBlock(8,221,8))->power==0,"warm repeater expired early");
+        tick(1);require(Redstone::blockState(world.getBlock(8,221,8))->power==15,"warm repeater lost remaining delay");
+        tick(11);require(decodeButton(world.getBlock(8,221,10),button)&&button.pressed,"promoted button released early");
+        tick(1);require(decodeButton(world.getBlock(8,221,10),button)&&!button.pressed,"promoted button failed release");
+        drainWorkers(world,pool);
+    }
+    std::filesystem::remove_all(root);
+    Config::RENDER_DISTANCE=oldDistance;
 }

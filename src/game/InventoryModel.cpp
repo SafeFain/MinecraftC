@@ -19,7 +19,7 @@ uint32_t InventoryModel::add(ItemStack incoming) {
 
     for (auto& stack : m_storage) {
         if (incoming.count == 0) break;
-        if (stack.id != incoming.id || stack.damage != incoming.damage ||
+        if (!stack.sameItem(incoming) ||
             stack.count >= maxStack) continue;
         const uint8_t moved = static_cast<uint8_t>(
             std::min<int>(incoming.count, maxStack - stack.count));
@@ -30,7 +30,7 @@ uint32_t InventoryModel::add(ItemStack incoming) {
         if (incoming.count == 0) break;
         if (!stack.empty()) continue;
         const uint8_t moved = std::min(incoming.count, maxStack);
-        stack = {incoming.id, moved, incoming.damage};
+        stack = incoming.withCount(moved);
         incoming.count -= moved;
     }
     return incoming.count;

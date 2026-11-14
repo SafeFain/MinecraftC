@@ -73,6 +73,8 @@ private:
         HeldItemUseState use;
     };
     std::map<uint64_t, RemotePlayer> remotePlayerModels;
+    struct MotionPresentation {uint8_t age=0;float elapsed=0;};
+    std::map<uint64_t,MotionPresentation> pistonPresentation;
     void appendBowTrajectory(const GameSession& session,
                              const glm::dvec3& renderOrigin);
 };

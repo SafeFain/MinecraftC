@@ -1,6 +1,7 @@
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
 #include "world/World.h"
+#include "world/RedstoneBlocks.h"
 #include "game/DimensionRules.h"
 #include "world/NetherPortal.h"
 #include "world/VoxelRaycast.h"
@@ -115,6 +116,7 @@ World::World()
     : m_generator(Config::WORLD_SEED, WorldType::Normal,
                   DimensionId::Overworld) {
     m_lod.reset(&m_generator);
+    m_persistence.setContainerChangeCallback([this](glm::ivec3 p){notifyContainerChanged(p);});
 }
 
 void World::resetForNewSeed(
@@ -132,6 +134,8 @@ void World::resetForNewSeed(
         store.clearUnlocked();
     });
     m_fluids.clear();
+    m_redstone=RedstoneWorldState{};
+    m_pendingBlockChanges.clear();m_blockTransaction=m_pistonCommit=m_runningInteractive=false;
     m_fluidBatchActive = false;
     m_fluidMutations.clear();
     m_uniqueFluidMutations.clear();
@@ -142,7 +146,7 @@ void World::resetForNewSeed(
     m_streamer.setExternalSnapshots(false);
     m_streamer.setRenderDistanceLimit(std::numeric_limits<int>::max());
     m_persistence.clear();
-    m_supportDrops.clear();
+    m_supportDrops.clear(); m_fallingAnvils.clear();
     m_pendingDoorPower.clear();
     m_interactionSounds.clear();
     m_simulation.clear();
@@ -154,6 +158,13 @@ void World::resetForNewSeed(
     new (&m_generator) WorldGenerator(newSeed, worldType, dimension,std::move(config));
     m_lod.reset(&m_generator);
     Config::WORLD_SEED = newSeed;
+    if(m_saveStore && !m_replicaMode) {
+        m_redstone.motions=m_saveStore->loadPistonMotions();
+        for(const auto& motion:m_redstone.motions) {
+            m_redstone.nextMotion=std::max(m_redstone.nextMotion,motion.id);
+            for(const auto& edit:motion.edits())if(!m_redstone.reservations.emplace(edit.first,motion.id).second)throw std::runtime_error("Overlapping piston journal entries");
+        }
+    }
 }
 
 World::~World() {
@@ -163,8 +174,10 @@ World::~World() {
 }
 
 void World::retireChunkUnlocked(Chunk& chunk, bool keepWarm) {
+    m_redstone.dirty=true;m_redstone.propagation.reset();m_redstone.graph.reset();
     const int cx = chunk.cx;
     const int cz = chunk.cz;
+    retireRedstoneChunkUnlocked(cx,cz,keepWarm);
     // The streamer holds the chunk-store lock. Persist the live chunk before
     // releasing its GPU mesh or erasing any in-memory save bookkeeping.
     m_persistence.saveOverrides(cx, cz);
@@ -198,8 +211,14 @@ bool World::overridesAppliedUnlocked(int cx, int cz) const {
 }
 
 void World::applySavedChunkDataUnlocked(int cx, int cz) {
+    m_redstone.dirty=true;m_redstone.propagation.reset();m_redstone.graph.reset();
     m_persistence.applySavedOverridesUnlocked(cx, cz);
     m_persistence.loadBlockEntities(cx, cz);
+    m_persistence.forEachOverrideInChunkUnlocked(cx,cz,[&](uint32_t index,BlockId id){
+        const glm::ivec3 position{cx*16+int(index%16),Config::WORLD_MIN_Y+int(index/256),cz*16+int((index/16)%16)};
+        const auto entity=m_persistence.getBlockEntityUnlocked(position);
+        registerRedstone(position,id,false,entity?&entity->circuitState:nullptr);
+    });
 }
 
 void World::registerGeneratedBlockEntityUnlocked(
@@ -231,11 +250,20 @@ std::optional<BlockId> World::getLoadedBlock(int worldX, int worldY, int worldZ)
     const Chunk* chunk = m_chunks.find(cx,cz);
     if (!chunk || !chunk->generated.load() ||
         chunk->lifecycle.load() == Chunk::LifecycleState::Warm) return std::nullopt;
+    if(m_redstone.evaluating && redstoneTickPending() && !m_redstone.activeChunks.count({cx,cz}))return std::nullopt;
+    if(!m_redstone.evaluating && !m_runningInteractive && !m_pistonCommit) {
+        const auto before=m_redstone.committedBefore.find({worldX,worldY,worldZ});
+        if(before!=m_redstone.committedBefore.end())return before->second;
+    }
     return chunk->getBlock(worldX-cx*Config::CHUNK_SIZE_X,worldY,
                            worldZ-cz*Config::CHUNK_SIZE_Z);
 }
 
 BlockId World::getBlock(int worldX, int worldY, int worldZ) const {
+    if(!m_redstone.evaluating && !m_runningInteractive && !m_pistonCommit) {
+        const auto before=m_redstone.committedBefore.find({worldX,worldY,worldZ});
+        if(before!=m_redstone.committedBefore.end())return before->second;
+    }
     if (!Config::isValidWorldY(worldY)) {
         return BlockId::AIR;
     }
@@ -387,6 +415,9 @@ glm::dvec3 World::findSafeSpawn(int maximumRadius) const {
 }
 
 void World::setBlock(int worldX, int worldY, int worldZ, BlockId id) {
+    if(redstoneTickPending() && !m_runningInteractive && !m_pistonCommit) {
+        m_redstone.externalEdits[{worldX,worldY,worldZ}]=id;return;
+    }
     setBlockInternal(worldX,worldY,worldZ,id,true);
 }
 
@@ -432,6 +463,7 @@ void World::setDerivedBlock(const glm::ivec3& position, BlockId id) {
 
 void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
                              bool recordOverride) {
+    if(!m_pistonCommit && pistonReserved({worldX,worldY,worldZ}))return;
     if (m_replicaMode || !Config::isValidWorldY(worldY) || !dimensionRules(dimension()).contains(worldY)) return;
     if(dimensionRules(dimension()).ultrawarm && isWater(id))id=BlockId::AIR;
     // Flowing/falling states are derived simulation output. Even public
@@ -440,11 +472,10 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
     if (isDerivedFluidState(id)) recordOverride = false;
     const BlockId previous = getBlock(worldX, worldY, worldZ);
     if (previous == id) return;
+    if(redstoneTickPending())m_redstone.committedBefore.emplace(Redstone::Position{worldX,worldY,worldZ},previous);
     // Replacing fluid with air is still a fluid-surface change. Replacing it
     // with an ordinary block is a player edit and must bypass the fluid mesh
     // merge window immediately.
-    const bool fluidMutation = isFluid(id) ||
-        (isFluid(previous) && id == BlockId::AIR);
 
     int cx = worldToChunkX(static_cast<double>(worldX));
     int cz = worldToChunkZ(static_cast<double>(worldZ));
@@ -460,12 +491,24 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
         lx + lz * Config::CHUNK_SIZE_X +
         Config::worldYToStorageY(worldY) *
             Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
-    if (m_blockMutationCallback)
-        m_blockMutationCallback(cx, cz, chunk->blockRevision(), localIndex, id, recordOverride);
     if (recordOverride) {
         m_persistence.recordOverride(cx, cz, localIndex, id);
     }
-    const glm::ivec3 position{worldX, worldY, worldZ};
+    const glm::ivec3 position{worldX,worldY,worldZ};
+    if(m_blockTransaction) {m_pendingBlockChanges.push_back({position,previous,id,recordOverride,chunk->blockRevision()});return;}
+    finishBlockChange(position,previous,id,recordOverride);
+}
+
+void World::finishBlockChange(const glm::ivec3& position,BlockId previous,BlockId id,bool recordOverride,uint64_t revision) {
+    const int worldX=position.x,worldY=position.y,worldZ=position.z;
+    const int cx=worldToChunkX(worldX),cz=worldToChunkZ(worldZ);
+    const int lx=worldX-cx*16,lz=worldZ-cz*16;
+    const auto localIndex=static_cast<uint32_t>(lx+lz*16+Config::worldYToStorageY(worldY)*256);
+    auto* chunk=m_chunks.find(cx,cz);
+    if(m_pistonCommit && !m_redstone.publishing)m_redstone.atomicMeshes.emplace(cx,cz);
+    const bool fluidMutation=isFluid(id)||(isFluid(previous)&&id==BlockId::AIR);
+    if(m_blockMutationCallback)m_blockMutationCallback(cx,cz,revision?revision:chunk->blockRevision(),localIndex,id,recordOverride);
+    if (isAnvil(id)) m_persistence.scheduleResource(position,id,2);
     if (m_fluidBatchActive) {
         if (fluidMutation) chunk->markFluidMutation(m_currentFluidTick);
         else chunk->markNonFluidMutation();
@@ -480,6 +523,7 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
         Chunk* neighbor = m_chunks.find(neighborX, neighborZ);
         if (neighbor == nullptr) return;
         neighbor->markDirty();
+        if(m_pistonCommit && !m_redstone.publishing)m_redstone.atomicMeshes.emplace(neighborX,neighborZ);
         if (fluidMutation)
             neighbor->markFluidMutation(m_currentFluidTick);
         else
@@ -501,6 +545,27 @@ void World::setBlockInternal(int worldX, int worldY, int worldZ, BlockId id,
         struct Guard { bool& flag; ~Guard(){flag=false;} } guard{m_portalValidationActive};
         m_portalValidationActive=true;
         NetherPortal::invalidateAround(*this,position);
+    }
+    if(const auto state=Redstone::blockState(previous);state && Redstone::thin(state->kind) && isFluid(id)) {
+        if(!recordOverride)m_persistence.recordOverride(cx,cz,localIndex,BlockId::AIR);
+        if(gameRules().boolean(GameRuleId::BlockDrops))m_supportDrops.push_back({position,{itemForBlock(previous),1,0}});
+    }
+    redstoneChanged(position,previous,id);
+    if(!m_pairMutation && Redstone::native(previous)) {
+        const auto state=Redstone::blockState(previous);
+        if(state && state->kind==Redstone::Kind::Piston && state->power) {
+            const auto head=position+Redstone::vector(Redstone::offset(state->facing));
+            const auto headId=getLoadedBlock(head.x,head.y,head.z);
+            if(headId && Redstone::native(*headId) && Redstone::pistonHead(Redstone::nativeSlot(*headId)))setBlock(head.x,head.y,head.z,BlockId::AIR);
+        } else if(Redstone::pistonHead(Redstone::nativeSlot(previous))) {
+            const auto face=static_cast<Redstone::Face>((unsigned(Redstone::nativeSlot(previous))-unsigned(Redstone::NativeBlock::PISTON_HEAD_FIRST))%6);
+            const auto base=position-Redstone::vector(Redstone::offset(face));
+            const auto baseId=getLoadedBlock(base.x,base.y,base.z);const auto piston=baseId?Redstone::blockState(*baseId):std::nullopt;
+            if(piston && piston->kind==Redstone::Kind::Piston && piston->facing==face && piston->power) {
+                if(gameRules().boolean(GameRuleId::BlockDrops))m_supportDrops.push_back({base,{itemForBlock(*baseId),1,0}});
+                setBlock(base.x,base.y,base.z,BlockId::AIR);
+            }
+        }
     }
     DoorState oldDoor, newDoor;
     if (!m_pairMutation && decodeDoor(previous,oldDoor) &&
@@ -568,7 +633,7 @@ std::optional<World::RaycastHit> World::raycast(const glm::dvec3& origin,
             const BlockId id = getBlock(blockPos.x, blockPos.y, blockPos.z);
             if (id == BlockId::AIR) return false;
             const BlockProperties& props = getBlockProps(id);
-            if (props.solid || props.shape==RenderShape::Button ||
+            if (props.solid || props.shape==RenderShape::Button || Redstone::native(id) ||
                 (Plugins::pluginBlock(id)&&Plugins::pluginBlock(id)->selection)) {
                 const BlockCollisionBoxes boxes = blockSelectionBoxes(id);
                 double nearest = maxDistance + 1.0;
@@ -665,6 +730,9 @@ void World::updateButtonPower(const glm::ivec3& p, const ButtonState& state) {
     }
 }
 void World::refreshDoorPower(const glm::ivec3& target) {
+    if(m_redstone.phase!=RedstoneWorldState::Phase::Ready && !m_redstone.committingConsumers) {
+        m_pendingDoorPower.emplace(target.x,target.y,target.z);return;
+    }
     if(!generatedAt(target.x,target.z)) {
         m_pendingDoorPower.emplace(target.x,target.y,target.z);return;
     }
@@ -672,19 +740,10 @@ void World::refreshDoorPower(const glm::ivec3& target) {
     if(!decodeDoor(getBlock(target.x,target.y,target.z),state)) return;
     const glm::ivec3 bottom=target-glm::ivec3(0,state.upper?1:0,0);
     bool powered=false, unknown=false;
-    for(int half=0;half<2;++half) for(uint8_t f=0;f<6;++f) {
-        const glm::ivec3 adjacent=bottom+glm::ivec3(0,half,0)+faceOffset(static_cast<FaceDir>(f));
-        if(!generatedAt(adjacent.x,adjacent.z)) {unknown=true;continue;}
-        ButtonState button;
-        if(decodeButton(getBlock(adjacent.x,adjacent.y,adjacent.z),button) && button.pressed) powered=true;
-        const BlockId support=getBlock(adjacent.x,adjacent.y,adjacent.z);
-        if(!isFullCollisionBlock(support) || getBlockProps(support).layer!=RenderLayer::Opaque) continue;
-        for(uint8_t bf=0;bf<6;++bf) {
-            const glm::ivec3 bp=adjacent+faceOffset(static_cast<FaceDir>(bf));
-            if(!generatedAt(bp.x,bp.z)) {unknown=true;continue;}
-            if(decodeButton(getBlock(bp.x,bp.y,bp.z),button) && button.pressed &&
-                bp-faceOffset(button.attachment)==adjacent) powered=true;
-        }
+    for(int half=0;half<2;++half) {
+        bool known=true;
+        powered=redstoneReceived(bottom+glm::ivec3(0,half,0),false,known)>0 || powered;
+        unknown=unknown || !known;
     }
     if(unknown) {
         m_pendingDoorPower.emplace(bottom.x,bottom.y,bottom.z);
@@ -706,9 +765,22 @@ void World::validateInteractiveNeighbors(const glm::ivec3& p) {
         const BlockId id=getBlock(q.x,q.y,q.z);
         DoorState door; ButtonState button;
         bool invalid=false;
-        if(decodeDoor(id,door)) {
+        if(const auto circuit=Redstone::blockState(id);circuit && Redstone::thin(circuit->kind)) {
+            const auto direction=(circuit->kind==Redstone::Kind::Lever || circuit->kind==Redstone::Kind::Torch)?circuit->facing:Redstone::Face::Up;
+            const auto support=q-Redstone::vector(Redstone::offset(direction));
+            const auto cell=getLoadedBlock(support.x,support.y,support.z);
+            invalid=cell && !blockSupportsFace(*cell,static_cast<FaceDir>(direction));
+        } else if(decodeDoor(id,door)) {
             const glm::ivec3 bottom=q-glm::ivec3(0,door.upper?1:0,0);
             invalid=!supportsFace(bottom-glm::ivec3(0,1,0),FaceDir::TOP);
+        } else if (isGrindstone(id)) {
+            const auto state = grindstoneState(id);
+            const auto outward = state / 4 == 0 ? glm::ivec3(0,1,0) : state / 4 == 2 ? glm::ivec3(0,-1,0) : bedDirectionOffset(static_cast<BedDirection>(state % 4));
+            const auto support = q - outward;
+            const auto loaded = getLoadedBlock(support.x,support.y,support.z);
+            if (loaded) invalid = !isFullCollisionBlock(*loaded);
+        } else if (isAnvil(id)) {
+            m_persistence.scheduleResource(q,id,2);
         } else if(decodeButton(id,button))
             invalid=!supportsFace(q-faceOffset(button.attachment),button.attachment);
         else if(const auto* behavior=Plugins::blockBehavior(id)) {
@@ -724,25 +796,44 @@ void World::validateInteractiveNeighbors(const glm::ivec3& p) {
     }
 }
 void World::tickInteractiveBlocks(const std::function<bool(const glm::ivec3&)>& arrowPresent) {
-    std::vector<glm::ivec3> ready;
-    for(auto it=m_pendingDoorPower.begin();it!=m_pendingDoorPower.end() && ready.size()<Config::BUTTON_TRANSITIONS_PER_TICK;) {
-        const auto [x,y,z]=*it;
-        if(generatedAt(x,z)) {ready.emplace_back(x,y,z);it=m_pendingDoorPower.erase(it);}
-        else ++it;
+    tickInteractiveBlocks(arrowPresent,{});
+}
+bool World::tickInteractiveBlocks(const std::function<bool(const glm::ivec3&)>& arrowPresent,RedstoneWorkBudget budget) {
+    if(!budget.events || !budget.propagation)throw std::invalid_argument("Redstone work budgets must be positive");
+    if(m_replicaMode)return true;
+    struct Running {bool& flag;~Running(){flag=false;}} running{m_runningInteractive};
+    m_runningInteractive=true;
+    if(!redstoneTickPending()) {
+        flushDeferredBlockEdits();
+        m_redstone.activeChunks.clear();
+        for(const auto* chunk:getSimulationChunks())if(chunk->generated.load())m_redstone.activeChunks.emplace(chunk->cx,chunk->cz);
+        m_redstone.motionView=m_redstone.motions;
+        m_redstone.motionRemaining=m_redstone.motions.size();
     }
-    for(const auto& p:ready)refreshDoorPower(p);
-    for(const auto& resource:m_persistence.tickResources())setBlock(resource.first.x,resource.first.y,resource.first.z,resource.second);
-    for(const glm::ivec3& p:m_persistence.tickButtons()) {
-        ButtonState button;
-        if(!decodeButton(getBlock(p.x,p.y,p.z),button)) continue;
-        if(buttonArrowTrigger(button) && arrowPresent(p)) {
-            if(auto* entity=m_persistence.getBlockEntity(p)) entity->buttonRemaining=static_cast<uint16_t>(buttonReleaseTicks(button));
-            continue;
+    if(m_redstone.phase==RedstoneWorldState::Phase::Ready) {
+    for (const auto& resource : m_persistence.tickResources()) {
+        const auto p = resource.first;
+        if (isAnvil(resource.second)) {
+            if (getLoadedBlock(p.x,p.y,p.z) != resource.second) continue;
+            const auto below = getLoadedBlock(p.x,p.y-1,p.z);
+            if (below && blockCollisionBoxes(*below).count == 0) m_fallingAnvils.push_back(p);
+            else m_persistence.scheduleResource(p,resource.second,20);
+        } else setBlock(p.x,p.y,p.z,resource.second);
+    }
+        m_redstone.phase=RedstoneWorldState::Phase::Lifecycle;
+        for(const glm::ivec3& p:m_persistence.tickButtons()) {
+            ButtonState button;
+            if(!decodeButton(getBlock(p.x,p.y,p.z),button)) continue;
+            if(buttonArrowTrigger(button) && arrowPresent(p)) {
+                if(auto* entity=m_persistence.getBlockEntity(p)) entity->buttonRemaining=static_cast<uint16_t>(buttonReleaseTicks(button));
+                continue;
+            }
+            button.pressed=false;setBlock(p.x,p.y,p.z,buttonBlock(button));
+            updateButtonPower(p,button);
+            m_interactionSounds.push_back({p,button.material==DoorMaterial::Iron,false,true});
         }
-        button.pressed=false;setBlock(p.x,p.y,p.z,buttonBlock(button));
-        updateButtonPower(p,button);
-        m_interactionSounds.push_back({p,button.material==DoorMaterial::Iron,false,true});
     }
+    return tickRedstone(budget);
 }
 void World::activateButtonsAtArrow(const glm::dvec3& arrow) {
     const glm::ivec3 cell(glm::floor(arrow));
@@ -757,4 +848,10 @@ void World::activateButtonsAtArrow(const glm::dvec3& arrow) {
         if(glm::all(glm::greaterThanEqual(local,glm::dvec3(box.min)-.03)) &&
            glm::all(glm::lessThanEqual(local,glm::dvec3(box.max)+.03))) activateButton(p);
     }
+}
+
+void World::flushDeferredBlockEdits() {
+    if(redstoneTickPending())throw std::logic_error("Deferred edits require a completed circuit tick");
+    auto edits=std::move(m_redstone.externalEdits);m_redstone.externalEdits.clear();
+    for(const auto& edit:edits)setBlock(edit.first.x,edit.first.y,edit.first.z,edit.second);
 }

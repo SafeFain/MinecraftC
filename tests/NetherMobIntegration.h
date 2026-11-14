@@ -3,6 +3,7 @@
 #include "NetherCombatCases.h"
 #include "game/NetherProgression.h"
 #include "network/EntityProtocol.h"
+#include <set>
 
 namespace NetherMobIntegration {
 inline int run(const std::filesystem::path& assets) {
@@ -10,18 +11,31 @@ inline int run(const std::filesystem::path& assets) {
     std::cerr<<"Nether integration: registry and persistence\n";
     {
         Scene s(assets);int i=0;
-#define SPAWN(type,egg,key,label,h,x,y,z,speed,d,monster,fire) check(s.mobs.spawnMob(EntityType::type,{double(i++*4-20),1,10}),"native mob spawn");
+        std::set<EntityType> spawnedTypes;
+#define SPAWN(type,egg,key,label,h,x,y,z,speed,d,monster,fire) check(s.mobs.spawnMob(EntityType::type,{double(i++*4-20),1,10}),"native mob spawn"); spawnedTypes.insert(EntityType::type);
         MC_NETHER_MOBS(SPAWN)
 #undef SPAWN
-        auto saved=s.mobs.saveEntities();check(saved.size()==11,"native mob count");
-        saved[3].nether.magmaSize=1;saved[4].nether.barterTicks=75;saved[9].nether.saddled=1;
-        saved[10].effects={{StatusEffectType::Weakness,1,1200}};
+        const auto record=[](auto& records,EntityType type)->auto& {
+            const auto found=std::find_if(records.begin(),records.end(),[&](const auto& entity){return static_cast<EntityType>(entity.type)==type;});
+            check(found!=records.end(),"persisted native mob is missing");return *found;
+        };
+        auto saved=s.mobs.saveEntities();
+        std::set<EntityType> savedTypes;for(const auto& entity:saved)savedTypes.insert(static_cast<EntityType>(entity.type));
+        check(savedTypes==spawnedTypes && saved.size()==savedTypes.size(),"native mob persistence omitted or duplicated an identity");
+        record(saved,EntityType::MagmaCube).nether.magmaSize=1;
+        record(saved,EntityType::Piglin).nether.barterTicks=75;
+        record(saved,EntityType::Strider).nether.saddled=1;
+        record(saved,EntityType::Enderman).effects={{StatusEffectType::Weakness,1,1200}};
         const auto path=std::filesystem::temp_directory_path()/"minecraftc-nether-mobs-v22";
         std::filesystem::remove_all(path);SaveStore store(path);store.saveChunkEntities(0,0,saved);
         const auto restored=store.loadChunkEntities(0,0);
-        check(restored.size()==11 && restored[4].nether.barterTicks==75 && restored[9].nether.saddled==1 && restored[10].effects[0].remaining==1200,"native state save roundtrip");
+        const auto& enderman=record(restored,EntityType::Enderman);
+        check(restored.size()==saved.size() && record(restored,EntityType::Piglin).nether.barterTicks==75 &&
+              record(restored,EntityType::Strider).nether.saddled==1 && !enderman.effects.empty() &&
+              enderman.effects[0].remaining==1200,"native state save roundtrip");
         s.mobs.clear();s.mobs.loadEntities(restored);
-        check(s.mobs.entities()[3].nether.magmaSize==1 && s.mobs.entities()[9].riderId==UINT64_MAX,"native durable state or transient rider");
+        check(record(s.mobs.entities(),EntityType::MagmaCube).nether.magmaSize==1 &&
+              record(s.mobs.entities(),EntityType::Strider).riderId==UINT64_MAX,"native durable state or transient rider");
         Lan::EntityBatch batch;batch.dimension=DimensionId::Nether;batch.epoch=1;
         EntitySnapshot snapshot;snapshot.id=1;snapshot.type=EntityType::Strider;snapshot.health=20;snapshot.nether.saddled=1;snapshot.riderId=7;
         snapshot.effects={{StatusEffectType::FireResistance,0,300}};batch.entities.push_back(snapshot);

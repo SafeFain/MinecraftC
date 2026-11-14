@@ -1,5 +1,6 @@
 #include "plugins/ContentQueries.h"
 #include "game/Item.h"
+#include "world/RedstoneBlocks.h"
 
 #include <array>
 #include <cctype>
@@ -526,6 +527,27 @@ std::array<ItemProperties, itemCount> buildRegistry() {
     MC_NETHER_MOBS(NETHER_EGG_PROPS)
 #undef NETHER_EGG_PROPS
     items[static_cast<size_t>(ItemId::NETHER_WART)].placedBlock=BlockId::NETHER_WART_CROP_0;
+    set(ItemId::LAPIS_LAZULI, {"Lapis Lazuli"});
+    set(ItemId::PAPER, {"Paper"});
+    set(ItemId::BOOK, {"Book"});
+    set(ItemId::ENCHANTED_BOOK, {"Enchanted Book", ItemKind::Material, 1});
+    set(ItemId::LAPIS_ORE, {"Lapis Ore", ItemKind::Block, 64, 0, ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::LAPIS_ORE});
+    set(ItemId::DEEPSLATE_LAPIS_ORE, {"Deepslate Lapis Ore", ItemKind::Block, 64, 0, ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DEEPSLATE_LAPIS_ORE});
+    set(ItemId::BOOKSHELF, {"Bookshelf", ItemKind::Block, 64, 0, ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::BOOKSHELF});
+    set(ItemId::IRON_BLOCK, {"Iron Block", ItemKind::Block, 64, 0, ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::IRON_BLOCK});
+    set(ItemId::ENCHANTING_TABLE, {"Enchanting Table", ItemKind::Block, 64, 0, ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::ENCHANTING_TABLE});
+    set(ItemId::ANVIL, {"Anvil", ItemKind::Block, 64, 0, ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::ANVIL});
+    set(ItemId::CHIPPED_ANVIL, {"Chipped Anvil", ItemKind::Block, 64, 0, ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::CHIPPED_ANVIL});
+    set(ItemId::DAMAGED_ANVIL, {"Damaged Anvil", ItemKind::Block, 64, 0, ToolKind::None, ToolTier::None, 0, 0, 0, 0, BlockId::DAMAGED_ANVIL});
+#define REDSTONE_ITEM_NAME(id,key,label) set(ItemId::id,{label});
+    MC_REDSTONE_ITEMS(REDSTONE_ITEM_NAME)
+#undef REDSTONE_ITEM_NAME
+#define REDSTONE_ITEM_BLOCK(id,key,label) if(const auto native=Redstone::namedBlock(key)) {auto& props=items[static_cast<size_t>(ItemId::id)];props.kind=ItemKind::Block;props.placedBlock=Redstone::worldBlock(*native);}
+    MC_REDSTONE_ITEMS(REDSTONE_ITEM_BLOCK)
+#undef REDSTONE_ITEM_BLOCK
+    items[static_cast<size_t>(ItemId::REDSTONE_DUST)].placedBlock=Redstone::worldBlock(*Redstone::namedBlock("redstone_dust"));
+    items[static_cast<size_t>(ItemId::SLIME_SPAWN_EGG)].kind=ItemKind::SpawnEgg;
+    items[static_cast<size_t>(ItemId::SLIME_SPAWN_EGG)].spawnEggMob=SpawnEggMob::Slime;
     return items;
 }
 
@@ -535,6 +557,13 @@ const auto REGISTRY = buildRegistry();
 // inventory tests: every serialized item appears in exactly one category and
 // all category sizes are asserted there.
 CreativeItemCategory categoryFor(ItemId id) {
+    if(id==ItemId::SLIME_BALL)return CreativeItemCategory::Materials;
+    if(id>=ItemId::LEVER && id<=ItemId::REDSTONE_BLOCK)return CreativeItemCategory::Functional;
+    if(id==ItemId::REDSTONE_ORE || id==ItemId::DEEPSLATE_REDSTONE_ORE)return CreativeItemCategory::BuildingBlocks;
+    if (id == ItemId::LAPIS_LAZULI || id == ItemId::PAPER || id == ItemId::BOOK) return CreativeItemCategory::Materials;
+    if (id == ItemId::ENCHANTED_BOOK) return CreativeItemCategory::Tools;
+    if (id >= ItemId::LAPIS_ORE && id <= ItemId::IRON_BLOCK) return CreativeItemCategory::BuildingBlocks;
+    if (id >= ItemId::ENCHANTING_TABLE && id <= ItemId::DAMAGED_ANVIL) return CreativeItemCategory::Functional;
     if(getItemProps(id).kind==ItemKind::SpawnEgg)return CreativeItemCategory::SpawnEggs;
     if(const auto* item=Plugins::pluginItem(id))return item->category;
     if (id >= ItemId::BIRCH_PLANKS && id <= ItemId::ACACIA_PLANKS)
@@ -820,6 +849,26 @@ const ItemProperties& getItemProps(ItemId id) {
 }
 
 ItemId itemForBlock(BlockId id) {
+    if(const auto state=Redstone::blockState(id)) {
+        switch(state->kind) {
+            case Redstone::Kind::Dust:return ItemId::REDSTONE_DUST;
+            case Redstone::Kind::Lever:return ItemId::LEVER;
+            case Redstone::Kind::Torch:return ItemId::REDSTONE_TORCH;
+            case Redstone::Kind::Repeater:return ItemId::REDSTONE_REPEATER;
+            case Redstone::Kind::Comparator:return ItemId::REDSTONE_COMPARATOR;
+            case Redstone::Kind::Observer:return ItemId::OBSERVER;
+            case Redstone::Kind::Piston:return state->alternate?ItemId::STICKY_PISTON:ItemId::PISTON;
+            case Redstone::Kind::Lamp:return ItemId::REDSTONE_LAMP;
+            case Redstone::Kind::Block:return ItemId::REDSTONE_BLOCK;
+        }
+    }
+    if(Redstone::native(id)) {
+        if(Redstone::ore(Redstone::nativeSlot(id)))return (unsigned(Redstone::nativeSlot(id))-unsigned(Redstone::NativeBlock::REDSTONE_ORE))%2?ItemId::DEEPSLATE_REDSTONE_ORE:ItemId::REDSTONE_ORE;
+        return ItemId::EMPTY;
+    }
+    if (id >= BlockId::LAPIS_ORE && id <= BlockId::DAMAGED_ANVIL) return static_cast<ItemId>(static_cast<uint16_t>(ItemId::LAPIS_ORE) + static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::LAPIS_ORE));
+    if (id >= BlockId::ANVIL_EAST && id <= BlockId::DAMAGED_ANVIL_EAST) return static_cast<ItemId>(static_cast<uint16_t>(ItemId::ANVIL) + static_cast<uint16_t>(id) - static_cast<uint16_t>(BlockId::ANVIL_EAST));
+    if (id >= BlockId::GRINDSTONE_STATE_FIRST && id <= BlockId::GRINDSTONE_STATE_LAST) return ItemId::GRINDSTONE;
     if(respawnAnchorCharge(id)>0)return ItemId::RESPAWN_ANCHOR;
     if(isNetherWart(id))return ItemId::NETHER_WART;
     switch(id) {
@@ -1019,6 +1068,9 @@ std::vector<ItemId> creativeInventoryItems() {
 
 const std::string& itemCommandName(ItemId id) {
     switch(id) {
+#define REDSTONE_COMMAND(id,key,label) case ItemId::id: {static const std::string name=key;return name;}
+        MC_REDSTONE_ITEMS(REDSTONE_COMMAND)
+#undef REDSTONE_COMMAND
 #define NETHER_COMMAND(id,key,label,r,g,b,shape,light) case ItemId::id: {static const std::string name=key;return name;}
         MC_NETHER_BLOCKS(NETHER_COMMAND)
 #undef NETHER_COMMAND

@@ -23,6 +23,7 @@
 #include "game/CombatRules.h"
 #include "player/PlayerPhysics.h"
 
+namespace Redstone {struct PistonSweep;}
 struct PotionDefinition;
 struct EntitySnapshot;
 struct EntityDeathSnapshot;
@@ -74,6 +75,7 @@ struct Entity {
     bool sleeping = false;
     EntityAiState ai;
     uint64_t shooterId = 0;
+    uint8_t lootingLevel = 0;
     float playerHitRemaining = 0; // Transient kill attribution, never serialized.
     std::string pluginState="{}";
     std::string nativeOwner; // derived cache of the persisted shared envelope
@@ -124,7 +126,7 @@ public:
     void awardMiningExperience(const glm::dvec3&,BlockId,const ItemStack&);
     void settleFurnaceExperience(const glm::dvec3&, const std::map<std::string,uint64_t>&);
     void spawnArrow(const glm::dvec3& position, const glm::vec3& velocity,
-                    float damage, bool playerOwned, uint64_t shooterId = 0);
+                    float damage, bool playerOwned, uint64_t shooterId = 0, ItemStack weapon = {}, bool pickup = true, const std::string& owner = "local");
     bool spawnMob(EntityType type, const glm::dvec3& position);
     void spawnNativeProjectile(EntityType,const glm::dvec3&,const glm::vec3&,uint64_t,ItemStack={},const std::string& owner="local");
     bool useNativeMob(Player&,uint64_t playerId);
@@ -166,13 +168,14 @@ public:
         m_presentation = presentation;
     }
     static glm::vec3 entitySize(const Entity& entity) {
-        return renderSize(entity.type)*(entity.type==EntityType::MagmaCube ? static_cast<float>(1u<<entity.nether.magmaSize) : 1.f)*((entity.type==EntityType::Villager ||
+        return renderSize(entity.type)*(jumpingCube(entity.type) ? static_cast<float>(1u<<entity.nether.magmaSize) : 1.f)*((entity.type==EntityType::Villager ||
             entity.type==EntityType::ZombieVillager) && !entity.villager.adult() ? .5f : 1.0f);
     }
     const std::vector<Entity>& entities() const { return m_entities; }
     const std::vector<DeadEntityRender>& deadEntityRenders() const {
         return m_deadEntityRenders;
     }
+    void pushPiston(const Redstone::PistonSweep& sweep);
     std::vector<EntityRecord> saveEntities() const;
     void loadEntities(const std::vector<EntityRecord>& entities);
     bool hasHostileNear(const glm::dvec3& position, float radius) const;
@@ -310,7 +313,7 @@ private:
     void pluginEvent(Entity&,uint32_t);
     bool pluginAi(Entity&,float);
     void spawnAroundPlayer(const glm::dvec3& playerPosition, bool hostile,
-                           bool underground);
+                           bool underground,bool slimeOnly=false);
     void moveWithTerrain(Entity& entity, const glm::vec3& horizontal, float dt);
     void integrateVelocity(Entity& entity, float dt);
     bool collides(const Entity& entity, const glm::dvec3& position) const;
@@ -322,6 +325,7 @@ private:
                        std::optional<glm::dvec3> source = std::nullopt,
                        uint64_t sourceId = 0);
     void updateArrow(Entity& entity, float dt);
+    void updateFallingAnvil(Entity&,float);
     void explode(const glm::dvec3& center, float power,
                  uint32_t eventSeed, bool mobExplosion = false,
                  std::optional<uint64_t> playerOwner = {}, bool experienceCredit = false);

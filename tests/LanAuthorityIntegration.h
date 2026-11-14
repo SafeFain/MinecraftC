@@ -5,11 +5,11 @@ inline int run() {
     const auto root = std::filesystem::temp_directory_path() / "minecraftc-lan-authority-test";
     std::filesystem::remove_all(root);
     Config::RENDER_DISTANCE = 2;
-    GameSession session(root / "saves");
-    GameSessionTestAccess::world(session).setThreadPool(nullptr);
+    ScenarioSession session(root / "saves");
+    SessionScenario::world(session).setThreadPool(nullptr);
     const auto worldId = session.createWorld("LAN authority", 42, GameMode::Survival, Difficulty::Normal, true, WorldType::Superflat);
     session.startWorld(worldId, true, 0);
-    GameSessionTestAccess::prepareLanScene(session);
+    SessionScenario::prepareLanScene(session);
     require(session.openLanRoom(0, 2, true), "loaded world opens authoritative listen server");
     Lan::Client client;
     auto identity = Lan::ProfileStore::localIdentity(root / "guest");
@@ -25,7 +25,7 @@ inline int run() {
     for (int i = 0; i < 500 && (client.state() != Lan::Client::State::Connected || session.lanGuestCount() != 1); ++i) pump();
     require(client.state() == Lan::Client::State::Connected && session.lanGuestCount() == 1,
             "paired socket admission creates exactly one independent player");
-    auto& guest = GameSessionTestAccess::guest(session, client.peerId());
+    auto& guest = SessionScenario::guest(session, client.peerId());
     require(&guest.player.inventory() != &session.inventory(), "guest inventory cannot alias host storage");
     Lan::PlayerInput input;
     input.forward = 1; input.yaw = 90;
@@ -33,8 +33,9 @@ inline int run() {
     for (int i = 0; i < 20; ++i) pump();
     const auto hostBefore = session.playerState().getPosition();
     const auto guestBefore = guest.player.getPosition();
-    GameSessionTestAccess::tickLanPlayers(session, .05f);
-    require(guest.player.getPosition().x > guestBefore.x && session.playerState().getPosition() == hostBefore,
+    SessionScenario::tickLanPlayers(session, .05f);
+    const auto hostAfter=session.playerState().getPosition();
+    require(guest.player.getPosition().x > guestBefore.x && hostAfter.x==hostBefore.x&&hostAfter.z==hostBefore.z,
             "server input moves only the identified guest using server elapsed time");
     const auto afterOneTick = guest.player.getPosition();
     for (int i = 0; i < 10; ++i) { client.send({Lan::MessageType::Input, 0, Lan::encodePlayerInput(input)}); pump(); }
@@ -44,8 +45,8 @@ inline int run() {
     InventoryAction cursor;
     cursor.sequence = 1;
     require(guest.window.apply(guest.player.inventory(), cursor, {}).accepted, "authoritative window owns picked-up stack");
-    GameSessionTestAccess::world(session).setBlock(1,100,1,BlockId::DIAMOND_ORE);
-    GameSessionTestAccess::setTerrainReady(session, false);
+    SessionScenario::world(session).setBlock(1,100,1,BlockId::DIAMOND_ORE);
+    SessionScenario::setTerrainReady(session, false);
     bool saveError = false; session.saveNow([&] { saveError = true; });
     Lan::ProfileStore loadingProfiles(root / "saves" / worldId / "players");
     const auto loadingProfile = loadingProfiles.load(identity);
@@ -55,7 +56,7 @@ inline int run() {
             std::any_of(loadingEdits.begin(), loadingEdits.end(), [](const BlockOverride& edit) {
                 return edit.localIndex == static_cast<uint32_t>((100 - Config::WORLD_MIN_Y) * 256 + 17) && edit.block == BlockId::DIAMOND_ORE;
             }), "active host saves guest cursor and terrain even while its own dimension is loading");
-    GameSessionTestAccess::setTerrainReady(session, true);
+    SessionScenario::setTerrainReady(session, true);
     client.close();
     for (int i = 0; i < 500 && session.lanGuestCount(); ++i) pump();
     require(session.lanGuestCount() == 0, "disconnect retires guest runtime");
@@ -66,8 +67,8 @@ inline int run() {
     require(client.join("::1", session.lanPort(), GameSession::lanCompatibility(), identity, now), "guest reconnects with persistent identity");
     for (int i = 0; i < 500 && session.lanGuestCount() == 0; ++i) pump();
     require(session.lanGuestCount() == 1 &&
-            GameSessionTestAccess::guest(session, client.peerId()).player.inventory().slot(0).count == 3 &&
-            GameSessionTestAccess::guest(session, client.peerId()).player.experience().level()==32,
+            SessionScenario::guest(session, client.peerId()).player.inventory().slot(0).count == 3 &&
+            SessionScenario::guest(session, client.peerId()).player.experience().level()==32,
             "reconnection restores guest inventory rather than host inventory");
     Lan::Bytes malformed = Lan::encodePlayerInput(input); malformed[2] = 0xff; malformed[3] = 0xff;
     malformed[4] = 0xff; malformed[5] = 0x7f;

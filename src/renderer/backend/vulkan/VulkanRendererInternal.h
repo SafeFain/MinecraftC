@@ -430,6 +430,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     VkExtent2D diagnosticCaptureExtent{};
     std::optional<VoxelGiConfig> diagnosticGiConfig;
     bool diagnosticGiReuseMask = false;
+    std::optional<float> diagnosticParticleTime;
     bool sceneFinished = false;
     RendererPerformanceStats performance{};
 

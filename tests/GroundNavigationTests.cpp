@@ -51,7 +51,8 @@ int main() {
         TerrainFixture f; f.wall(3,-3,3);
         auto search=solve(f,{.5,1,.5},{6.5,1,.5});
         require(search.status()==GroundNavigation::Status::Succeeded,"wall detour was not found");
-        require(search.path().size()>10,"wall route did not detour");
+        require(std::any_of(search.path().begin(),search.path().end(),[](const auto& p){return std::abs(p.z)>3;}),
+                "wall route did not pass around the sealed wall's end");
         for (size_t i=1;i<search.path().size();++i)
             require(GroundNavigation::traverse(f.terrain(),human,search.path()[i-1],search.path()[i]),
                     "returned route contains an invalid edge");
@@ -122,7 +123,8 @@ int main() {
         require(!GroundNavigation::clear(terrain,human,{1.9,1,.5}),"closed door did not obstruct ordinary mobs");
         terrain.canOpenWoodDoors=true;
         GroundNavigation::Search search(terrain,human,{.5,1,.5},{{2.5,1,.5},.15,.1});
-        while(search.status()==GroundNavigation::Status::Pending)search.advance(terrain,32);
+        for(int batch=0;batch<256&&search.status()==GroundNavigation::Status::Pending;++batch)
+            require(search.advance(terrain,32)<=32,"door search exceeded its incremental budget");
         require(search.status()==GroundNavigation::Status::Succeeded,"villager cannot plan through wooden door");
         door.upper=false;door.material=DoorMaterial::Iron;f.edits[{1,1,0}]=doorBlock(door);
         door.upper=true;f.edits[{1,2,0}]=doorBlock(door);

@@ -39,7 +39,9 @@ inline int run() {
             require(natural.tilesPerSide==normal.tilesPerSide,"matching sequences changed atlas dimensions");
             require(natural.texture.pixels!=normal.texture.pixels,"natural atlas equals baseline");
             require(gi[uint16_t(BlockId::STONE)].reflectance[0]!=normalGi[uint16_t(BlockId::STONE)].reflectance[0],"GI retained old texture color");
-            require(natural.texture.mipLevels.size()==4&&natural.normalTexture.mipLevels.size()==4&&natural.propertyTexture.mipLevels.size()==4,"natural mipmaps missing");
+            require(!natural.texture.mipLevels.empty()&&natural.texture.mipLevels.size()==normal.texture.mipLevels.size()&&
+                natural.normalTexture.mipLevels.size()==normal.normalTexture.mipLevels.size()&&
+                natural.propertyTexture.mipLevels.size()==normal.propertyTexture.mipLevels.size(),"natural overrides changed the atlas mip contract");
             for(const auto& entry:Plugins::content().materials)require(entry.second.replace,"natural material appended instead of replacing");
             const auto water=getAtlasTextureIndex(BlockTexture::Water);
             require(natural.sequences.at(water).frames==normal.sequences.at(water).frames,"water animation lost");
@@ -109,7 +111,9 @@ inline int run() {
         const auto mobile=root/"virtual";write(mobile/"plugins.json",R"({"official_heaven":false,"official_natural_textures":true})");
         {AssetStore title(assets);Plugins::PluginManager virtualPack({{},mobile});virtualPack.initialize();
             require(pack(virtualPack).active,pack(virtualPack).status.c_str());
-            require(pack(virtualPack).root.generic_string().find(".cache/builtin_plugins")!=std::string::npos,"virtual assets were not materialized");virtualPack.shutdown();}
+            require(pack(virtualPack).root.is_absolute()&&std::filesystem::is_directory(pack(virtualPack).root)&&
+                bytes(pack(virtualPack).root/"mod.json")==bytes(assets/"plugins/official_natural_textures/mod.json"),
+                "virtual resources were not materialized byte-exactly");virtualPack.shutdown();}
         std::filesystem::remove_all(root);std::cout<<"Natural textures coverage, overrides, compatibility, rollback and mobile materialization passed\n";return 0;
     }catch(const std::exception& error){std::cerr<<"Natural textures: "<<error.what()<<'\n';return 1;}
 }

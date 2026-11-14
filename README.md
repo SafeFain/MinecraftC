@@ -28,6 +28,8 @@ Run `./build-local/minecraftc` on Linux/macOS. For Visual Studio builds, run
 `.\build-local\Release\minecraftc.exe`. Installed builds find assets beside the
 executable; see [installation](docs/building.md#install-and-test).
 All platforms require Vulkan; startup does not fall back to another renderer.
+See [test execution and review](docs/testing.md) for CTest subsets, isolated
+fixtures and Vulkan readback validation.
 
 Move with WASD, look with the mouse, jump with Space, open inventory with E,
 and pause with Esc. Bindings are configurable; see [controls](docs/controls.md).
@@ -47,7 +49,7 @@ and pause with Esc. Bindings are configurable; see [controls](docs/controls.md).
 
 ## World compatibility
 
-Opening a world requires save format **v22 or v23** and global generation **v21**
+Opening a world requires save format **v22–v25** and global generation **v23**
 (native Nether **v1**, optional Heaven **v9**). Older/future versions remain listed as incompatible. Gameplay
 plugin changes require review and explicit local recovery; a full backup is
 retained by default, and entering without one permanently discards removed content.

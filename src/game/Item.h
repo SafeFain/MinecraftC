@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "world/Block.h"
+#include "game/ItemComponents.h"
 #include "game/NetherItems.h"
 #include "entity/NetherMobs.h"
 
@@ -339,6 +340,11 @@ enum class ItemId : uint16_t {
 #define NETHER_EGG_ENUM(type,egg,key,label,h,x,y,z,s,d,monster,fire) egg,
     MC_NETHER_MOBS(NETHER_EGG_ENUM)
 #undef NETHER_EGG_ENUM
+    LAPIS_LAZULI, PAPER, BOOK, ENCHANTED_BOOK,
+    LAPIS_ORE, DEEPSLATE_LAPIS_ORE, BOOKSHELF, IRON_BLOCK, ENCHANTING_TABLE, ANVIL, CHIPPED_ANVIL, DAMAGED_ANVIL,
+#define REDSTONE_ITEM_ENUM(id,key,label) id,
+    MC_REDSTONE_ITEMS(REDSTONE_ITEM_ENUM)
+#undef REDSTONE_ITEM_ENUM
     COUNT,
     POPPY = FLOWER
 };
@@ -381,6 +387,7 @@ enum class SpawnEggMob : uint8_t {
 #define NETHER_EGG_MOB(type,egg,key,label,h,x,y,z,s,d,monster,fire) type,
     MC_NETHER_MOBS(NETHER_EGG_MOB)
 #undef NETHER_EGG_MOB
+    Slime,
 };
 
 enum class ToolKind : uint8_t {
@@ -445,11 +452,23 @@ struct ItemStack {
     uint8_t count = 0;
     uint16_t damage = 0;
 
+    ItemComponents components;
+    ItemStack() = default;
+    ItemStack(ItemId item, uint8_t amount, uint16_t wear = 0, ItemComponents data = {})
+        : id(item), count(amount), damage(wear), components(std::move(data)) {}
+    bool sameItem(const ItemStack& other) const {
+        return id == other.id && damage == other.damage && components == other.components;
+    }
+    bool operator==(const ItemStack& other) const { return count == other.count && sameItem(other); }
+    bool operator!=(const ItemStack& other) const { return !(*this == other); }
+    ItemStack withCount(uint8_t amount) const { auto result = *this; result.count = amount; return result; }
+    uint8_t enchantment(EnchantmentId enchantment) const { return components.enchantments.level(enchantment); }
     bool empty() const { return id == ItemId::EMPTY || count == 0; }
     void clear() {
         id = ItemId::EMPTY;
         count = 0;
         damage = 0;
+        components = {};
     }
 };
 

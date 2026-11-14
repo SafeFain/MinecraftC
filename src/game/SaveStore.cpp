@@ -1,7 +1,11 @@
+#include "world/RedstonePersistence.h"
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
 #include "plugins/Json.h"
 #include "game/SaveStore.h"
+#include "game/FallingAnvilState.h"
+#include "game/EnchantmentHitContext.h"
+#include "game/EnchantingRules.h"
 #include "Config.h"
 #include "core/Platform.h"
 #include "entity/EntityLogic.h"
@@ -87,7 +91,7 @@ class Reader {
 public:
     explicit Reader(Bytes bytes, uint32_t version=0, bool inspection=false,
                     bool recovery=false, std::vector<PluginCompatibilityIssue>* issues=nullptr)
-        : inspectOnly(inspection), recoverPlugins(recovery), report(issues), m_bytes(std::move(bytes)) {
+        : formatVersion(version), inspectOnly(inspection), recoverPlugins(recovery), report(issues), m_bytes(std::move(bytes)) {
         if (version < 16) return;
         const uint32_t requirementCount=read<uint32_t>();
         if (requirementCount>4096) throw std::runtime_error("Too many plugin requirements");
@@ -123,6 +127,7 @@ public:
         };
         palette(true);palette(false);
     }
+    uint32_t formatVersion = 0;
     std::set<PluginCompatibilityIssue> seenIssues;
     bool inspectOnly=false;
     bool recoverPlugins=false;
@@ -353,10 +358,12 @@ CheckedBytes readChecked(const std::filesystem::path& path) {
 }
 
 void appendStack(Bytes& payload, const ItemStack& stack) {
+    if (!EnchantingRules::validComponents(stack)) throw std::runtime_error("Invalid item components");
     if(!Plugins::availableItem(stack.id))throw std::runtime_error("Cannot save unavailable item");
     append(payload, static_cast<uint16_t>(stack.id));
     append(payload, stack.count);
     append(payload, stack.damage);
+    writeItemComponents(stack.components, [&](uint8_t byte) { append(payload, byte); });
 }
 
 ItemStack readStack(Reader& reader) {
@@ -364,16 +371,19 @@ ItemStack readStack(Reader& reader) {
     stack.id = static_cast<ItemId>(reader.contentId(reader.read<uint16_t>(), false));
     stack.count = reader.read<uint8_t>();
     stack.damage = reader.read<uint16_t>();
+    if (reader.formatVersion >= 24) stack.components = readItemComponents([&]() { return reader.read<uint8_t>(); });
     if(stack.count>64)throw std::runtime_error("Save contains invalid item count");
     if (reader.inspectOnly && !isValidItemId(stack.id)) return stack;
     if (!isValidItemId(stack.id)) throw std::runtime_error("Save contains invalid item id");
     if (stack.empty()) {
+        if (reader.formatVersion >= 24 && !reader.recoverPlugins && !stack.components.empty()) throw std::runtime_error("Empty stack carries components");
         stack.clear();
     } else {
         const auto& props = getItemProps(stack.id);
         if (stack.count > props.maxStack || stack.damage > props.maxDurability)
             throw std::runtime_error("Save contains invalid item stack");
     }
+    if (!EnchantingRules::validComponents(stack)) throw std::runtime_error("Invalid item components");
     return stack;
 }
 
@@ -411,6 +421,8 @@ void appendEntity(Bytes& payload, const WorldMetadata::PersistedEntity& entity) 
     appendString(payload,Plugins::entityKey(entity.type));
     if(entity.pluginState.size()>MC_ENTITY_STATE_LIMIT)throw std::runtime_error("Entity state too large");
     Plugins::Json::parse(entity.pluginState);
+    (void)FallingAnvilState::decode(entity.pluginState);
+    (void)EnchantmentHitContext::read(entity.pluginState);
     appendString(payload,entity.pluginState);append(payload,entity.pluginStateVersion);
     if(!validNetherMobState(entity.nether)||!validStatusEffects(entity.effects))throw std::runtime_error("Invalid native entity state");
 #define NETHER_SAVE_FIELD(type,name,value) append(payload,entity.nether.name);
@@ -479,6 +491,8 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
         const auto key=reader.readString();if(!Plugins::validKey(key))throw std::runtime_error("Invalid entity key");entity.pluginState=reader.readString();entity.pluginStateVersion=reader.read<uint32_t>();
         if(entity.pluginState.size()>MC_ENTITY_STATE_LIMIT)throw std::runtime_error("Entity state too large");
         Plugins::Json::parse(entity.pluginState);
+        (void)FallingAnvilState::decode(entity.pluginState);
+        (void)EnchantmentHitContext::read(entity.pluginState);
         const auto old=entity.type;
         if(!reader.inspectOnly) {
             try {entity.type=Plugins::resolveEntity(key);}
@@ -498,7 +512,7 @@ WorldMetadata::PersistedEntity readEntity(Reader& reader, uint32_t version) {
 #define NETHER_LOAD_FIELD(type,name,value) entity.nether.name=reader.read<type>();
         MC_NETHER_STATE_FIELDS(NETHER_LOAD_FIELD)
 #undef NETHER_LOAD_FIELD
-        const auto count=reader.read<uint8_t>();if(count>7)throw std::runtime_error("Too many entity effects");
+        const auto count=reader.read<uint8_t>();if(count>8)throw std::runtime_error("Too many entity effects");
         for(uint8_t i=0;i<count;++i)entity.effects.push_back({static_cast<StatusEffectType>(reader.read<uint8_t>()),reader.read<uint8_t>(),reader.read<uint32_t>()});
         if(!validNetherMobState(entity.nether)||!validStatusEffects(entity.effects))throw std::runtime_error("Invalid native entity state");
     }
@@ -524,6 +538,10 @@ void appendBlockEntity(Bytes& payload, const PersistedBlockEntity& entity) {
         const int count=entity.value.type==BlockEntityType::BrewingStand?5:3;
         for(int i=0;i<count;++i)appendStack(payload,entity.value.chest[i]);
         if(entity.value.type==BlockEntityType::BrewingStand){appendStack(payload,entity.value.input);append(payload,entity.value.burnRemaining);append(payload,entity.value.cookProgress);}
+    } else if(entity.value.type==BlockEntityType::Redstone) {
+        Redstone::decodeSnapshot(entity.value.circuitState);
+        append(payload,static_cast<uint8_t>(entity.value.circuitState.size()));
+        for(const auto byte:entity.value.circuitState)append(payload,byte);
     } else if(entity.value.type==BlockEntityType::Spawner) {
         append(payload,entity.value.burnRemaining);
     } else if (entity.value.type == BlockEntityType::Resource) {
@@ -553,7 +571,7 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
     if (entity.localIndex >= static_cast<uint32_t>(Config::CHUNK_VOLUME))
         throw std::runtime_error("Invalid block entity position");
     const uint8_t type = reader.read<uint8_t>();
-    if (type > static_cast<uint8_t>(version >= 22 ? BlockEntityType::Spawner : version >= 21 ? BlockEntityType::Resource : version >= 18 ? BlockEntityType::Button : BlockEntityType::Furnace))
+    if (type > static_cast<uint8_t>(version >= 25 ? BlockEntityType::Redstone : version >= 22 ? BlockEntityType::Spawner : version >= 21 ? BlockEntityType::Resource : version >= 18 ? BlockEntityType::Button : BlockEntityType::Furnace) || (type>=static_cast<uint8_t>(BlockEntityType::EnchantingTable) && type<=static_cast<uint8_t>(BlockEntityType::Grindstone)))
         throw std::runtime_error("Invalid block entity type");
     entity.value.type = static_cast<BlockEntityType>(type);
     if (entity.value.type == BlockEntityType::Chest) {
@@ -567,6 +585,10 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
         const int count=entity.value.type==BlockEntityType::BrewingStand?5:3;
         for(int i=0;i<count;++i)entity.value.chest[i]=readStack(reader);
         if(entity.value.type==BlockEntityType::BrewingStand){entity.value.input=readStack(reader);entity.value.burnRemaining=reader.read<uint16_t>();entity.value.cookProgress=reader.read<uint16_t>();entity.value.cookTotal=400;if(entity.value.burnRemaining>20||entity.value.cookProgress>=400)throw std::runtime_error("Invalid brewing progress");}
+    } else if(entity.value.type==BlockEntityType::Redstone) {
+        const auto size=reader.read<uint8_t>();if(size>64)throw std::runtime_error("Circuit state exceeds safety limit");
+        for(unsigned i=0;i<size;++i)entity.value.circuitState.push_back(reader.read<uint8_t>());
+        Redstone::decodeSnapshot(entity.value.circuitState);
     } else if(entity.value.type==BlockEntityType::Spawner) {
         entity.value.burnRemaining=reader.read<uint16_t>();if(entity.value.burnRemaining>600)throw std::runtime_error("Invalid spawner timer");
     } else if(entity.value.type==BlockEntityType::Resource){entity.value.resourceRemaining=reader.read<uint32_t>();const auto resourceKey=reader.readString();if(!Plugins::validKey(resourceKey))throw std::runtime_error("Invalid resource block key");try{entity.value.resourceBlock=static_cast<uint16_t>(Plugins::resolveBlock(resourceKey));}catch(const std::exception&){if(!reader.recoverPlugins)throw;entity.value.resourceBlock=0;reader.issue("missing_content",resourceKey,resourceKey,"");}if(entity.value.resourceRemaining>72000)throw std::runtime_error("Invalid resource timer");
@@ -706,18 +728,20 @@ void SaveStore::saveMetadata(const WorldMetadata& metadata) const {
     append(payload,static_cast<uint32_t>(metadata.timePolicies.size()));
     for(const auto& entry:metadata.timePolicies){appendString(payload,Plugins::dimensionContent(entry.first).key);append(payload,entry.second.first);append(payload,entry.second.second);}
     append(payload,static_cast<uint32_t>(metadata.experience.level()));append(payload,metadata.experience.progress());
+    append(payload,metadata.enchantmentSeed);
+    for (const auto& stack : metadata.heldItems) appendStack(payload,stack);
     writeAtomic(m_worldDirectory / "level.bin", payload);
 }
 
 WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     CheckedBytes checked = readChecked(m_worldDirectory / "level.bin");
-    if(!inspection&&(checked.version!=22&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("World requires save format v22 or v23; legacy worlds are incompatible");
+    if(!inspection&&(checked.version!=22&&checked.version!=23&&checked.version!=24&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("World requires save format v22, v23, v24 or v25; legacy worlds are incompatible");
     const bool recovery=m_policy==SaveReadPolicy::RecoverPlugins;
     Reader reader(std::move(checked.payload), checked.version, inspection, recovery, m_issues);
     WorldMetadata metadata;
     metadata.pluginRequirements = reader.requirements;
     metadata.pluginCompatibilityError = reader.compatibilityError;
-    if((checked.version!=22&&checked.version!=SAVE_FORMAT_VERSION))metadata.pluginCompatibilityError="World requires save format v22 or v23; legacy worlds are incompatible";
+    if((checked.version!=22&&checked.version!=23&&checked.version!=24&&checked.version!=SAVE_FORMAT_VERSION))metadata.pluginCompatibilityError="World requires save format v22, v23, v24 or v25; legacy worlds are incompatible";
     if (checked.version < 16 && !Plugins::content().requirements.empty()) {
         metadata.pluginCompatibilityError = "Legacy world has no content/behavior plugins";
         if (!inspection) throw std::runtime_error(metadata.pluginCompatibilityError);
@@ -788,7 +812,7 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     if (checked.version >= 11)
         metadata.foodTickTimer = reader.read<uint32_t>();
     if(checked.version>=22) {
-        const auto count=reader.read<uint8_t>();if(count>7)throw std::runtime_error("Too many player effects");
+        const auto count=reader.read<uint8_t>();if(count>8)throw std::runtime_error("Too many player effects");
         for(uint8_t i=0;i<count;++i)metadata.effects.push_back({static_cast<StatusEffectType>(reader.read<uint8_t>()),reader.read<uint8_t>(),reader.read<uint32_t>()});
         if(!validStatusEffects(metadata.effects))throw std::runtime_error("Invalid player effects");
     }
@@ -920,6 +944,7 @@ WorldMetadata SaveStore::loadMetadata(bool inspection) const {
     if(checked.version>=23) {const auto level=reader.read<uint32_t>();const auto progress=reader.read<double>();
         if(level>uint32_t(Experience::MAX_LEVEL))throw std::runtime_error("Invalid experience level");
         metadata.experience.restore(static_cast<int32_t>(level),progress);}
+    if (checked.version >= 24) { metadata.enchantmentSeed = reader.read<uint32_t>(); for (auto& stack : metadata.heldItems) stack = readStack(reader); }
     if (checked.version >= 10 && !reader.finished())
         throw std::runtime_error("Unexpected trailing save data");
     return metadata;
@@ -969,7 +994,20 @@ void SaveStore::saveChunkOverrides(
 
 std::vector<BlockOverride> SaveStore::loadChunkOverrides(int chunkX, int chunkZ) const {
     const auto path = chunkPath(chunkX, chunkZ);
-    if (!std::filesystem::exists(path)) return {};
+    const auto overlay=[&](std::vector<BlockOverride> overrides) {
+        std::map<uint32_t,size_t> indices;
+        for(size_t i=0;i<overrides.size();++i)indices[overrides[i].localIndex]=i;
+        for(const auto& motion:loadPistonMotions())for(const auto& edit:motion.edits()) {
+            const auto p=edit.first;
+            if(static_cast<int>(std::floor(double(p.x)/16))!=chunkX || static_cast<int>(std::floor(double(p.z)/16))!=chunkZ)continue;
+            const auto index=static_cast<uint32_t>((p.x-chunkX*16)+(p.z-chunkZ*16)*16+Config::worldYToStorageY(p.y)*256);
+            const auto found=indices.find(index);
+            if(found!=indices.end())overrides[found->second].block=edit.second;
+            else {indices[index]=overrides.size();overrides.push_back({index,edit.second});}
+        }
+        return overrides;
+    };
+    if (!std::filesystem::exists(path)) return overlay({});
     CheckedBytes checked = readChecked(path);
     Reader reader(std::move(checked.payload), checked.version, false, m_policy==SaveReadPolicy::RecoverPlugins, m_issues);
     if (reader.read<int32_t>() != chunkX || reader.read<int32_t>() != chunkZ)
@@ -994,7 +1032,7 @@ std::vector<BlockOverride> SaveStore::loadChunkOverrides(int chunkX, int chunkZ)
         overrides.push_back(entry);
     }
     if (!reader.finished()) throw std::runtime_error("Unexpected trailing chunk data");
-    return overrides;
+    return overlay(std::move(overrides));
 }
 
 void SaveStore::saveGeneratedChunk(
@@ -1094,6 +1132,100 @@ ChunkLoadBundle SaveStore::loadChunkLoadBundle(
     return bundle;
 }
 
+void SaveStore::savePistonMotions(const std::vector<Redstone::PistonMotion>& motions) const {
+    std::lock_guard<std::mutex> lock(*m_pistonMutex);writePistonJournal(m_worldDirectory/"pistons.dat",motions);
+}
+void SaveStore::savePistonMotion(const Redstone::PistonMotion& motion) const {
+    std::lock_guard<std::mutex> lock(*m_pistonMutex);
+    writePistonJournal(m_worldDirectory/"pistons"/(std::to_string(motion.id)+".dat"),{motion});
+}
+void SaveStore::erasePistonMotion(uint64_t id) const {
+    std::lock_guard<std::mutex> lock(*m_pistonMutex);
+    const auto path=m_worldDirectory/"pistons"/(std::to_string(id)+".dat");
+    const auto legacy=readPistonJournal(m_worldDirectory/"pistons.dat");
+    if(std::any_of(legacy.begin(),legacy.end(),[&](const auto& motion){return motion.id==id;}))writePistonJournal(path,{});
+    else std::filesystem::remove(path);
+}
+void SaveStore::writePistonJournal(const std::filesystem::path& path,const std::vector<Redstone::PistonMotion>& motions) const {
+    if(motions.size()>4096)throw std::runtime_error("Too many piston transactions");
+    Bytes bytes;append(bytes,uint8_t(2));append(bytes,static_cast<uint32_t>(motions.size()));
+    std::set<uint64_t> ids;
+    for(const auto& motion:motions) {
+        if(!Redstone::validMotion(motion)||!ids.insert(motion.id).second)throw std::runtime_error("Invalid piston transaction");
+        append(bytes,motion.id);append(bytes,Redstone::vector(motion.base));
+        append(bytes,Redstone::encode(motion.piston));append(bytes,uint8_t(motion.extending));append(bytes,motion.age);
+        append(bytes,static_cast<uint8_t>(motion.moves.size()));
+        for(const auto& move:motion.moves) {append(bytes,Redstone::vector(move.from));append(bytes,Redstone::vector(move.to));appendString(bytes,Plugins::blockKey(static_cast<BlockId>(move.block)));}
+        append(bytes,uint8_t(motion.destroyed.has_value()));if(motion.destroyed)append(bytes,Redstone::vector(*motion.destroyed));
+        append(bytes,static_cast<uint8_t>(motion.additionalDestroy.size()));for(const auto p:motion.additionalDestroy)append(bytes,Redstone::vector(p));
+    }
+    writeAtomic(path,bytes);
+}
+std::vector<Redstone::PistonMotion> SaveStore::loadPistonMotions() const {
+    std::lock_guard<std::mutex> lock(*m_pistonMutex);
+    std::map<uint64_t,Redstone::PistonMotion> merged;
+    for(auto& motion:readPistonJournal(m_worldDirectory/"pistons.dat"))merged.emplace(motion.id,std::move(motion));
+    const auto directory=m_worldDirectory/"pistons";
+    if(std::filesystem::exists(directory)) {
+        size_t files=0;
+        for(const auto& entry:std::filesystem::directory_iterator(directory)) {
+            if(entry.path().extension()!=".dat")continue;
+            if(++files>8192)throw std::runtime_error("Too many piston journal files");
+            const auto name=entry.path().stem().string();size_t used=0;
+            const auto id=std::stoull(name,&used);
+            if(!id || used!=name.size() || std::to_string(id)!=name)throw std::runtime_error("Invalid piston journal filename");
+            auto motions=readPistonJournal(entry.path());
+            if(motions.size()>1 || (!motions.empty() && motions[0].id!=id))throw std::runtime_error("Mismatched piston journal identity");
+            if(motions.empty())merged.erase(id);else merged[id]=std::move(motions[0]);
+        }
+    }
+    if(merged.size()>4096)throw std::runtime_error("Too many active piston transactions");
+    std::vector<Redstone::PistonMotion> result;std::set<Redstone::Position> occupied;
+    for(auto& entry:merged) {
+        for(const auto& edit:entry.second.edits())if(!occupied.insert(edit.first).second)throw std::runtime_error("Overlapping piston transactions");
+        result.push_back(std::move(entry.second));
+    }
+    return result;
+}
+std::vector<Redstone::PistonMotion> SaveStore::readPistonJournal(const std::filesystem::path& path) const {
+    if(!std::filesystem::exists(path))return {};
+    auto checked=readChecked(path);Reader reader(std::move(checked.payload),checked.version,false,m_policy==SaveReadPolicy::RecoverPlugins,m_issues);
+    const auto schema=reader.read<uint8_t>();if(checked.version!=25 || (schema!=1 && schema!=2))throw std::runtime_error("Unsupported piston journal");
+    const auto count=reader.read<uint32_t>();if(count>4096)throw std::runtime_error("Too many piston transactions");
+    std::vector<Redstone::PistonMotion> result;std::set<uint64_t> ids;
+    for(uint32_t i=0;i<count;++i) {
+        Redstone::PistonMotion motion;std::vector<size_t> missing;
+        motion.id=reader.read<uint64_t>();motion.base=Redstone::position(reader.read<glm::ivec3>());
+        const auto state=Redstone::decode(reader.read<uint16_t>());if(!state)throw std::runtime_error("Invalid piston state");motion.piston=*state;
+        const auto flag=reader.read<uint8_t>();if(flag>1)throw std::runtime_error("Invalid piston direction flag");motion.extending=flag!=0;motion.age=reader.read<uint8_t>();
+        const auto moves=reader.read<uint8_t>();if(moves>12)throw std::runtime_error("Too many piston moves");
+        for(unsigned j=0;j<moves;++j) {
+            Redstone::Move move;move.from=Redstone::position(reader.read<glm::ivec3>());move.to=Redstone::position(reader.read<glm::ivec3>());
+            const auto key=reader.readString();
+            try {move.block=static_cast<uint16_t>(Plugins::resolveBlock(key));}
+            catch(const std::exception&) {
+                if(!reader.recoverPlugins)throw;
+                reader.issue("missing_content",key,key,"");
+                // Validate the original chain geometry before replacing removed
+                // content by AIR in the explicitly authorized recovery copy.
+                move.block=static_cast<uint16_t>(BlockId::STONE);missing.push_back(motion.moves.size());
+            }
+            motion.moves.push_back(move);
+        }
+        const auto destroyed=reader.read<uint8_t>();if(destroyed>1)throw std::runtime_error("Invalid piston destroy flag");
+        if(destroyed)motion.destroyed=Redstone::position(reader.read<glm::ivec3>());
+        if(schema>=2) {
+            const auto extra=reader.read<uint8_t>();if(extra>2)throw std::runtime_error("Too many paired piston breaks");
+            for(unsigned j=0;j<extra;++j)motion.additionalDestroy.push_back(Redstone::position(reader.read<glm::ivec3>()));
+        }
+        if(!Redstone::validMotion(motion)||!ids.insert(motion.id).second)throw std::runtime_error("Invalid piston transaction");
+        for(const auto index:missing)motion.moves[index].block=0;
+        result.push_back(std::move(motion));
+    }
+    if(!reader.finished())throw std::runtime_error("Trailing piston transaction data");
+    return result;
+}
+
 void SaveStore::saveBlockEntities(
     int chunkX, int chunkZ, const std::vector<PersistedBlockEntity>& entities) const {
     Bytes payload;
@@ -1186,6 +1318,16 @@ struct DurableFile {
 DurableFile durableFile(const std::filesystem::path& relative) {
     const auto folder=relative.parent_path().filename().string();
     if(relative=="level.bin")return {{},'l',0,0};
+    if(relative.filename()=="pistons.dat" || (folder=="pistons" && relative.extension()==".dat")) {
+        const auto root=relative.filename()=="pistons.dat"?relative.parent_path():relative.parent_path().parent_path();
+        auto partition=durableFile(root/"chunks"/"c.0.0.bin");
+        if(!partition.kind)return {};
+        if(folder=="pistons") {
+            const auto name=relative.stem().string();
+            if(name.empty() || name[0]=='0' || !std::all_of(name.begin(),name.end(),[](unsigned char c){return c>='0' && c<='9';}))throw std::runtime_error("Invalid piston partition filename");
+        }
+        partition.kind='m';return partition;
+    }
     if(folder!="chunks" && folder!="block_entities" && folder!="entities")return {};
     // Restrict conversion to world partitions, excluding arbitrary plugin/private trees.
     const auto parent=relative.parent_path().parent_path();
@@ -1270,7 +1412,7 @@ void SaveStore::recoverFileTo(const std::filesystem::path& relative,const std::f
     SaveStore source(m_worldDirectory/file.root,m_policy,m_issues),target(destination/file.root);
     if(file.kind) {
         const auto checked=readChecked(m_worldDirectory/relative);
-        if((checked.version!=22&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("Durable world partitions require save format v22 or v23");
+        if((checked.version!=22&&checked.version!=23&&checked.version!=24&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("Durable world partitions require save format v22, v23, v24 or v25");
     }
     switch(file.kind) {
         case 'l': {auto metadata=source.loadMetadata();if(!WorldGenContext::canLoadGeneration(metadata.generationVersion))throw std::runtime_error("World generation version is incompatible");if(!destination.empty()) {
@@ -1295,6 +1437,30 @@ void SaveStore::recoverFileTo(const std::filesystem::path& relative,const std::f
         }
         case 'e': {const auto values=source.loadChunkEntities(file.x,file.z);if(!destination.empty())target.saveChunkEntities(file.x,file.z,values);break;}
         case 'p': {const auto value=source.loadChunkEntityPopulationVersion(file.x,file.z);if(!destination.empty())target.saveChunkEntityPopulationVersion(file.x,file.z,value);break;}
+        case 'm': {
+            auto motions=source.loadPistonMotions();
+            if(!destination.empty()) {
+                std::map<std::pair<int,int>,std::map<uint32_t,BlockId>> chunks;
+                for(auto& motion:motions) {
+                    motion.age=2;
+                    for(const auto& edit:motion.edits()) {
+                        const auto p=edit.first;
+                        const int cx=static_cast<int>(std::floor(double(p.x)/16)),cz=static_cast<int>(std::floor(double(p.z)/16));
+                        const auto key=std::make_pair(cx,cz);
+                        if(!chunks.count(key))for(const auto& saved:target.loadChunkOverrides(cx,cz))chunks[key][saved.localIndex]=saved.block;
+                        chunks[key][static_cast<uint32_t>(p.x-cx*16+(p.z-cz*16)*16+Config::worldYToStorageY(p.y)*256)]=edit.second;
+                    }
+                }
+                for(const auto& chunk:chunks) {
+                    std::vector<BlockOverride> edits;for(const auto& edit:chunk.second)edits.push_back({edit.first,edit.second});
+                    target.saveChunkOverrides(chunk.first.first,chunk.first.second,edits);
+                }
+                // Recovery settles the transaction in the staged copy. Keeping
+                // a retired record could resurrect blocks on the first load.
+                target.writePistonJournal(destination/relative,{});
+            }
+            break;
+        }
         default: if(!destination.empty()){std::filesystem::create_directories((destination/relative).parent_path());std::filesystem::copy_file(m_worldDirectory/relative,destination/relative);}break;
     }
 }
@@ -1456,7 +1622,7 @@ std::vector<glm::ivec3> SaveStore::netherPortalsNear(const glm::dvec3& center,in
     for(int z=firstZ;z<=lastZ;++z)for(int x=firstX;x<=lastX;++x) {
         const auto file=m_worldDirectory/"portals"/("p."+std::to_string(x)+"."+std::to_string(z)+".bin");
         if(!std::filesystem::exists(file))continue;
-        const auto checked=readChecked(file);if((checked.version!=22&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("Incompatible portal index");
+        const auto checked=readChecked(file);if((checked.version!=22&&checked.version!=23&&checked.version!=24&&checked.version!=SAVE_FORMAT_VERSION))throw std::runtime_error("Incompatible portal index");
         Reader reader(checked.payload,checked.version);
         if(reader.read<int32_t>()!=x||reader.read<int32_t>()!=z)throw std::runtime_error("Invalid portal index coordinates");
         const auto count=reader.read<uint32_t>();if(count>16384)throw std::runtime_error("Portal index exceeds chunk capacity");

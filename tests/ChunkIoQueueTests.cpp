@@ -45,12 +45,16 @@ int main() {
             ++completed;
         });
         entered.get_future().wait();
-        auto drained = std::async(std::launch::async, [&] { active.drain(); });
+        std::promise<void> drainStarted;
+        auto drained = std::async(std::launch::async, [&] {
+            drainStarted.set_value();active.drain();return completed.load()==lifetimes+1;
+        });
+        drainStarted.get_future().wait();
         require(drained.wait_for(std::chrono::milliseconds(10)) ==
                     std::future_status::timeout,
                 "drain waits for an active task after the pending queue is empty");
         release.set_value();
-        drained.get();
+        require(drained.get(),"drain returned before active task completion was observable");
         require(completed == lifetimes + 1, "drain observes active task completion");
     }
 

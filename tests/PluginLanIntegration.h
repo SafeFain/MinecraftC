@@ -56,9 +56,9 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
     for(const auto& info:plugins.plugins())if(info.manifest.id=="legacy_fixture"||info.manifest.id=="lan_fixture")require(info.active,"old and new native fixtures load");
     codecs();
-    Config::RENDER_DISTANCE=2;
+    const int previousDistance=Config::RENDER_DISTANCE;Config::RENDER_DISTANCE=2;
     {
-        GameSession host(root/"host"/"saves"),client(root/"client"/"saves");
+        ScenarioSession host(root/"host"/"saves"),client(root/"client"/"saves");
         plugins.operations.player=[&](MC_PlayerSnapshot& out){return host.pluginPlayer(out);};
         plugins.operations.players=[&]{return host.pluginPlayers();};
         plugins.operations.playerById=[&](uint64_t id,MC_PlayerSnapshot& out,uint32_t& dimension){return host.pluginPlayerById(id,out,dimension);};
@@ -67,18 +67,18 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         plugins.operations.setBlock=[&](int32_t x,int32_t y,int32_t z,uint16_t id){return host.pluginSetBlock(x,y,z,id);};
         Plugins::contextProvider()=[&]{return host.pluginContext();};
         const auto world=host.createWorld("Plugin LAN",42,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
-        host.startWorld(world,true,0);GameSessionTestAccess::prepareLanScene(host);
+        host.startWorld(world,true,0);SessionScenario::prepareLanScene(host);
         auto ready=Plugins::event(MC_WORLD_READY);plugins.dispatch(ready);
         require(host.openLanRoom(0,2,true),"plugin world opens LAN");
         client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
         require(client.joinLanRoom("::1",host.lanPort(),0),"plugin-enabled client joins");
-        double now=0;auto pump=[&]{now+=.005;host.pollLan(now);client.pollLan(now);GameSessionTestAccess::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
+        double now=0;auto pump=[&]{now+=.005;host.pollLan(now);client.pollLan(now);SessionScenario::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
         for(int i=0;i<500&&!client.lanWorldReady();++i)pump();
         require(client.lanWorldReady(),"plugin bootstrap accepted");
-        auto& guest=GameSessionTestAccess::guest(host,GameSessionTestAccess::replicaPeer(client));
+        auto& guest=SessionScenario::guest(host,SessionScenario::replicaPeer(client));
         const auto item=Plugins::resolveItem("official_content:crystal");const auto block=Plugins::resolveBlock("official_content:crystal_block");
         guest.player.inventory().slot(0)={item,1,0};guest.player.setPosition({.5,1.01,.5});guest.player.setOrientation(0,0);
-        GameSessionTestAccess::world(host).setBlock(0,2,2,block);
+        SessionScenario::world(host).setBlock(0,2,2,block);
         for(int i=0;i<100&&client.worldState().getBlock(0,2,2)!=block;++i)pump();
         require(client.worldState().getBlock(0,2,2)==block,"plugin block delta reaches replica");
         const auto hostDiamonds=host.inventory().count(ItemId::DIAMOND);
@@ -87,13 +87,13 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         client.setLocalControl(true);
         client.handleMouseButton(MouseButton::Right,ButtonAction::Press); // forwarded intent, no client gameplay callback
         for(int i=0;i<20;++i)pump();
-        GameSessionTestAccess::pluginHostLoading(host,true);
-        GameSessionTestAccess::tickLanPlayers(host,.05f);
+        SessionScenario::pluginHostLoading(host,true);
+        SessionScenario::tickLanPlayers(host,.05f);
         require(guest.player.inventory().count(ItemId::DIAMOND)==0,"legacy plugin rewards remain queued");
         plugins.flushOperations();
-        GameSessionTestAccess::pluginHostLoading(host,false);
+        SessionScenario::pluginHostLoading(host,false);
         require(guest.player.inventory().count(ItemId::DIAMOND)==3&&host.inventory().count(ItemId::DIAMOND)==hostDiamonds,"old ABI callback gives to guest, never host");
-        require(GameSessionTestAccess::world(host).getBlock(0,2,2)==block,"cancelled guest use leaves terrain unchanged");
+        require(SessionScenario::world(host).getBlock(0,2,2)==block,"cancelled guest use leaves terrain unchanged");
         client.handleMouseButton(MouseButton::Right,ButtonAction::Release);
         require(client.sendPluginCommand("/legacy_fixture:gift"),"old host-only command can be requested");
         for(int i=0;i<30;++i)pump();
@@ -105,12 +105,12 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         for(int i=0;i<20;++i)pump();
         require(guest.player.inventory().count(ItemId::EMERALD)==2&&client.inventory().count(ItemId::EMERALD)==2,"opt-in command targets and syncs guest");
         // Explicit client role must suppress gameplay dispatch and world mutations.
-        auto replicaUse=Plugins::event(MC_USE_PRE);replicaUse.role=MC_CLIENT;replicaUse.player_id=GameSessionTestAccess::replicaPeer(client);replicaUse.item=static_cast<uint16_t>(item);
+        auto replicaUse=Plugins::event(MC_USE_PRE);replicaUse.role=MC_CLIENT;replicaUse.player_id=SessionScenario::replicaPeer(client);replicaUse.item=static_cast<uint16_t>(item);
         plugins.dispatch(replicaUse);plugins.flushOperations();require(!replicaUse.cancelled&&guest.player.inventory().count(ItemId::DIAMOND)==3,"replica does not run gameplay callbacks");
-        auto& heaven=GameSessionTestAccess::pluginDimension(host,DimensionId::Heaven);
+        auto& heaven=SessionScenario::pluginDimension(host,DimensionId::Heaven);
         heaven.setBlock(0,2,3,BlockId::STONE);
         const auto beforeHostBlock=host.worldState().getBlock(0,2,3);
-        const Plugins::ActorContext queuedActor{GameSessionTestAccess::replicaPeer(client),1,MC_HOST};
+        const Plugins::ActorContext queuedActor{SessionScenario::replicaPeer(client),1,MC_HOST};
         const auto provider=Plugins::dispatcher();
         bool dimensionRead=false;
         Plugins::dispatcher()=[&](MC_Event& event){
@@ -132,11 +132,11 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         }
         require(heaven.getBlock(0,2,3)==BlockId::STONE,"dimension mutation remains queued");
         Plugins::dispatcher()=provider;
-        guest.profile.dimension=DimensionId::Overworld;guest.player.bindWorld(GameSessionTestAccess::world(host),nullptr);
+        guest.profile.dimension=DimensionId::Overworld;guest.player.bindWorld(SessionScenario::world(host),nullptr);
         plugins.flushOperations();
         require(heaven.getBlock(0,2,3)==block&&host.worldState().getBlock(0,2,3)==beforeHostBlock,"queued mutation keeps original dimension after actor travels");
         // Close triggers a queued gift for the departing player; flushing cannot redirect it.
-        const auto hostEmeralds=host.inventory().count(ItemId::EMERALD);GameSessionTestAccess::disconnectReplica(client);
+        const auto hostEmeralds=host.inventory().count(ItemId::EMERALD);SessionScenario::disconnectReplica(client);
         for(int i=0;i<50&&host.lanGuestCount();++i)pump();
         plugins.flushOperations();
         require(!host.lanGuestCount()&&host.inventory().count(ItemId::EMERALD)==hostEmeralds,"departed actor operations are rejected without host fallback");
@@ -146,7 +146,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         const auto savedLevel=root/"host"/"saves"/world/"level.bin";
         auto bytes=[](const auto& path){std::ifstream file(path,std::ios::binary);return std::string(std::istreambuf_iterator<char>(file),{});};
         const auto beforeFault=bytes(savedLevel);
-        auto& faultGuest=GameSessionTestAccess::guest(host,GameSessionTestAccess::replicaPeer(client));
+        auto& faultGuest=SessionScenario::guest(host,SessionScenario::replicaPeer(client));
         const auto savedProfile=root/"host"/"saves"/world/"players"/(faultGuest.profile.identity.id+".lanplayer");
         const auto profileBeforeFault=bytes(savedProfile);
         require(!profileBeforeFault.empty(),"guest profile exists before fault");
@@ -154,15 +154,15 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         require(plugins.command("/lan_fixture:fault"),"faulting command found");
         require(!Plugins::mutableContentState().runtimeFault.empty(),"callback failure marks runtime fault");
         faultGuest.player.inventory().slot(0)={ItemId::DIAMOND,64,0};
-        GameSessionTestAccess::pluginRemoveGuest(host,GameSessionTestAccess::replicaPeer(client));
+        host.closeLanRoom();
         require(bytes(savedProfile)==profileBeforeFault,"faulted departure does not overwrite guest profile");
         plugins.flushOperations();host.abortPluginWorld();
         for(int i=0;i<50&&!client.lanConnectionFailed();++i){now+=.005;client.pollLan(now);std::this_thread::sleep_for(std::chrono::milliseconds(1));}
         require(client.lanConnectionFailed()&&client.lanError().find("Plugin command failed")!=std::string::npos,("host fault ends guest session with reason: "+client.lanError()+" joining="+std::to_string(client.joiningLan())).c_str());
         require(bytes(savedLevel)==beforeFault&&!host.hasWorldStore(),"faulted world is detached without metadata save");
-        GameSessionTestAccess::disconnectReplica(client);Plugins::contextProvider()={};plugins.operations={};
+        SessionScenario::disconnectReplica(client);Plugins::contextProvider()={};plugins.operations={};
     }
-    plugins.shutdown();std::filesystem::remove_all(root);
+    plugins.shutdown();std::filesystem::remove_all(root);Config::RENDER_DISTANCE=previousDistance;
     std::cout<<"Plugin LAN codec, old ABI, authority and guest permission regressions passed\n";return 0;
 }
 }

@@ -1,5 +1,7 @@
+#include "TestSupport.h"
 #include "core/Window.h"
-#include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
+#include "renderer/backend/vulkan/VulkanDiagnostics.h"
+#include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "world/ChunkMesh.h"
 #include "world/ChunkMeshBuilder.h"
 
@@ -48,7 +50,7 @@ void run(const Options& o, const Scene& scene, const Tier& tier, std::ofstream& 
     if(o.reference){
         auto config=voxelGiConfig(tier.quality,settings);
         config.temporalReuse=false; config.emptySpaceSkipping=false;
-        VulkanGiSmokeProbe::configureDiagnostic(renderer,config);
+        VulkanDiagnostics::configureDiagnostic(renderer,config);
     }
     std::vector<std::unique_ptr<Chunk>> chunks;
     for(int z=-2;z<=2;++z)for(int x=-2;x<=2;++x)chunks.push_back(std::make_unique<Chunk>(x,z));
@@ -117,7 +119,7 @@ void run(const Options& o, const Scene& scene, const Tier& tier, std::ofstream& 
         throw std::runtime_error("warmup did not converge; increase --warmup");
     const std::string name=std::string(scene.name)+"-"+tier.name+(o.reference?"-reference":"");
     std::ofstream metadata(o.output/(name+"-metadata.txt"));
-    metadata << VulkanGiSmokeProbe::deviceDescription(renderer) << "\n"
+    metadata << VulkanDiagnostics::deviceDescription(renderer) << "\n"
         << "resolution=" << window.width() << 'x' << window.height() << "\n"
         << "warmup=" << o.warmup << " frames=" << o.frames << " exposure=1\n"
         << "reference=" << o.reference << " (reuse and hierarchical skipping disabled; same visual gains)\n"
@@ -140,13 +142,13 @@ void run(const Options& o, const Scene& scene, const Tier& tier, std::ofstream& 
         }else csv << ",,,,";
         csv << ',' << s.uploadedBytes << ',' << s.pendingSlices << ',' << s.pendingCoarseChunks << '\n';
     }
-    VulkanGiSmokeProbe::requestCapture(renderer); frame();
-    const auto image=VulkanGiSmokeProbe::readCapture(renderer);
+    VulkanDiagnostics::requestCapture(renderer); frame();
+    const auto image=VulkanDiagnostics::readCapture(renderer);
     std::ofstream ppm(o.output/(name+".ppm"),std::ios::binary);
     ppm << "P6\n" << window.width() << ' ' << window.height() << "\n255\n";
     for(size_t i=0;i<image.size();i+=4)ppm.write(reinterpret_cast<const char*>(image.data()+i),3);
     if(tier.gi){
-        const auto effects=VulkanGiSmokeProbe::readEffects(renderer);
+        const auto effects=VulkanDiagnostics::readEffects(renderer);
         glm::dvec3 mean(0); double peak=0; size_t lit=0;
         for(size_t i=0;i<effects.size();i+=4){
             const glm::dvec3 rgb(effects[i],effects[i+1],effects[i+2]); mean+=rgb;
@@ -170,7 +172,7 @@ void run(const Options& o, const Scene& scene, const Tier& tier, std::ofstream& 
 }
 }
 
-int main(int argc,char** argv){
+int main(int argc,char** argv)try {
     try{
         Options o;
         if(argc<3)throw std::runtime_error("usage: vulkan_gi_benchmark assets output [--width N --height N --frames N --warmup N --scene all|colored-room|cave-entry|thin-wall --tier all|high|very-high-off|very-high|ultra --reference]");
@@ -205,4 +207,6 @@ int main(int argc,char** argv){
             for(const auto& t:tiers)if(o.tier=="all"||o.tier==t.name)run(o,s,t,summary);
         return 0;
     }catch(const std::exception& e){std::cerr << "GI benchmark failed: " << e.what() << '\n';return 1;}
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

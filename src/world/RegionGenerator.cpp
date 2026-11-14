@@ -1,3 +1,4 @@
+#include "world/OreExposure.h"
 #include "world/BiomeBlockLogic.h"
 #include "world/RegionGenerator.h"
 #include "world/HeightPipeline.h"
@@ -496,7 +497,7 @@ void RegionGenerator::populateChunk(Chunk& chunk, int localCX, int localCZ) {
                     existing != BlockId::CALCITE) continue;
                 BlockId ore = m_oreGenerator.getOre(static_cast<float>(wx) + 0.5f,
                     static_cast<float>(y) + 0.5f, static_cast<float>(wz) + 0.5f,
-                    existing, surfaceColumn.biome);
+                    existing, surfaceColumn.biome, [&] { return oreExposed(m_heightPipeline,m_caveGenerator,wx,y,wz,&m_regionData.caves); });
                 if (ore != BlockId::AIR) chunk.setBlock(x, y, z, ore);
             }
 

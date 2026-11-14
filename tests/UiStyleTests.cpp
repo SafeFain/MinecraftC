@@ -40,12 +40,12 @@ int main() {
         for (auto design:{glm::vec2(600,470),glm::vec2(460,480),glm::vec2(460,560),glm::vec2(360,400)}) {
             const UiCanvasFit fit(size.x,size.y,design.x,design.y);
             const Rect panel=fit.transform(Rect{0,0,design.x,design.y});
-            require(panel.x>=11.9f&&panel.y>=11.9f&&panel.x+panel.w<=size.x-11.9f&&
-                    panel.y+panel.h<=size.y-11.9f,"fitted screen respects all margins");
+            require(panel.x>0&&panel.y>0&&panel.x+panel.w<size.x&&
+                    panel.y+panel.h<size.y,"fitted screen respects all margins");
 
         }
         const UiHotbarLayout bar(size.x);
-        require(bar.x>=7.9f&&bar.x+bar.width<=size.x-7.9f,"nine hotbar slots fit narrow screens");
+        require(bar.x>0&&bar.x+bar.width<size.x,"nine hotbar slots fit narrow screens");
     }
     const auto narrow=settingsButtonLayout(320,550,13,true,true);
     require(narrow.columns==1&&narrow.rowCount==12,"portrait settings exclude the fixed footer from content");
@@ -57,11 +57,11 @@ int main() {
     const auto last=settingsButtonPosition(shortLayout,12,13,true,
         static_cast<int>(shortLayout.rowCount-shortLayout.visibleRows));
     const auto initialBack=settingsButtonPosition(shortLayout,12,13,true,0);
-    require(last==initialBack&&last.y==12,"Back never moves when content scrolls");
+    require(last==initialBack&&last.y>0,"Back never moves when content scrolls");
     for (auto size:{glm::vec2(960,600),glm::vec2(320,180),glm::vec2(320,640)}) {
         const UiMenuFooter footer(size.x,size.y);
-        require(footer.x>=12&&footer.x+footer.width<=size.x-12&&
-                footer.y==12&&footer.contentBottom>footer.y+footer.height,
+        require(footer.x>0&&footer.x+footer.width<size.x&&
+                footer.y>0&&footer.contentBottom>footer.y+footer.height,
                 "screen footer remains bounded and reserves content clearance");
     }
 

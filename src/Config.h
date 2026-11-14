@@ -7,6 +7,8 @@
 namespace Config {
     // Bound door-power/mesh work when many pulses finish together.
     constexpr size_t BUTTON_TRANSITIONS_PER_TICK = 256;
+constexpr size_t REDSTONE_EVENTS_PER_TICK = 4096;
+constexpr size_t REDSTONE_PROPAGATION_PER_TICK = 8192;
 
     constexpr size_t PLUGIN_MAX_DIMENSIONS = 1024;
     constexpr size_t PLUGIN_MAX_OPERATIONS = 1024;

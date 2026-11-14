@@ -99,7 +99,13 @@ inline void testHeavenMigration() {
         std::reverse(targets.begin(),targets.end());
         std::vector<RegionGenerationData::PendingBlock> pending;
         runtime.generateRegion(cx,cz,3,6,targets,pending);
-        require(pending.empty(),"P1 region unexpectedly used another metadata channel");
+        for(const auto& block:pending)for(auto& chunk:region)
+            if(block.worldX>=chunk->worldX()&&block.worldX<chunk->worldX()+16&&
+               block.worldZ>=chunk->worldZ()&&block.worldZ<chunk->worldZ()+16) {
+                const int x=block.worldX-chunk->worldX(),z=block.worldZ-chunk->worldZ();
+                if(block.overwrite||chunk->getBlock(x,block.worldY,z)==BlockId::AIR)
+                    chunk->setBlock(x,block.worldY,z,block.id);
+            }
         for(const auto& chunk:region) {
             auto expected=std::make_unique<Chunk>(chunk->cx,chunk->cz);
             FrozenHeavenReference::FrozenHeavenV9::populateHeaven(*expected,reference);

@@ -1,0 +1,19 @@
+{
+  "key": "observer_face",
+  "replace": true,
+  "sequence": {
+    "variants": 1,
+    "frames": 1,
+    "fps_milli": 0,
+    "seed": 2342973291,
+    "images": [
+      "textures/materials/observer_face-0-images.png"
+    ],
+    "normals": [
+      "textures/materials/observer_face-0-normals.png"
+    ],
+    "properties": [
+      "textures/materials/observer_face-0-properties.png"
+    ]
+  }
+}

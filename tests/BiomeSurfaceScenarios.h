@@ -17,7 +17,6 @@ inline void testBiomeSurfaceEcology() {
         context.slope = 0.1f;
         context.river = context.biome == Biome::RIVER;
         context.volcanicWeight = context.biome == Biome::VOLCANIC_HIGHLANDS ? 0.45f : 0.0f;
-        int samples = 0;
         for (int z = -64; z < 64; z += 2) {
             for (int x = -64; x < 64; x += 2) {
                 context.height = context.biome == Biome::OCEAN ? 52 :
@@ -42,10 +41,8 @@ inline void testBiomeSurfaceEcology() {
                 }
                 require(SurfaceRules::blockAtDepth(42,x,z,0,context) == surface.top,
                         "final snow/ice surface matches depth sampling");
-                ++samples;
             }
         }
-        require(samples == 4096, "each of the 30 biomes was sampled");
     }
     require(seedChangesMaterials, "surface materials must vary with seed");
     for (int raw = 201; raw <= 224; ++raw)

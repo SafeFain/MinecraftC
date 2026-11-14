@@ -1,7 +1,9 @@
+#include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "core/Window.h"
 #include "renderer/BlockAtlasData.h"
-#include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
+#include "renderer/backend/vulkan/VulkanDiagnostics.h"
+#include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "world/ChunkMesh.h"
 
 #include <iostream>
@@ -87,7 +89,7 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
         requireSmoke(renderer.voxelGiStatus().pendingSlices == 0 && renderer.voxelGiStatus().pendingCoarseChunks == 0, "GI queue did not converge");
     };
     settle();
-    const auto initial = VulkanGiSmokeProbe::readEffects(renderer);
+    const auto initial = VulkanDiagnostics::readEffects(renderer);
     const std::string tier = quality == VisualQuality::Ultra ? "ultra" : "very-high";
     std::ofstream metrics;
     if (!evidence.empty()) {
@@ -136,10 +138,10 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
         requireSmoke(partial.uploadedBytes == 64u*64u*32u &&
                      partial.injectedVoxels == 64u*64u,
                      "single-axis motion did not use one actual GPU plane");
-        const auto local = VulkanGiSmokeProbe::readEffects(renderer);
-        VulkanGiSmokeProbe::forceFullUpdate(renderer);
+        const auto local = VulkanDiagnostics::readEffects(renderer);
+        VulkanDiagnostics::forceFullUpdate(renderer);
         frame();
-        const auto full = VulkanGiSmokeProbe::readEffects(renderer);
+        const auto full = VulkanDiagnostics::readEffects(renderer);
         requireSmoke(local.size() == full.size(), "GPU comparison size mismatch");
         for (size_t i = 0; i < local.size(); ++i)
             requireSmoke(std::abs(local[i]-full[i]) <= 0.00001f,
@@ -152,10 +154,10 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
                  diagonalStatus.injectedVoxels * 32 == diagonalStatus.uploadedBytes &&
                  diagonalStatus.uploadedBytes < 3u*64u*64u*64u*32u,
                  "diagonal move did not retain disjoint partial GPU regions");
-    const auto diagonal = VulkanGiSmokeProbe::readEffects(renderer);
-    VulkanGiSmokeProbe::forceFullUpdate(renderer);
+    const auto diagonal = VulkanDiagnostics::readEffects(renderer);
+    VulkanDiagnostics::forceFullUpdate(renderer);
     frame();
-    const auto diagonalFull = VulkanGiSmokeProbe::readEffects(renderer);
+    const auto diagonalFull = VulkanDiagnostics::readEffects(renderer);
     for (size_t i = 0; i < diagonal.size(); ++i)
         requireSmoke(std::abs(diagonal[i]-diagonalFull[i]) <= 0.00001f,
                      "multi-region injection differs from full-volume GPU reference");
@@ -167,9 +169,9 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
                  "stability adjustment rebuilt GI");
     // Actual production fragment early exit, rather than merely checking a flag.
     settle();
-    VulkanGiSmokeProbe::showReuseMask(renderer,true);
+    VulkanDiagnostics::showReuseMask(renderer,true);
     frame();
-    const auto reuseMask=VulkanGiSmokeProbe::readEffects(renderer);
+    const auto reuseMask=VulkanDiagnostics::readEffects(renderer);
     size_t reused=0;
     for(size_t i=3;i<reuseMask.size();i+=4)if(reuseMask[i]==0)++reused;
     requireSmoke(reused>reuseMask.size()/40,"stationary GI did not reuse validated receivers");
@@ -177,23 +179,23 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     // Turn without changing source geometry: disoccluded/moving receivers must
     // reject the early exit even if the global history revision is unchanged.
     lookDirection.x=0.25f; frame();
-    const auto turned=VulkanGiSmokeProbe::readEffects(renderer);
+    const auto turned=VulkanDiagnostics::readEffects(renderer);
     for(size_t i=3;i<turned.size();i+=4)
         requireSmoke(turned[i]>0,"camera rotation skipped new receiver tracing");
     lookDirection.x=0; frame();
     camera.x+=0.5f; frame();
-    const auto moved=VulkanGiSmokeProbe::readEffects(renderer);
+    const auto moved=VulkanDiagnostics::readEffects(renderer);
     for(size_t i=3;i<moved.size();i+=4)
         requireSmoke(moved[i]>0,"camera movement reused another receiver");
     camera.x-=0.5f; frame();
-    VulkanGiSmokeProbe::showReuseMask(renderer,false);
+    VulkanDiagnostics::showReuseMask(renderer,false);
     settings.gi.temporalStability=0;
     renderer.setEnhancedVisualSettings(settings); frame();
-    VulkanGiSmokeProbe::showReuseMask(renderer,true); frame();
-    const auto noReuse=VulkanGiSmokeProbe::readEffects(renderer);
+    VulkanDiagnostics::showReuseMask(renderer,true); frame();
+    const auto noReuse=VulkanDiagnostics::readEffects(renderer);
     for(size_t i=3;i<noReuse.size();i+=4)
         requireSmoke(noReuse[i]>0,"zero stability reused lighting history");
-    VulkanGiSmokeProbe::showReuseMask(renderer,false);
+    VulkanDiagnostics::showReuseMask(renderer,false);
     settings.gi.temporalStability=100;
     renderer.setEnhancedVisualSettings(settings);
     settle();
@@ -203,7 +205,7 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
         frame();
         requireSmoke(renderer.voxelGiStatus().injectedVoxels==64u*64u*64u &&
             renderer.voxelGiStatus().uploadedBytes==0 &&
-            VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y==1,
+            VulkanDiagnostics::reusesHistory(renderer),
             "smooth light update was unbounded or discarded valid history");
     }
     frame();
@@ -211,16 +213,16 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     settings.gi.strength = 50;
     renderer.setEnhancedVisualSettings(settings);
     frame();
-    requireSmoke(VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y == 0 &&
+    requireSmoke(!VulkanDiagnostics::reusesHistory(renderer) &&
                  renderer.voxelGiStatus().uploadedBytes == 0,
                  "strength adjustment kept old-scale history or rebuilt volume");
     chunks[12]->setBlock(8,65,8,BlockId::TORCH);
     frame();
-    requireSmoke(VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y == 0,
+    requireSmoke(!VulkanDiagnostics::reusesHistory(renderer),
                  "block edit reused stale lighting history");
     while (renderer.voxelGiStatus().pendingSlices > 0 || renderer.voxelGiStatus().pendingCoarseChunks > 0) {
         frame();
-        requireSmoke(VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y == 0,
+        requireSmoke(!VulkanDiagnostics::reusesHistory(renderer),
                      "bounded edit propagation accumulated intermediate old lighting");
     }
     settle();
@@ -230,7 +232,7 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     const size_t levels = quality == VisualQuality::Ultra ? 4 : 3;
     requireSmoke(renderer.voxelGiStatus().injectedVoxels == levels*64u*64u*64u &&
                  renderer.voxelGiStatus().uploadedBytes == 0 &&
-                 VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y == 0,
+                 !VulkanDiagnostics::reusesHistory(renderer),
                  "environment change did not relight fully and reject stale history");
     ++sceneId;
     settle();
@@ -260,16 +262,16 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     };
     const int lastLevel = quality == VisualQuality::Ultra ? 3 : 2;
     const auto ray = [&](const char* name,glm::vec3 origin,glm::vec3 direction,int level) {
-        VulkanGiSmokeProbe::Ray input;
+        VulkanDiagnostics::Ray input;
         input.origin=glm::vec4(origin,1); input.direction=glm::vec4(direction,0);
-        const auto result=VulkanGiSmokeProbe::traceRays(renderer,{input},level)[0].result;
+        const auto result=VulkanDiagnostics::traceRays(renderer,{input},level)[0].result;
         if(metrics.is_open())metrics << name << ',' << level << ',' << result.r << ',' << result.g << ',' << result.b << ',' << result.a << '\n';
         return result;
     };
     const auto energy = [](glm::vec4 value){return value.r+value.g+value.b;};
     const auto compareFull = [&](glm::vec3 origin,glm::vec3 direction) {
         const auto partial=ray("partial",origin,direction,lastLevel);
-        VulkanGiSmokeProbe::forceFullUpdate(renderer); frame();
+        VulkanDiagnostics::forceFullUpdate(renderer); frame();
         const auto full=ray("full",origin,direction,lastLevel);
         requireSmoke(glm::all(glm::lessThanEqual(glm::abs(partial-full),glm::vec4(0.00001f))),
                      "edited auxiliary regions differ from full GPU reference");
@@ -336,7 +338,7 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     const auto facing=ray("sun-facing",{4.5f,69.5f,4.5f},{0,-1,0},0);
     environment.lightDirection={0,-1,0}; frame();
     requireSmoke(renderer.voxelGiStatus().uploadedBytes==0 &&
-                 VulkanGiSmokeProbe::lastUniforms(renderer).temporal.y==0,
+                 !VulkanDiagnostics::reusesHistory(renderer),
                  "direction light change uploaded geometry or retained history");
     const auto away=ray("sun-away",{4.5f,69.5f,4.5f},{0,-1,0},0);
     requireSmoke(energy(facing)>0.00001f && energy(away)<0.000001f,
@@ -357,12 +359,12 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
     environment.ambientIntensity=1; environment.ambientColor=glm::vec3(1);
     environment.directIntensity=0; settle();
     for(float boundary:{2.0f,4.0f}){
-        std::vector<VulkanGiSmokeProbe::Ray> inputs(2);
+        std::vector<VulkanDiagnostics::Ray> inputs(2);
         for(int i=0;i<2;++i){
             inputs[i].origin=glm::vec4(4.5f,68.5f,4.01f,0);
             inputs[i].direction=glm::vec4(0,0,1,boundary+(i==0?-0.001f:0.001f));
         }
-        const auto results=VulkanGiSmokeProbe::traceRays(renderer,inputs);
+        const auto results=VulkanDiagnostics::traceRays(renderer,inputs);
         requireSmoke(energy(results[0].result)>0.00001f &&
             glm::length(glm::vec3(results[0].result-results[1].result))<0.01f,
             "radiance footprint has a discontinuity at a clipmap scale transition");
@@ -386,7 +388,7 @@ void runSmoke(const std::filesystem::path& assets, VisualQuality quality,
 }
 }
 
-int main(int argc,char** argv) {
+int main(int argc,char** argv) try {
     if (argc != 2 && argc != 3) return 2;
     try {
         installHeavenFixture();
@@ -401,4 +403,6 @@ int main(int argc,char** argv) {
         std::cerr << "Voxel GI Vulkan smoke failed: " << error.what() << '\n';
         return 1;
     }
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

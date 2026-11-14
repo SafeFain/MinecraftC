@@ -1,6 +1,8 @@
+#include "TestSupport.h"
 #include "OverworldStructureFixtures.h"
 #include "core/Window.h"
-#include "renderer/backend/vulkan/VulkanGiSmokeProbe.h"
+#include "renderer/backend/vulkan/VulkanDiagnostics.h"
+#include "renderer/backend/vulkan/VulkanRenderer.h"
 #include "world/ChunkMesh.h"
 #include "world/ChunkMeshBuilder.h"
 #include "world/WorldGenerator.h"
@@ -17,7 +19,7 @@ constexpr int width = 960, height = 640;
 int floorChunk(int n) { return n/16-(n%16<0); }
 
 void writeCapture(VulkanRenderer& renderer, const std::filesystem::path& path) {
-    const auto rgba = VulkanGiSmokeProbe::readCapture(renderer);
+    const auto rgba = VulkanDiagnostics::readCapture(renderer);
     if (rgba.size() != width*height*4) throw std::runtime_error("unexpected structure capture size");
     std::ofstream out(path, std::ios::binary);
     out << "P6\n" << width << ' ' << height << "\n255\n";
@@ -27,7 +29,7 @@ void writeCapture(VulkanRenderer& renderer, const std::filesystem::path& path) {
 }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) try {
     if (argc < 3 || argc > 4) {
         std::cerr << "Usage: vulkan_structure_smoke <assets> <capture-directory> [--villages|--doors]\n";
         return 2;
@@ -40,7 +42,7 @@ int main(int argc, char** argv) {
         if(argc==4 && std::string(argv[3])=="--nether")return VulkanNetherCases::run(renderer,window,std::filesystem::absolute(argv[1]),std::filesystem::absolute(argv[2]));
         renderer.setVisualQuality(VisualQuality::Medium);
         renderer.setEnhancedVisuals(false);
-        std::cout << VulkanGiSmokeProbe::deviceDescription(renderer) << '\n';
+        std::cout << VulkanDiagnostics::deviceDescription(renderer) << '\n';
         DayNightCycle day;
         day.setPhase(0.25f);
         const auto environment = day.evaluate();
@@ -166,7 +168,7 @@ int main(int argc, char** argv) {
                 renderer.endFrame();
             };
             for (int i = 0; i < 8; ++i) frame();
-            VulkanGiSmokeProbe::requestCapture(renderer);
+            VulkanDiagnostics::requestCapture(renderer);
             frame();
             writeCapture(renderer,std::filesystem::path(argv[2])/(doors?"doors.ppm":std::string(structureCommandName(fixture.type))+".ppm"));
             if(villages) {
@@ -174,7 +176,7 @@ int main(int argc, char** argv) {
                 vp=glm::perspective(glm::radians(58.0f),window.aspectRatio(),.1f,512.0f)*
                     glm::lookAt(camera,glm::vec3(0,fixture.y+1.5f,5.5f),glm::vec3(0,1,0));
                 for(int i=0;i<4;++i)frame();
-                VulkanGiSmokeProbe::requestCapture(renderer);frame();
+                VulkanDiagnostics::requestCapture(renderer);frame();
                 writeCapture(renderer,std::filesystem::path(argv[2])/"village-residents.ppm");
             }
             renderer.waitIdle();
@@ -186,4 +188,6 @@ int main(int argc, char** argv) {
         std::cerr << "Structure smoke failed: " << e.what() << '\n';
         return 1;
     }
+} catch (...) {
+    return TestSupport::reportUnhandledException(__FILE__);
 }

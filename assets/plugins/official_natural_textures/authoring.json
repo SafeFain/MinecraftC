@@ -12900,6 +12900,1986 @@
         139,
         255
       ]
+    ],
+    "lapis_ore": [
+      [
+        77,
+        86,
+        99,
+        255
+      ],
+      [
+        85,
+        94,
+        106,
+        255
+      ],
+      [
+        90,
+        102,
+        116,
+        255
+      ],
+      [
+        29,
+        47,
+        111,
+        255
+      ],
+      [
+        42,
+        71,
+        161,
+        255
+      ],
+      [
+        60,
+        98,
+        191,
+        255
+      ],
+      [
+        93,
+        144,
+        226,
+        255
+      ]
+    ],
+    "deepslate_lapis_ore": [
+      [
+        52,
+        57,
+        65,
+        255
+      ],
+      [
+        58,
+        64,
+        72,
+        255
+      ],
+      [
+        65,
+        71,
+        80,
+        255
+      ],
+      [
+        29,
+        47,
+        111,
+        255
+      ],
+      [
+        42,
+        71,
+        161,
+        255
+      ],
+      [
+        60,
+        98,
+        191,
+        255
+      ],
+      [
+        93,
+        144,
+        226,
+        255
+      ]
+    ],
+    "bookshelf": [
+      [
+        114,
+        88,
+        51,
+        255
+      ],
+      [
+        121,
+        96,
+        59,
+        255
+      ],
+      [
+        133,
+        103,
+        59,
+        255
+      ],
+      [
+        143,
+        111,
+        62,
+        255
+      ],
+      [
+        71,
+        130,
+        134,
+        255
+      ],
+      [
+        164,
+        74,
+        65,
+        255
+      ],
+      [
+        189,
+        173,
+        81,
+        255
+      ]
+    ],
+    "iron_block": [
+      [
+        160,
+        173,
+        165,
+        255
+      ],
+      [
+        168,
+        181,
+        173,
+        255
+      ],
+      [
+        176,
+        190,
+        182,
+        255
+      ],
+      [
+        184,
+        199,
+        191,
+        255
+      ],
+      [
+        193,
+        208,
+        200,
+        255
+      ],
+      [
+        201,
+        217,
+        208,
+        255
+      ],
+      [
+        210,
+        226,
+        216,
+        255
+      ]
+    ],
+    "enchanting_table": [
+      [
+        68,
+        45,
+        79,
+        255
+      ],
+      [
+        75,
+        52,
+        86,
+        255
+      ],
+      [
+        84,
+        57,
+        97,
+        255
+      ],
+      [
+        92,
+        64,
+        106,
+        255
+      ],
+      [
+        100,
+        72,
+        114,
+        255
+      ],
+      [
+        211,
+        190,
+        134,
+        255
+      ],
+      [
+        235,
+        223,
+        167,
+        255
+      ]
+    ],
+    "anvil": [
+      [
+        62,
+        66,
+        69,
+        255
+      ],
+      [
+        69,
+        74,
+        75,
+        255
+      ],
+      [
+        76,
+        80,
+        83,
+        255
+      ],
+      [
+        83,
+        88,
+        90,
+        255
+      ],
+      [
+        90,
+        96,
+        98,
+        255
+      ],
+      [
+        98,
+        104,
+        106,
+        255
+      ],
+      [
+        105,
+        112,
+        113,
+        255
+      ]
+    ],
+    "chipped_anvil": [
+      [
+        56,
+        59,
+        62,
+        255
+      ],
+      [
+        63,
+        67,
+        70,
+        255
+      ],
+      [
+        70,
+        74,
+        77,
+        255
+      ],
+      [
+        76,
+        81,
+        84,
+        255
+      ],
+      [
+        84,
+        89,
+        91,
+        255
+      ],
+      [
+        91,
+        97,
+        99,
+        255
+      ],
+      [
+        99,
+        105,
+        106,
+        255
+      ]
+    ],
+    "damaged_anvil": [
+      [
+        54,
+        57,
+        60,
+        255
+      ],
+      [
+        60,
+        64,
+        67,
+        255
+      ],
+      [
+        67,
+        72,
+        75,
+        255
+      ],
+      [
+        74,
+        78,
+        82,
+        255
+      ],
+      [
+        81,
+        86,
+        90,
+        255
+      ],
+      [
+        89,
+        94,
+        97,
+        255
+      ],
+      [
+        96,
+        102,
+        104,
+        255
+      ]
+    ],
+    "frosted_ice": [
+      [
+        120,
+        158,
+        172,
+        255
+      ],
+      [
+        128,
+        167,
+        181,
+        255
+      ],
+      [
+        131,
+        175,
+        192,
+        255
+      ],
+      [
+        137,
+        185,
+        203,
+        255
+      ],
+      [
+        145,
+        194,
+        211,
+        255
+      ],
+      [
+        153,
+        203,
+        221,
+        255
+      ],
+      [
+        162,
+        212,
+        229,
+        255
+      ]
+    ],
+    "redstone_dust": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        97,
+        46,
+        39,
+        255
+      ],
+      [
+        109,
+        49,
+        42,
+        255
+      ],
+      [
+        120,
+        55,
+        47,
+        255
+      ],
+      [
+        128,
+        62,
+        54,
+        255
+      ],
+      [
+        137,
+        70,
+        61,
+        255
+      ],
+      [
+        145,
+        77,
+        69,
+        255
+      ]
+    ],
+    "redstone_dust_on": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        185,
+        67,
+        51,
+        255
+      ],
+      [
+        204,
+        63,
+        45,
+        255
+      ],
+      [
+        218,
+        65,
+        46,
+        255
+      ],
+      [
+        227,
+        76,
+        55,
+        255
+      ],
+      [
+        233,
+        85,
+        64,
+        255
+      ],
+      [
+        233,
+        94,
+        72,
+        255
+      ]
+    ],
+    "lever": [
+      [
+        94,
+        85,
+        66,
+        255
+      ],
+      [
+        102,
+        92,
+        72,
+        255
+      ],
+      [
+        111,
+        99,
+        77,
+        255
+      ],
+      [
+        119,
+        107,
+        83,
+        255
+      ],
+      [
+        126,
+        114,
+        90,
+        255
+      ],
+      [
+        135,
+        122,
+        98,
+        255
+      ],
+      [
+        142,
+        130,
+        106,
+        255
+      ]
+    ],
+    "redstone_torch": [
+      [
+        165,
+        59,
+        42,
+        255
+      ],
+      [
+        174,
+        67,
+        50,
+        255
+      ],
+      [
+        192,
+        65,
+        46,
+        255
+      ],
+      [
+        205,
+        69,
+        48,
+        255
+      ],
+      [
+        215,
+        77,
+        56,
+        255
+      ],
+      [
+        224,
+        87,
+        65,
+        255
+      ],
+      [
+        233,
+        96,
+        73,
+        255
+      ]
+    ],
+    "redstone_torch_off": [
+      [
+        83,
+        44,
+        34,
+        255
+      ],
+      [
+        91,
+        51,
+        41,
+        255
+      ],
+      [
+        103,
+        56,
+        45,
+        255
+      ],
+      [
+        112,
+        62,
+        50,
+        255
+      ],
+      [
+        120,
+        69,
+        56,
+        255
+      ],
+      [
+        128,
+        76,
+        64,
+        255
+      ],
+      [
+        136,
+        84,
+        71,
+        255
+      ]
+    ],
+    "redstone_repeater": [
+      [
+        109,
+        106,
+        101,
+        255
+      ],
+      [
+        117,
+        114,
+        108,
+        255
+      ],
+      [
+        126,
+        122,
+        115,
+        255
+      ],
+      [
+        133,
+        129,
+        123,
+        255
+      ],
+      [
+        141,
+        138,
+        130,
+        255
+      ],
+      [
+        149,
+        145,
+        139,
+        255
+      ],
+      [
+        157,
+        154,
+        146,
+        255
+      ]
+    ],
+    "redstone_repeater_on": [
+      [
+        145,
+        71,
+        58,
+        255
+      ],
+      [
+        153,
+        78,
+        66,
+        255
+      ],
+      [
+        168,
+        81,
+        67,
+        255
+      ],
+      [
+        180,
+        87,
+        70,
+        255
+      ],
+      [
+        189,
+        94,
+        79,
+        255
+      ],
+      [
+        197,
+        103,
+        87,
+        255
+      ],
+      [
+        206,
+        111,
+        94,
+        255
+      ]
+    ],
+    "redstone_comparator": [
+      [
+        110,
+        109,
+        104,
+        255
+      ],
+      [
+        117,
+        117,
+        111,
+        255
+      ],
+      [
+        126,
+        125,
+        119,
+        255
+      ],
+      [
+        134,
+        133,
+        127,
+        255
+      ],
+      [
+        141,
+        141,
+        134,
+        255
+      ],
+      [
+        149,
+        149,
+        143,
+        255
+      ],
+      [
+        158,
+        157,
+        150,
+        255
+      ]
+    ],
+    "redstone_comparator_on": [
+      [
+        145,
+        77,
+        61,
+        255
+      ],
+      [
+        154,
+        85,
+        69,
+        255
+      ],
+      [
+        168,
+        88,
+        70,
+        255
+      ],
+      [
+        180,
+        93,
+        74,
+        255
+      ],
+      [
+        189,
+        102,
+        82,
+        255
+      ],
+      [
+        197,
+        109,
+        90,
+        255
+      ],
+      [
+        206,
+        118,
+        97,
+        255
+      ]
+    ],
+    "piston": [
+      [
+        100,
+        98,
+        89,
+        255
+      ],
+      [
+        107,
+        107,
+        96,
+        255
+      ],
+      [
+        115,
+        114,
+        102,
+        255
+      ],
+      [
+        124,
+        122,
+        108,
+        255
+      ],
+      [
+        131,
+        129,
+        116,
+        255
+      ],
+      [
+        139,
+        138,
+        125,
+        255
+      ],
+      [
+        147,
+        145,
+        132,
+        255
+      ]
+    ],
+    "piston_side": [
+      [
+        99,
+        97,
+        87,
+        255
+      ],
+      [
+        106,
+        106,
+        94,
+        255
+      ],
+      [
+        114,
+        113,
+        100,
+        255
+      ],
+      [
+        123,
+        121,
+        107,
+        255
+      ],
+      [
+        130,
+        128,
+        115,
+        255
+      ],
+      [
+        138,
+        137,
+        123,
+        255
+      ],
+      [
+        146,
+        144,
+        130,
+        255
+      ]
+    ],
+    "piston_top": [
+      [
+        135,
+        114,
+        76,
+        255
+      ],
+      [
+        143,
+        122,
+        84,
+        255
+      ],
+      [
+        153,
+        129,
+        84,
+        255
+      ],
+      [
+        163,
+        137,
+        89,
+        255
+      ],
+      [
+        172,
+        144,
+        96,
+        255
+      ],
+      [
+        180,
+        153,
+        105,
+        255
+      ],
+      [
+        188,
+        161,
+        112,
+        255
+      ]
+    ],
+    "sticky_piston_top": [
+      [
+        90,
+        123,
+        68,
+        255
+      ],
+      [
+        97,
+        131,
+        76,
+        255
+      ],
+      [
+        101,
+        140,
+        76,
+        255
+      ],
+      [
+        107,
+        150,
+        80,
+        255
+      ],
+      [
+        114,
+        158,
+        88,
+        255
+      ],
+      [
+        123,
+        167,
+        96,
+        255
+      ],
+      [
+        130,
+        175,
+        104,
+        255
+      ]
+    ],
+    "observer": [
+      [
+        87,
+        91,
+        93,
+        255
+      ],
+      [
+        94,
+        99,
+        101,
+        255
+      ],
+      [
+        101,
+        107,
+        108,
+        255
+      ],
+      [
+        108,
+        114,
+        117,
+        255
+      ],
+      [
+        116,
+        122,
+        125,
+        255
+      ],
+      [
+        124,
+        130,
+        132,
+        255
+      ],
+      [
+        131,
+        138,
+        141,
+        255
+      ]
+    ],
+    "observer_face": [
+      [
+        110,
+        115,
+        113,
+        255
+      ],
+      [
+        118,
+        122,
+        121,
+        255
+      ],
+      [
+        126,
+        130,
+        129,
+        255
+      ],
+      [
+        133,
+        138,
+        137,
+        255
+      ],
+      [
+        141,
+        147,
+        146,
+        255
+      ],
+      [
+        149,
+        154,
+        153,
+        255
+      ],
+      [
+        157,
+        163,
+        162,
+        255
+      ]
+    ],
+    "observer_back": [
+      [
+        82,
+        66,
+        61,
+        255
+      ],
+      [
+        90,
+        73,
+        68,
+        255
+      ],
+      [
+        99,
+        79,
+        73,
+        255
+      ],
+      [
+        108,
+        87,
+        80,
+        255
+      ],
+      [
+        115,
+        94,
+        88,
+        255
+      ],
+      [
+        123,
+        102,
+        95,
+        255
+      ],
+      [
+        131,
+        109,
+        103,
+        255
+      ]
+    ],
+    "observer_back_on": [
+      [
+        148,
+        55,
+        41,
+        255
+      ],
+      [
+        157,
+        63,
+        49,
+        255
+      ],
+      [
+        172,
+        62,
+        47,
+        255
+      ],
+      [
+        185,
+        66,
+        50,
+        255
+      ],
+      [
+        195,
+        76,
+        58,
+        255
+      ],
+      [
+        204,
+        84,
+        66,
+        255
+      ],
+      [
+        213,
+        92,
+        74,
+        255
+      ]
+    ],
+    "redstone_lamp": [
+      [
+        80,
+        61,
+        39,
+        255
+      ],
+      [
+        88,
+        69,
+        47,
+        255
+      ],
+      [
+        98,
+        75,
+        50,
+        255
+      ],
+      [
+        106,
+        82,
+        54,
+        255
+      ],
+      [
+        114,
+        90,
+        61,
+        255
+      ],
+      [
+        122,
+        97,
+        69,
+        255
+      ],
+      [
+        129,
+        105,
+        76,
+        255
+      ]
+    ],
+    "redstone_lamp_on": [
+      [
+        175,
+        151,
+        94,
+        255
+      ],
+      [
+        183,
+        158,
+        102,
+        255
+      ],
+      [
+        195,
+        166,
+        99,
+        255
+      ],
+      [
+        206,
+        174,
+        102,
+        255
+      ],
+      [
+        215,
+        183,
+        110,
+        255
+      ],
+      [
+        223,
+        191,
+        119,
+        255
+      ],
+      [
+        231,
+        200,
+        128,
+        255
+      ]
+    ],
+    "redstone_block": [
+      [
+        132,
+        39,
+        30,
+        255
+      ],
+      [
+        140,
+        47,
+        37,
+        255
+      ],
+      [
+        156,
+        46,
+        35,
+        255
+      ],
+      [
+        169,
+        49,
+        38,
+        255
+      ],
+      [
+        177,
+        59,
+        46,
+        255
+      ],
+      [
+        186,
+        68,
+        54,
+        255
+      ],
+      [
+        195,
+        76,
+        62,
+        255
+      ]
+    ],
+    "redstone_ore": [
+      [
+        77,
+        86,
+        99,
+        255
+      ],
+      [
+        85,
+        94,
+        106,
+        255
+      ],
+      [
+        90,
+        102,
+        116,
+        255
+      ],
+      [
+        114,
+        34,
+        28,
+        255
+      ],
+      [
+        154,
+        40,
+        30,
+        255
+      ],
+      [
+        195,
+        51,
+        33,
+        255
+      ],
+      [
+        226,
+        78,
+        49,
+        255
+      ]
+    ],
+    "deepslate_redstone_ore": [
+      [
+        52,
+        57,
+        65,
+        255
+      ],
+      [
+        58,
+        64,
+        72,
+        255
+      ],
+      [
+        65,
+        71,
+        80,
+        255
+      ],
+      [
+        114,
+        34,
+        28,
+        255
+      ],
+      [
+        154,
+        40,
+        30,
+        255
+      ],
+      [
+        195,
+        51,
+        33,
+        255
+      ],
+      [
+        226,
+        78,
+        49,
+        255
+      ]
+    ],
+    "redstone_dust_1": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        99,
+        44,
+        37,
+        255
+      ],
+      [
+        112,
+        47,
+        39,
+        255
+      ],
+      [
+        123,
+        52,
+        44,
+        255
+      ],
+      [
+        131,
+        60,
+        52,
+        255
+      ],
+      [
+        139,
+        67,
+        58,
+        255
+      ],
+      [
+        148,
+        76,
+        66,
+        255
+      ]
+    ],
+    "redstone_dust_2": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        102,
+        42,
+        34,
+        255
+      ],
+      [
+        114,
+        44,
+        36,
+        255
+      ],
+      [
+        125,
+        49,
+        41,
+        255
+      ],
+      [
+        133,
+        58,
+        48,
+        255
+      ],
+      [
+        142,
+        65,
+        55,
+        255
+      ],
+      [
+        150,
+        73,
+        63,
+        255
+      ]
+    ],
+    "redstone_dust_3": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        103,
+        40,
+        32,
+        255
+      ],
+      [
+        116,
+        42,
+        33,
+        255
+      ],
+      [
+        127,
+        46,
+        37,
+        255
+      ],
+      [
+        136,
+        55,
+        45,
+        255
+      ],
+      [
+        144,
+        62,
+        52,
+        255
+      ],
+      [
+        153,
+        71,
+        59,
+        255
+      ]
+    ],
+    "redstone_dust_4": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        105,
+        38,
+        30,
+        255
+      ],
+      [
+        118,
+        39,
+        30,
+        255
+      ],
+      [
+        130,
+        44,
+        33,
+        255
+      ],
+      [
+        138,
+        52,
+        41,
+        255
+      ],
+      [
+        147,
+        60,
+        49,
+        255
+      ],
+      [
+        156,
+        68,
+        56,
+        255
+      ]
+    ],
+    "redstone_dust_5": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        111,
+        39,
+        31,
+        255
+      ],
+      [
+        125,
+        40,
+        31,
+        255
+      ],
+      [
+        137,
+        44,
+        34,
+        255
+      ],
+      [
+        145,
+        53,
+        42,
+        255
+      ],
+      [
+        153,
+        61,
+        50,
+        255
+      ],
+      [
+        162,
+        69,
+        57,
+        255
+      ]
+    ],
+    "redstone_dust_6": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        118,
+        42,
+        32,
+        255
+      ],
+      [
+        133,
+        43,
+        32,
+        255
+      ],
+      [
+        144,
+        46,
+        35,
+        255
+      ],
+      [
+        153,
+        56,
+        43,
+        255
+      ],
+      [
+        161,
+        64,
+        52,
+        255
+      ],
+      [
+        171,
+        72,
+        59,
+        255
+      ]
+    ],
+    "redstone_dust_7": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        126,
+        45,
+        34,
+        255
+      ],
+      [
+        140,
+        45,
+        33,
+        255
+      ],
+      [
+        152,
+        49,
+        37,
+        255
+      ],
+      [
+        161,
+        58,
+        45,
+        255
+      ],
+      [
+        170,
+        66,
+        52,
+        255
+      ],
+      [
+        179,
+        75,
+        61,
+        255
+      ]
+    ],
+    "redstone_dust_8": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        133,
+        48,
+        37,
+        255
+      ],
+      [
+        149,
+        47,
+        35,
+        255
+      ],
+      [
+        160,
+        52,
+        38,
+        255
+      ],
+      [
+        170,
+        60,
+        47,
+        255
+      ],
+      [
+        178,
+        69,
+        54,
+        255
+      ],
+      [
+        187,
+        77,
+        63,
+        255
+      ]
+    ],
+    "redstone_dust_9": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        140,
+        51,
+        39,
+        255
+      ],
+      [
+        156,
+        50,
+        37,
+        255
+      ],
+      [
+        169,
+        54,
+        40,
+        255
+      ],
+      [
+        177,
+        63,
+        49,
+        255
+      ],
+      [
+        186,
+        72,
+        56,
+        255
+      ],
+      [
+        195,
+        80,
+        65,
+        255
+      ]
+    ],
+    "redstone_dust_10": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        148,
+        54,
+        41,
+        255
+      ],
+      [
+        164,
+        53,
+        39,
+        255
+      ],
+      [
+        176,
+        57,
+        42,
+        255
+      ],
+      [
+        185,
+        65,
+        50,
+        255
+      ],
+      [
+        195,
+        75,
+        58,
+        255
+      ],
+      [
+        204,
+        83,
+        67,
+        255
+      ]
+    ],
+    "redstone_dust_11": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        155,
+        57,
+        44,
+        255
+      ],
+      [
+        172,
+        55,
+        41,
+        255
+      ],
+      [
+        184,
+        59,
+        43,
+        255
+      ],
+      [
+        194,
+        68,
+        52,
+        255
+      ],
+      [
+        203,
+        76,
+        60,
+        255
+      ],
+      [
+        212,
+        86,
+        69,
+        255
+      ]
+    ],
+    "redstone_dust_12": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        162,
+        60,
+        46,
+        255
+      ],
+      [
+        180,
+        58,
+        43,
+        255
+      ],
+      [
+        193,
+        61,
+        45,
+        255
+      ],
+      [
+        202,
+        71,
+        53,
+        255
+      ],
+      [
+        211,
+        79,
+        62,
+        255
+      ],
+      [
+        220,
+        89,
+        70,
+        255
+      ]
+    ],
+    "redstone_dust_13": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        170,
+        63,
+        48,
+        255
+      ],
+      [
+        187,
+        60,
+        44,
+        255
+      ],
+      [
+        201,
+        63,
+        47,
+        255
+      ],
+      [
+        210,
+        73,
+        55,
+        255
+      ],
+      [
+        219,
+        82,
+        64,
+        255
+      ],
+      [
+        229,
+        91,
+        71,
+        255
+      ]
+    ],
+    "redstone_dust_14": [
+      [
+        5,
+        5,
+        4,
+        0
+      ],
+      [
+        177,
+        66,
+        51,
+        255
+      ],
+      [
+        195,
+        63,
+        46,
+        255
+      ],
+      [
+        208,
+        66,
+        48,
+        255
+      ],
+      [
+        218,
+        76,
+        57,
+        255
+      ],
+      [
+        228,
+        85,
+        66,
+        255
+      ],
+      [
+        233,
+        93,
+        73,
+        255
+      ]
     ]
   },
   "patterns": {
@@ -13200,7 +15180,52 @@
     "crimson_door_bottom": "semantic",
     "crimson_door_top": "semantic",
     "warped_door_bottom": "semantic",
-    "warped_door_top": "semantic"
+    "warped_door_top": "semantic",
+    "lapis_ore": "ore",
+    "deepslate_lapis_ore": "ore",
+    "bookshelf": "semantic",
+    "iron_block": "semantic",
+    "enchanting_table": "semantic",
+    "anvil": "semantic",
+    "chipped_anvil": "semantic",
+    "damaged_anvil": "semantic",
+    "frosted_ice": "semantic",
+    "redstone_dust": "semantic",
+    "redstone_dust_on": "semantic",
+    "lever": "semantic",
+    "redstone_torch": "semantic",
+    "redstone_torch_off": "semantic",
+    "redstone_repeater": "semantic",
+    "redstone_repeater_on": "semantic",
+    "redstone_comparator": "semantic",
+    "redstone_comparator_on": "semantic",
+    "piston": "semantic",
+    "piston_side": "semantic",
+    "piston_top": "semantic",
+    "sticky_piston_top": "semantic",
+    "observer": "semantic",
+    "observer_face": "semantic",
+    "observer_back": "semantic",
+    "observer_back_on": "semantic",
+    "redstone_lamp": "semantic",
+    "redstone_lamp_on": "semantic",
+    "redstone_block": "semantic",
+    "redstone_ore": "ore",
+    "deepslate_redstone_ore": "ore",
+    "redstone_dust_1": "semantic",
+    "redstone_dust_2": "semantic",
+    "redstone_dust_3": "semantic",
+    "redstone_dust_4": "semantic",
+    "redstone_dust_5": "semantic",
+    "redstone_dust_6": "semantic",
+    "redstone_dust_7": "semantic",
+    "redstone_dust_8": "semantic",
+    "redstone_dust_9": "semantic",
+    "redstone_dust_10": "semantic",
+    "redstone_dust_11": "semantic",
+    "redstone_dust_12": "semantic",
+    "redstone_dust_13": "semantic",
+    "redstone_dust_14": "semantic"
   },
   "recipes": {
     "version": 1,
@@ -14424,6 +16449,186 @@
         "variants": 1
       },
       "skyroot_door_top": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "lapis_ore": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "deepslate_lapis_ore": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "bookshelf": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "iron_block": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "enchanting_table": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "anvil": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "chipped_anvil": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "damaged_anvil": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "frosted_ice": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_on": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "lever": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_torch": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_torch_off": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_repeater": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_repeater_on": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_comparator": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_comparator_on": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "piston": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "piston_side": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "piston_top": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "sticky_piston_top": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "observer": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "observer_face": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "observer_back": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "observer_back_on": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_lamp": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_lamp_on": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_block": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_ore": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "deepslate_redstone_ore": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_1": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_2": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_3": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_4": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_5": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_6": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_7": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_8": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_9": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_10": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_11": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_12": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_13": {
+        "recipe": "base",
+        "variants": 1
+      },
+      "redstone_dust_14": {
         "recipe": "base",
         "variants": 1
       }
@@ -16873,6 +19078,378 @@
       "metallic": 0.0,
       "emission": 0.0,
       "normal_strength": 0.28
+    },
+    "lapis_ore": {
+      "pattern": "mineral",
+      "roughness": 0.56,
+      "height_strength": 0.18,
+      "metallic": 0.3,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "deepslate_lapis_ore": {
+      "pattern": "mineral",
+      "roughness": 0.56,
+      "height_strength": 0.18,
+      "metallic": 0.3,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "bookshelf": {
+      "pattern": "fibers",
+      "roughness": 0.78,
+      "height_strength": 0.18,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "iron_block": {
+      "pattern": "flakes",
+      "roughness": 0.79,
+      "height_strength": 0.18,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "enchanting_table": {
+      "pattern": "flakes",
+      "roughness": 0.79,
+      "height_strength": 0.18,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "anvil": {
+      "pattern": "flakes",
+      "roughness": 0.79,
+      "height_strength": 0.18,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "chipped_anvil": {
+      "pattern": "flakes",
+      "roughness": 0.79,
+      "height_strength": 0.18,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "damaged_anvil": {
+      "pattern": "flakes",
+      "roughness": 0.79,
+      "height_strength": 0.18,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "frosted_ice": {
+      "pattern": "crystal",
+      "roughness": 0.16,
+      "height_strength": 0.08,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_dust": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_on": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "lever": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_torch": {
+      "pattern": "flat",
+      "roughness": 0.28,
+      "height_strength": 0.06,
+      "metallic": 0.0,
+      "emission": 1.0,
+      "normal_strength": 0.28,
+      "emission_roles": [
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "redstone_torch_off": {
+      "pattern": "flat",
+      "roughness": 0.28,
+      "height_strength": 0.06,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_repeater": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_repeater_on": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_comparator": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_comparator_on": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "piston": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "piston_side": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "piston_top": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "sticky_piston_top": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "observer": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "observer_face": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "observer_back": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "observer_back_on": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_lamp": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_lamp_on": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 1.0,
+      "normal_strength": 0.28,
+      "emission_roles": [
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "redstone_block": {
+      "pattern": "flat",
+      "roughness": 0.65,
+      "height_strength": 0.1,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_ore": {
+      "pattern": "mineral",
+      "roughness": 0.56,
+      "height_strength": 0.18,
+      "metallic": 0.3,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "deepslate_redstone_ore": {
+      "pattern": "mineral",
+      "roughness": 0.56,
+      "height_strength": 0.18,
+      "metallic": 0.3,
+      "emission": 0.0,
+      "normal_strength": 0.28
+    },
+    "redstone_dust_1": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_2": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_3": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_4": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_5": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_6": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_7": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_8": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_9": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_10": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_11": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_12": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_13": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
+    },
+    "redstone_dust_14": {
+      "pattern": "flat",
+      "roughness": 0.8,
+      "height_strength": 0.03,
+      "metallic": 0.0,
+      "emission": 0.0,
+      "normal_strength": 0.2
     }
   },
   "items": {
@@ -16930,7 +19507,10 @@
       "potion": {},
       "splash_potion": {},
       "empty_bottle": {},
-      "smithing_template": {}
+      "smithing_template": {},
+      "paper": {},
+      "book": {},
+      "enchanted_book": {}
     },
     "handle_palette": [
       [
@@ -18427,6 +21007,94 @@
           120,
           101,
           83
+        ]
+      ],
+      "parchment": [
+        [
+          120,
+          102,
+          71
+        ],
+        [
+          180,
+          165,
+          117
+        ],
+        [
+          235,
+          229,
+          178
+        ],
+        [
+          207,
+          196,
+          144
+        ]
+      ],
+      "binding": [
+        [
+          74,
+          46,
+          33
+        ],
+        [
+          106,
+          64,
+          40
+        ],
+        [
+          151,
+          86,
+          46
+        ],
+        [
+          230,
+          218,
+          155
+        ]
+      ],
+      "lapis": [
+        [
+          24,
+          39,
+          91
+        ],
+        [
+          34,
+          56,
+          136
+        ],
+        [
+          49,
+          87,
+          186
+        ],
+        [
+          110,
+          162,
+          232
+        ]
+      ],
+      "slime": [
+        [
+          77,
+          118,
+          56
+        ],
+        [
+          87,
+          136,
+          63
+        ],
+        [
+          101,
+          153,
+          74
+        ],
+        [
+          115,
+          170,
+          90
         ]
       ]
     },
@@ -20354,6 +23022,112 @@
         "generator": "item_sprite",
         "template": "spawn_egg",
         "material": "enderman_egg"
+      },
+      "lapis_ore": {
+        "generator": "block_item_icon",
+        "block": "lapis_ore"
+      },
+      "deepslate_lapis_ore": {
+        "generator": "block_item_icon",
+        "block": "deepslate_lapis_ore"
+      },
+      "bookshelf": {
+        "generator": "block_item_icon",
+        "block": "bookshelf"
+      },
+      "iron_block": {
+        "generator": "block_item_icon",
+        "block": "iron_block"
+      },
+      "enchanting_table": {
+        "generator": "block_item_icon",
+        "block": "enchanting_table"
+      },
+      "anvil": {
+        "generator": "block_item_icon",
+        "block": "anvil"
+      },
+      "chipped_anvil": {
+        "generator": "block_item_icon",
+        "block": "chipped_anvil"
+      },
+      "damaged_anvil": {
+        "generator": "block_item_icon",
+        "block": "damaged_anvil"
+      },
+      "paper": {
+        "generator": "item_sprite",
+        "template": "paper",
+        "material": "parchment"
+      },
+      "book": {
+        "generator": "item_sprite",
+        "template": "book",
+        "material": "binding"
+      },
+      "enchanted_book": {
+        "generator": "item_sprite",
+        "template": "enchanted_book",
+        "material": "binding"
+      },
+      "lapis_lazuli": {
+        "generator": "item_sprite",
+        "template": "gem",
+        "material": "lapis"
+      },
+      "lever": {
+        "generator": "block_item_icon",
+        "block": "lever"
+      },
+      "redstone_torch": {
+        "generator": "block_item_icon",
+        "block": "redstone_torch"
+      },
+      "redstone_repeater": {
+        "generator": "block_item_icon",
+        "block": "redstone_repeater"
+      },
+      "redstone_comparator": {
+        "generator": "block_item_icon",
+        "block": "redstone_comparator"
+      },
+      "piston": {
+        "generator": "block_item_icon",
+        "block": "piston"
+      },
+      "sticky_piston": {
+        "generator": "block_item_icon",
+        "block": "sticky_piston"
+      },
+      "observer": {
+        "generator": "block_item_icon",
+        "block": "observer"
+      },
+      "redstone_lamp": {
+        "generator": "block_item_icon",
+        "block": "redstone_lamp"
+      },
+      "redstone_block": {
+        "generator": "block_item_icon",
+        "block": "redstone_block"
+      },
+      "redstone_ore": {
+        "generator": "block_item_icon",
+        "block": "redstone_ore"
+      },
+      "deepslate_redstone_ore": {
+        "generator": "block_item_icon",
+        "block": "deepslate_redstone_ore"
+      },
+      "slime_ball": {
+        "generator": "item_sprite",
+        "template": "gem",
+        "material": "slime"
+      },
+      "slime_spawn_egg": {
+        "generator": "item_sprite",
+        "template": "spawn_egg",
+        "material": "slime"
       }
     },
     "documentation": {
@@ -21141,7 +23915,32 @@
     "hoglin_spawn_egg": "minecraftc:hoglin_spawn_egg",
     "zoglin_spawn_egg": "minecraftc:zoglin_spawn_egg",
     "strider_spawn_egg": "minecraftc:strider_spawn_egg",
-    "enderman_spawn_egg": "minecraftc:enderman_spawn_egg"
+    "enderman_spawn_egg": "minecraftc:enderman_spawn_egg",
+    "lapis_ore": "minecraftc:lapis_ore",
+    "deepslate_lapis_ore": "minecraftc:deepslate_lapis_ore",
+    "bookshelf": "minecraftc:bookshelf",
+    "iron_block": "minecraftc:iron_block",
+    "enchanting_table": "minecraftc:enchanting_table",
+    "anvil": "minecraftc:anvil",
+    "chipped_anvil": "minecraftc:chipped_anvil",
+    "damaged_anvil": "minecraftc:damaged_anvil",
+    "paper": "minecraftc:paper",
+    "book": "minecraftc:book",
+    "enchanted_book": "minecraftc:enchanted_book",
+    "lapis_lazuli": "minecraftc:lapis_lazuli",
+    "lever": "minecraftc:lever",
+    "redstone_torch": "minecraftc:redstone_torch",
+    "redstone_repeater": "minecraftc:redstone_repeater",
+    "redstone_comparator": "minecraftc:redstone_comparator",
+    "piston": "minecraftc:piston",
+    "sticky_piston": "minecraftc:sticky_piston",
+    "observer": "minecraftc:observer",
+    "redstone_lamp": "minecraftc:redstone_lamp",
+    "redstone_block": "minecraftc:redstone_block",
+    "redstone_ore": "minecraftc:redstone_ore",
+    "deepslate_redstone_ore": "minecraftc:deepslate_redstone_ore",
+    "slime_ball": "minecraftc:slime_ball",
+    "slime_spawn_egg": "minecraftc:slime_spawn_egg"
   },
   "non_runtime_materials": [
     "copper_ore"

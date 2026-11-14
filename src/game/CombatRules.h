@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <functional>
+#include "game/Item.h"
 
 #include <glm/glm.hpp>
 
@@ -21,6 +23,8 @@ struct MeleeAttackRequest {
     bool critical = false;
     bool sweeping = false;
     bool sprintKnockback = false;
+    ItemStack weapon{};
+    float strength = 1;
 };
 
 struct MeleeAttackResult {
@@ -48,7 +52,9 @@ enum class DamageCause : uint8_t {
     Drowning,
     Starvation,
     Void,
-    Lightning
+    Lightning,
+    Thorns,
+    FallingBlock
 };
 
 struct DamageSourceInfo {
@@ -60,6 +66,7 @@ struct DamageSourceInfo {
     bool hasOrigin = false;
     glm::dvec3 origin{0.0};
     glm::vec3 impulse{0.0f};
+    std::function<void(float)> retaliate{};
 };
 
 struct DamageOutcome {

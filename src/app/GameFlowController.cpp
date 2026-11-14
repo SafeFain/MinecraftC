@@ -203,7 +203,7 @@ void GameFlowController::openPlayerInventoryView() {
 void GameFlowController::giveCreativeItem(ItemId id, int hotbarSlot) {
     if (hotbarSlot < 0 || hotbarSlot >= static_cast<int>(InventoryModel::HOTBAR_SIZE))
         hotbarSlot = m_ui.hotbar.getSelectedSlot();
-    m_session.giveCreativeItem(id, hotbarSlot);
+    m_session.giveCreativeItem(id, hotbarSlot, id == ItemId::ENCHANTED_BOOK ? m_ui.inventory.hoveredEnchantment() : EnchantmentId::Count);
     m_ui.itemNameSeconds = 2.0f;
 }
 

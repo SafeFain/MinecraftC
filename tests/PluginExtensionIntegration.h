@@ -31,7 +31,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     EntityModelRegistry models;models.loadAll(assets);
     check(!models.definition(static_cast<EntityType>(Plugins::resolveEntity("model_data:custom"))).usesPlaceholder,"package model/animation loads with rooted Title Storage active");
     const auto type=Plugins::resolveEntity("entity_demo:grazer");check(type>=4096,"custom entity runtime range");
-    check(Plugins::entityContent(2)&&Plugins::entityContent(2)->health==24,"explicit builtin override");
+    const auto pig=static_cast<uint16_t>(EntityType::Pig);
+    check(Plugins::entityContent(pig)&&Plugins::entityContent(pig)->health==24,"explicit builtin override");
     const auto* item=Plugins::pluginItem(Plugins::resolveItem("entity_demo:grazer_egg"));check(item&&item->spawnEntity==type&&item->properties.kind==ItemKind::SpawnEgg,"custom spawn egg registration");
     Plugins::GenerationConfig config{"terrain_demo:plateau","1","{\"base_height\":48}",{{"terrain_demo:markers","1"}}};
     WorldGenerator generator(12,WorldType::Normal,DimensionId::Overworld,config);

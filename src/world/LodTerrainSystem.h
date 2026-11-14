@@ -143,7 +143,6 @@ public:
     float selectedMaximumDistance() const;
 
 private:
-    friend struct LanLodTestAccess;
     struct Request {
         LodTileKey key;
         float minimumDistance = 0.0f;
