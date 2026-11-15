@@ -9,10 +9,10 @@ remain supported; `release` does not take an iteration.
 
 | VERSION | Runtime display | Release tag | GitHub release type |
 |---|---|---|---|
-| `1.4.0-beta.1` | `Beta.1-1.4.0` | `v1.4.0-beta.1` | Prerelease |
-| `1.4.0-beta.2` | `Beta.2-1.4.0` | `v1.4.0-beta.2` | Prerelease |
-| `1.4.0-rc.1` | `RC.1-1.4.0` | `v1.4.0-rc.1` | Prerelease |
-| `1.4.0-release` | `Release-1.4.0` | `v1.4.0-release` | Release |
+| `1.4.0-beta.1` | `1.4.0-Beta.1` | `v1.4.0-beta.1` | Prerelease |
+| `1.4.0-beta.2` | `1.4.0-Beta.2` | `v1.4.0-beta.2` | Prerelease |
+| `1.4.0-rc.1` | `1.4.0-RC.1` | `v1.4.0-rc.1` | Prerelease |
+| `1.4.0-release` | `1.4.0-Release` | `v1.4.0-release` | Release |
 
 CMake, Android/iOS/macOS metadata, runtime output, package names, and release CI
 all derive from this file. Branch pushes, pull requests, and manual workflow runs

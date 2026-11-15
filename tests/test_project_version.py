@@ -49,7 +49,7 @@ class ProjectVersionTests(unittest.TestCase):
                     display_label = label + ("." + iteration if iteration else "")
                     self.assertEqual(values["MINECRAFTC_VERSION_CORE"], "1.3.4")
                     self.assertEqual(values["MINECRAFTC_VERSION_DISPLAY"],
-                                     display_label + "-1.3.4")
+                                     "1.3.4-" + display_label)
                     self.assertEqual(values["version"], version)
                     self.assertEqual(values["channel"], channel)
                     self.assertEqual(values["prerelease"],

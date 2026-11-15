@@ -19,7 +19,7 @@ if case == "version":
     core, channel = source_version.split("-", 1)
     stage, separator, iteration = channel.partition(".")
     label = {"alpha": "Alpha", "beta": "Beta", "rc": "RC", "release": "Release"}[stage]
-    expected_display = f"{label}{separator}{iteration}-{core}"
+    expected_display = f"{core}-{label}{separator}{iteration}"
     require(version == expected_display, f"CMake display version disagrees with VERSION: {version!r}")
     require(result.stdout.strip() == f"MinecraftC {version}", f"wrong version: {result}")
     require(not result.stderr, f"unexpected error output: {result}")
