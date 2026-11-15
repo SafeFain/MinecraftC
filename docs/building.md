@@ -171,3 +171,39 @@ verification alone took 465 seconds: compressed tar resources are now hashed in
 archive order to avoid repeated decompression when manifest order differs.
 New runner timings must be measured after CI execution, including cold/warm cache
 state; these historical durations are not promised speedups.
+
+### iOS configuration snapshots and measurements
+
+iOS keeps one macos-15 job, Xcode, four compiler workers, both iPhone/iPad Vulkan
+first-frame checks and the unsigned arm64 device IPA. Before compilation,
+`tools/ci_ios.py` saves separate simulator/device configuration trees through
+Actions cache restore/save. These contain CMake probe results, generated project
+files and pinned dependency sources, not final build/archive products. CMake
+always runs again; a restored configuration failure discards only that lane's
+workspace build tree and retries cold once. Missing caches use the ordinary path.
+
+Keys include runner image, workspace/tool paths, Xcode/Clang/SDK/CMake versions,
+configuration scripts and iOS/SDK inputs. There are no broader restore prefixes.
+The helper and workflow are key inputs, so changing flags invalidates snapshots.
+Configuration snapshots retain the absolute paths CMake expects; an image or path
+change causes a miss. Simulator and device compiler results remain in sccache.
+The daemon has no idle expiration and each build resets/reports its own counters.
+
+Simulator smoke reuses available devices in the selected runtime, selected by
+UDID within each family, and creates a device only when none matches. Each app
+is uninstalled before installation. Devices run serially and are shut down on
+exit; only newly created devices are deleted. Initialization, Vulkan first frame,
+MoltenVK workaround and the 300-second first-frame timeout remain enforced.
+Diagnostics are uploaded even after failures under `ios-ci-diagnostics`, outside
+the release artifact pattern. Actions Summary reports step durations including
+cache transfer, configuration, build, smoke preparation, checks and packaging.
+
+Baseline [run 43723067838](https://github.com/SafeFain/MinecraftC/actions/runs/43723067838)
+(2026-11-15) passed: iOS 1543s, simulator configuration 399s, build about 202s,
+smoke 469s, device configuration 288s. Native measurements for this
+change are pending: compare three cold and three warm runs of the same commit,
+including cache transfer. The warm median target is at most 18 minutes; the cold
+median must stay within 110% of an equivalent uncached baseline. Validate source
+and resource edits, toolchain/configuration misses and both release artifacts.
+These targets are not measured speedup claims. Windows portable helper tests do
+not replace macOS/iOS builds or simulator execution.
