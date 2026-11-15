@@ -15,6 +15,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -444,27 +445,43 @@ inline constexpr const char* DISC_16[] = {
 
 // ── Scenic backgrounds ─────────────────────────────────────────────────────
 
-// Pixel dirt with a grass lip on top and deterministic pebbles.  Used by
-// Quiet block landscape with bounded decoration independent of resolution.
+// Fixed-count voxel-inspired geometry; time is shared across menu transitions.
+// Sine paths never wrap at an edge or depend on frame rate or draw count.
 template <class T>
 inline void menuBackground(T& ui,float w,float h) {
-    rect(ui,0,0,w,h,PANEL_DEEP);
-    constexpr int bands=32;
+    if (w<=0 || h<=0) return;
+    const double time=ui.animationTime();
+    constexpr int bands=48;
     for (int i=0;i<bands;++i) {
         const float t=static_cast<float>(i)/bands;
         rect(ui,0,h*t,w,h/bands+1,
-             glm::mix(glm::vec4(.14f,.23f,.25f,1),glm::vec4(.065f,.10f,.14f,1),t));
+             glm::mix(glm::vec4(.18f,.39f,.37f,1),glm::vec4(.16f,.32f,.46f,1),t));
     }
-    for (int layer=0;layer<3;++layer) {
-        const glm::vec4 color=glm::mix(glm::vec4(.15f,.25f,.26f,1),PANEL_DEEP,layer*.38f);
-        for (int i=0;i<32;++i) {
-            const float t=static_cast<float>(i)/32;
-            const float wave=.5f+.3f*std::sin(t*13+layer*2)+.2f*std::sin(t*29+layer);
-            const float top=h*(.10f+(2-layer)*.075f+wave*.12f);
-            rect(ui,w*t,0,w/32+1,top,color);
-        }
+    constexpr std::array<glm::vec3,3> colors{{
+        {.28f,.64f,.76f},{.25f,.72f,.65f},{.40f,.69f,.49f}}};
+    const float unit=std::min(w,h);
+    constexpr double tau=6.283185307179586;
+    for (int i=0;i<28;++i) {
+        const float phase=i*2.399963f;
+        const float side=unit*(.10f+.025f*((i*7)%6));
+        const float x=w*((i%7+.5f)/7.0f)+unit*.035f*
+            static_cast<float>(std::sin(time*tau/(36+i%5*5)+phase))-side*.5f;
+        const float y=h*((i/7+.5f)/4.0f)+unit*.035f*
+            static_cast<float>(std::cos(time*tau/(40+i%4*6)+phase))-side*.5f;
+        const float light=.5f+.5f*static_cast<float>(std::sin(time*tau/(12+i%7*2)+phase));
+        const glm::vec3 color=colors[static_cast<size_t>(i)%colors.size()]*(.80f+.20f*light);
+        rect(ui,x,y,side,side,glm::vec4(color,.22f+.14f*light));
+        const float edge=side*.10f;
+        rect(ui,x,y+side-edge,side,edge,glm::vec4(.68f,.91f,.87f,.10f));
+        rect(ui,x+side-edge,y,edge,side-edge,glm::vec4(.06f,.19f,.26f,.13f));
     }
-    rect(ui,0,0,w,h,glm::vec4(.025f,.04f,.05f,.25f));
+    // Exposed titles sit on the left on wide screens; footers sit at the bottom.
+    // Quiet these regions without dimming the entire geometric background.
+    for (int i=0;i<16;++i) {
+        const float t=static_cast<float>(i)/16;
+        rect(ui,w*t*.5f,0,w/32,h,glm::vec4(.07f,.16f,.21f,.22f*(1-t)));
+    }
+    rect(ui,0,0,w,std::min(32.0f,h),glm::vec4(.07f,.16f,.21f,.30f));
 }
 
 template <class T>

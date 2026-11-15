@@ -11,9 +11,52 @@ void require(bool condition,const char* message) {
     if (!condition) { std::cerr<<"FAILED: "<<message<<'\n';std::exit(1); }
 }
 struct Rect { float x,y,w,h; };
+struct BackgroundCanvas {
+    struct Quad { glm::vec4 bounds,color; };
+    double time=0;
+    std::vector<Quad> quads;
+    double animationTime() const { return time; }
+    void drawRect(float x,float y,float w,float h,const glm::vec4& color) {
+        quads.push_back({{x,y,w,h},color});
+    }
+};
 }
 
 int main() {
+    for (auto size:{glm::vec2(960,600),glm::vec2(640,240),glm::vec2(320,640),glm::vec2(1,1)}) {
+        for (double time:{0.0,12.0,60.0,86400.0}) {
+            BackgroundCanvas first{time,{}},repeat{time,{}},next{time+1.0/60,{}},later{time+6,{}};
+            UiTheme::menuBackground(first,size.x,size.y);
+            UiTheme::dirtBackground(repeat,size.x,size.y);
+            UiTheme::menuBackground(next,size.x,size.y);
+            UiTheme::menuBackground(later,size.x,size.y);
+            require(!first.quads.empty() && first.quads.size()<=200 &&
+                    first.quads.size()==next.quads.size() && first.quads.size()==later.quads.size(),
+                    "background geometry stays bounded across sizes and time");
+            require(first.quads.size()==repeat.quads.size(),"shared backgrounds use identical geometry");
+            bool moved=false,recolored=false;
+            for (size_t i=0;i<first.quads.size();++i) {
+                const auto& quad=first.quads[i];
+                require(quad.bounds==repeat.quads[i].bounds && quad.color==repeat.quads[i].color,
+                        "same background time reproduces output without advancing it");
+                for (int component=0;component<4;++component) {
+                    require(std::isfinite(quad.bounds[component]) && std::isfinite(quad.color[component]) &&
+                            quad.color[component]>=0 && quad.color[component]<=1,"background has finite valid geometry and colors");
+                    require(std::abs(quad.color[component]-next.quads[i].color[component])<.002f,
+                            "background brightness changes smoothly");
+                }
+                require(quad.bounds.z>0 && quad.bounds.w>0,"background rectangles have positive area");
+                require(glm::length(glm::vec2(quad.bounds-next.quads[i].bounds))<std::min(size.x,size.y)*.001f,
+                        "background drifts smoothly even after a long session");
+                moved|=quad.bounds!=later.quads[i].bounds;
+                recolored|=quad.color!=later.quads[i].color;
+            }
+            require(moved && recolored,"background both drifts and changes brightness over time");
+        }
+    }
+    BackgroundCanvas empty;
+    UiTheme::menuBackground(empty,0,600);UiTheme::menuBackground(empty,320,-1);
+    require(empty.quads.empty(),"empty background dimensions produce no geometry");
     const auto linear=uiLinearColor({.5f,.04045f,1,.6f},.5f);
     require(std::abs(linear.r-.214041f)<.00001f&&std::abs(linear.g-.0031308f)<.00001f&&
             linear.b==1&&linear.a==.3f,"authored sRGB and opacity convert exactly once");

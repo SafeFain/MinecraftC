@@ -350,7 +350,7 @@ int main(int argc,char** argv) try {
         Hotbar hotbar;hotbar.setInventory(&items);
         TouchControls touch;touch.configure(width,height,{});
         const auto draw=[&](const std::string& name,const std::function<void()>& render,int frames=12) {
-            const bool menuCapture=name.rfind("nether-",0)==0 || name=="quality-zh_cn" || name=="quality-scrolled" ||
+            const bool menuCapture=name=="home" || name=="home-drift" || name.rfind("nether-",0)==0 || name=="quality-zh_cn" || name=="quality-scrolled" ||
                 name=="settings" || name=="settings-audio" || name=="settings-bindings" ||
                 name=="settings-keyboard-scroll" || name=="pause" || name=="about" ||
                 name=="plugins-en_us" || name=="plugins-zh_cn" || name=="plugins-scrolled-zh_cn" ||
@@ -496,6 +496,13 @@ int main(int argc,char** argv) try {
         };
         auto shapeImage=[&](BlockId block){return iconImage([&]{ui.drawBlockIcon(16,16,64,64,block);});};
         const auto blankIcon=iconImage([]{}), repeatedBlankIcon=iconImage([]{});
+        const auto background=[&]{UiTheme::menuBackground(ui,float(width),float(height));};
+        const auto stillBackground=iconImage(background),repeatedBackground=iconImage(background);
+        ui.advanceTime(6);
+        PixelReadback::requireEffect(stillBackground,repeatedBackground,iconImage(background),width,height,
+            PixelReadback::uiRegion(0,0,width,height,height),"drifting geometric background",size_t(width)*size_t(height)/100);
+        MainMenu driftMenu(callbacks,worlds,settings,localization,nullptr);
+        draw("home-drift",[&]{driftMenu.render(ui,width,height);});
         const auto slabImage=shapeImage(Plugins::resolveBlock("block_shapes_data:slab"));
         const auto cubeImage=shapeImage(BlockId::STONE);
         const auto iconRegion=PixelReadback::uiRegion(16,16,64,64,height);
