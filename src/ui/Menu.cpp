@@ -1,6 +1,7 @@
 #include "ui/Menu.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
+#include "ui/MainMenuBrand.h"
 #include "plugins/ContentQueries.h"
 
 #include "core/Window.h"
@@ -566,13 +567,19 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
         m_localization.text(home?"menu.home.subtitle":
         m_page==Page::Worlds?"menu.worlds.subtitle":"menu.create.subtitle");
     const float titleW=wideHome?panelX-64:panelW-40;
-    const float titleScale=fittedTextScale(ui,title,h<400?2.0f:home?3.4f:2.4f,titleW);
     const float titleX=wideHome?40:panelX+20;
-    const float titleY=wideHome?h*.60f:panelY+panelH-(h<400?20:32)-ui.measureText(title,titleScale).y;
-    UiTheme::textWithShadow(ui,title,titleX,titleY,titleScale,UiTheme::TEXT);
-    const float subScale=fittedTextScale(ui,subtitle,1.0f,titleW);
-    const float subY=titleY-ui.measureText(subtitle,subScale).y-(h<400?8:12);
-    UiTheme::textWithShadow(ui,subtitle,titleX,subY,subScale,UiTheme::TEXT_DIM);
+    float subY;
+    if (home) {
+        const float brandTop=wideHome?h*.66f:panelY+panelH-(h<400?20:32);
+        subY=UiTheme::mainMenuBrand(ui,titleX,brandTop,titleW,subtitle,h<400);
+    } else {
+        const float titleScale=fittedTextScale(ui,title,h<400?2.0f:2.4f,titleW);
+        const float titleY=panelY+panelH-(h<400?20:32)-ui.measureText(title,titleScale).y;
+        UiTheme::textWithShadow(ui,title,titleX,titleY,titleScale,UiTheme::TEXT);
+        const float subScale=fittedTextScale(ui,subtitle,1.0f,titleW);
+        subY=titleY-ui.measureText(subtitle,subScale).y-(h<400?8:12);
+        UiTheme::textWithShadow(ui,subtitle,titleX,subY,subScale,UiTheme::TEXT_DIM);
+    }
     const float contentTop=wideHome?panelY+panelH-20:subY-(h<400?12:24);
     const float contentBottom=home?panelY+20:std::max(panelY+20, UiMenuFooter(w,h).contentBottom);
     const float contentW=panelW-40;

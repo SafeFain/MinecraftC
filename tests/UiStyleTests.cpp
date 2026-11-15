@@ -2,6 +2,7 @@
 #include "ui/UIColor.h"
 #include "ui/UILayout.h"
 #include "ui/UIStyle.h"
+#include "ui/MainMenuBrand.h"
 #include "ui/SettingsMenu.h"
 #include <cstdlib>
 #include <iostream>
@@ -20,9 +21,36 @@ struct BackgroundCanvas {
         quads.push_back({{x,y,w,h},color});
     }
 };
+struct BrandCanvas : BackgroundCanvas {
+    Rect label{};
+    glm::vec2 measureText(const std::string& text,float scale) {
+        return {static_cast<float>(text.size())*8*scale,12*scale};
+    }
+    void renderTextAlpha(const std::string& text,float x,float y,float scale,const glm::vec3&,float) {
+        const auto size=measureText(text,scale);label={x,y,size.x,size.y};
+    }
+};
 }
 
 int main() {
+    for (float width:{168.0f,248.0f,360.0f,448.0f}) for (bool compact:{false,true}) {
+        for (const auto& subtitle:{std::string("A C++ Voxel Engine"),std::string(u8"C++ 体素引擎"),
+                                   std::string(u8"محرك فوكسل بلغة C++"),std::string(100,'W')}) {
+            BrandCanvas brand;
+            const float bottom=UiTheme::mainMenuBrand(brand,20,180,width,subtitle,compact);
+            require(bottom>20 && bottom<180,"brand reserves bounded vertical space even in compact menus");
+            require(!brand.quads.empty() && brand.quads.size()<1000,"wordmark geometry has a fixed small budget");
+            for (const auto& quad:brand.quads) {
+                require(quad.bounds.x>=20 && quad.bounds.y>=bottom-.001f &&
+                        quad.bounds.x+quad.bounds.z<=20+width+.001f &&
+                        quad.bounds.y+quad.bounds.w<=180+.001f,
+                        "wordmark outlines, extrusion and plaque fit their complete reserved area");
+            }
+            require(brand.label.x>=20 && brand.label.x+brand.label.w<=20+width &&
+                    brand.label.y>=bottom && brand.label.y+brand.label.h<180,
+                    "localized and long taglines fit inside the reserved brand area");
+        }
+    }
     for (auto size:{glm::vec2(960,600),glm::vec2(640,240),glm::vec2(320,640),glm::vec2(1,1)}) {
         for (double time:{0.0,12.0,60.0,86400.0}) {
             BackgroundCanvas first{time,{}},repeat{time,{}},next{time+1.0/60,{}},later{time+6,{}};

@@ -741,7 +741,10 @@ int main(int argc,char** argv) try {
                 "reselecting current language keeps focus and avoids redundant saving");
         menu.onKeyPress(Key::Escape);
         UIRenderer ui;recordUi=true;drawnLabels.clear();menu.render(ui,960,600);
-        require(drawnLabels.count("MINECRAFTC")==1,"Escape returns from language page to home");
+        require(drawnLabels.count("menu.home.subtitle")==1 &&
+                    drawnLabels.count("menu.home.singleplayer")==1 &&
+                    drawnLabels.count("menu.language.title")==0,
+                "Escape returns from language page to home");
         recordUi=false;
     }
 
@@ -769,7 +772,10 @@ int main(int argc,char** argv) try {
         menu.onMouseButton(MouseButton::Left,ButtonAction::Press,point.x,point.y);
         menu.onMouseButton(MouseButton::Left,ButtonAction::Release,point.x,point.y);
         drawnLabels.clear();menu.render(ui,size.x,size.y);
-        require(drawnLabels.count("MINECRAFTC")==1,"language Back button returns home");
+        require(drawnLabels.count("menu.home.subtitle")==1 &&
+                    drawnLabels.count("menu.home.singleplayer")==1 &&
+                    drawnLabels.count("menu.language.title")==0,
+                "language Back button returns home");
         recordUi=false;
     }
 
