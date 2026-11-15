@@ -531,6 +531,49 @@ void testBudgetedWarmChunkRetirement() {
     Config::RENDER_DISTANCE = oldRenderDistance;
 }
 
+// Generation can finish between the benchmark's completion poll and idle check.
+bool streamingBenchmarkReady(World& world, const ThreadPool& pool, bool requireCacheHit) {
+    const auto progress = world.generationProgress();
+    if (progress.total != 1 || progress.completed != 1 ||
+        (requireCacheHit && progress.cacheHits != 1) || !pool.idle())
+        return false;
+    // Idle guarantees all worker completions have been published. Consume the
+    // final handoff before moving away; a pending completion could otherwise
+    // replace the newly retired Warm lifecycle with BoundaryLighting.
+    world.processCompletedGenerations(true, 0.0);
+    return world.generationProgress().lightingReady == 1;
+}
+
+void testBenchmarkGenerationHandoff() {
+    const int oldRenderDistance = Config::RENDER_DISTANCE;
+    Config::RENDER_DISTANCE = 0;
+    ThreadPool pool(2);
+    World world;
+    world.setThreadPool(&pool);
+    world.resetForNewSeed(909090, WorldType::Superflat);
+    world.update({0.5, 64.0, 0.5}, 1);
+    Chunk* origin = world.getChunk(0, 0);
+    origin->cacheChecked = true;
+    world.enqueueGeneration();
+    // Deliberately finish generation without polling its main-thread handoff.
+    // This reproduces a worker completing immediately after the last poll.
+    pool.waitIdle();
+    require(origin->generated.load() && !origin->lightingInitialized.load(),
+            "benchmark regression stages an unconsumed generation completion");
+    require(streamingBenchmarkReady(world, pool, false),
+            "benchmark generation handoff reaches ready state");
+    require(origin->lightingInitialized.load(),
+            "benchmark readiness includes main-thread lighting handoff");
+    world.update({16.5, 64.0, 0.5}, 1);
+    world.processCompletedGenerations(false);
+    require(origin->lifecycle.load() == Chunk::LifecycleState::Warm,
+            "late generation completion must not overwrite benchmark warm retirement");
+    world.update({0.5, 64.0, 0.5}, 1);
+    require(world.getChunk(0, 0) == origin && origin->generated.load(),
+            "benchmark handoff regression reuses the warm origin");
+    Config::RENDER_DISTANCE = oldRenderDistance;
+}
+
 // 4. Small deterministic streaming benchmark. It deliberately reports
 // latency rather than asserting a machine-dependent threshold; CI still
 // exercises cold generation, disk cache revisit, warm promotion and the main
@@ -565,20 +608,17 @@ void testStreamingBenchmark() {
             world.update(position, 1);
             world.enqueueGeneration();
             world.processCompletedGenerations();
+            const bool ready = streamingBenchmarkReady(world, pool, requireCacheHit);
             const auto frameEnd = std::chrono::steady_clock::now();
             result.frames.push_back(std::chrono::duration<double, std::milli>(
                 frameEnd - frameStart).count());
-            const auto progress = world.generationProgress();
-            if (progress.total == 1 && progress.completed == 1 &&
-                (!requireCacheHit || progress.cacheHits == 1) && pool.idle())
-                break;
+            if (ready) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         result.elapsedMs = std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - start).count();
         const auto progress = world.generationProgress();
-        const bool ready = progress.total == 1 && progress.completed == 1 &&
-                           (!requireCacheHit || progress.cacheHits == 1);
+        const bool ready = streamingBenchmarkReady(world, pool, requireCacheHit);
         if (!ready) {
             std::cerr << "[streaming benchmark] " << leg << " leg timed out:"
                       << " total=" << progress.total
@@ -1443,6 +1483,9 @@ void testGuestStreamingInterests() {
 
 int main(int argc,char** argv) try {
     installHeavenFixture();
+    if(argc==2 && std::string(argv[1])=="--benchmark-handoff-test") {
+        testBenchmarkGenerationHandoff();return 0;
+    }
     if(argc==3 && std::string(argv[1])=="--redstone-budget-tests") {
         RedstoneTickScenarios::run(argv[2]);return 0;
     }
@@ -1458,6 +1501,7 @@ int main(int argc,char** argv) try {
     testAsyncGeneratedCacheRoundTrip();
     testWarmChunkBacktrack();
     testBudgetedWarmChunkRetirement();
+    testBenchmarkGenerationHandoff();
     testStreamingBenchmark();
     testGenerationHandoff();
     testBulkLightReplacement();
