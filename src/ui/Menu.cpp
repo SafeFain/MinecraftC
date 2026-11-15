@@ -653,11 +653,6 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
             m_deleteButtons[i].setPosition(contentX+contentW-deleteW,y);
             m_deleteButtons[i].setSize(deleteW,rowH);prepareButton(m_deleteButtons[i]);m_deleteButtons[i].render(ui);
         }
-        if (cards==0) {
-            const std::string empty=m_localization.text("menu.worlds.subtitle");
-            UiTheme::textWithShadow(ui,empty,contentX,contentTop-24,
-                fittedTextScale(ui,empty,1,contentW),UiTheme::TEXT_DIM);
-        }
         const float bw=(contentW-gap)*.5f;
         for (size_t i=cards;i<m_buttons.size();++i) {
             if (i+1==m_buttons.size()) {
