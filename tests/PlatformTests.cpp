@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "TestSupport.h"
 #include "core/Platform.h"
 
@@ -42,6 +43,14 @@ RuntimePathInputs baseInputs(const fs::path& root) {
 } // namespace
 
 int main() try {
+    const std::string utf8Name = "\xE8\xB7\xAF\xE5\xBE\x84\xF0\xA0\x80\x80";
+    const fs::path unicodePath = fs::u8path(utf8Name) / "file.txt";
+    require(genericPathToUtf8(unicodePath) == utf8Name + "/file.txt",
+            "generic paths preserve Chinese and non-BMP UTF-8 bytes and slash separators");
+    require(fs::u8path(pathToUtf8(unicodePath)) == unicodePath,
+            "native-format UTF-8 paths round trip without code-page conversion");
+    require(pathToUtf8({}).empty() && genericPathToUtf8({}).empty(),
+            "empty paths produce empty UTF-8 strings");
     TestSupport::TemporaryDirectory temporary;
     const fs::path root = temporary.path() / fs::u8path(u8"路径");
 

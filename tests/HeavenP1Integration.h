@@ -23,8 +23,8 @@ inline int run(const std::filesystem::path& assets,const std::array<std::filesys
         if(i==1)english["foreign:stolen"]="Must roll back";
         if(i==2)english.erase(ids[i]+":name");
         write(package/"lang/en_us.json",english.dump());
-        write(package/"lang/zh_cn.json",nlohmann::json{{ids[i]+":name",u8"第三维度"}}.dump());
-        write(package/"lang/ar_sa.json",nlohmann::json{{ids[i]+":name",u8"عالم ثالث"}}.dump());
+        write(package/"lang/zh_cn.json",nlohmann::json{{ids[i]+":name","第三维度"}}.dump());
+        write(package/"lang/ar_sa.json",nlohmann::json{{ids[i]+":name","عالم ثالث"}}.dump());
     }
     AssetStore rootedAssets(assets);
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
@@ -37,8 +37,8 @@ inline int run(const std::filesystem::path& assets,const std::array<std::filesys
     check(!Plugins::content().extensions.actions.count("p1_bad_english:action")&&
           !Plugins::content().extensions.particles.count("p1_bad_english:particle")&&
           !Plugins::content().extensions.translations.at("en_us").count("p1_bad_english:travel_name"),"Late failure did not roll back all registries");
-    check(Plugins::content().extensions.translations.at("zh_cn").at("p1_fixture:name")==u8"第三维度"&&
-          Plugins::content().extensions.translations.at("ar_sa").at("p1_fixture:name")==u8"عالم ثالث", "P1 UTF-8 dictionaries differ");
+    check(Plugins::content().extensions.translations.at("zh_cn").at("p1_fixture:name")=="第三维度"&&
+          Plugins::content().extensions.translations.at("ar_sa").at("p1_fixture:name")=="عالم ثالث", "P1 UTF-8 dictionaries differ");
     check(Plugins::content().extensions.bedTravel.at("p1_fixture:travel").target==dimension,"P1 bed travel target differs");
     WorldGenerator generator(123,WorldType::Normal,static_cast<DimensionId>(dimension));
     check(generator.getSeed()==WorldGenContext(123).derive(0x50315f444f4d4149ULL),"P1 seed domain was not derived exactly once");

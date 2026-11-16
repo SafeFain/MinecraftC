@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "debug/Log.h"
 #include "core/Platform.h"
 
@@ -25,7 +26,7 @@ void Log::init(LogLevel minLevel, bool fileOutput,
         s_file.open(logPath, std::ios::out | std::ios::app);
         if (!s_file.is_open()) {
             std::cerr << "[Log] Warning: failed to open log file: "
-                      << logPath.u8string() << std::endl;
+                      << pathToUtf8(logPath) << std::endl;
             s_fileOutput = false;
         }
     }

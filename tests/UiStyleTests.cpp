@@ -34,8 +34,8 @@ struct BrandCanvas : BackgroundCanvas {
 
 int main() {
     for (float width:{168.0f,248.0f,360.0f,448.0f}) for (bool compact:{false,true}) {
-        for (const auto& subtitle:{std::string("A C++ Voxel Engine"),std::string(u8"C++ 体素引擎"),
-                                   std::string(u8"محرك فوكسل بلغة C++"),std::string(100,'W')}) {
+        for (const auto& subtitle:{std::string("A C++ Voxel Engine"),std::string("C++ 体素引擎"),
+                                   std::string("محرك فوكسل بلغة C++"),std::string(100,'W')}) {
             BrandCanvas brand;
             const float bottom=UiTheme::mainMenuBrand(brand,20,180,width,subtitle,compact);
             require(bottom>20 && bottom<180,"brand reserves bounded vertical space even in compact menus");

@@ -64,7 +64,7 @@ cmake -S examples/plugins/native_demo -B build-local/plugins/native_demo
 cmake --build build-local/plugins/native_demo --config Release
 ```
 
-On Windows use a developer environment with a C++17 compiler and CMake. The
+On Windows use a developer environment with a C++20 compiler and CMake. The
 Visual Studio DLL is normally under `build-local/plugins/native_demo/Release/`.
 Single-configuration Linux/macOS builds normally place the library directly
 under `build-local/plugins/native_demo/`. Package the result as:

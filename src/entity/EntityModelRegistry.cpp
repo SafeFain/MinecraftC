@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "entity/EntityModelRegistry.h"
 #include <chrono>
 #include "entity/EntityAttackTiming.h"
@@ -154,7 +155,7 @@ void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot, model:
             if(base!=Plugins::content().extensions.entities.end()) supplied=base->second.asset;
         }
         const model::LoadResult loaded = supplied ? model::LoadResult{supplied, {}, {}} : (cache ? *cache : m_cache).load(path);
-        if (!loaded) LOG_WARN("Entity model fallback for " << path.u8string() << ": " << loaded.error);
+        if (!loaded) LOG_WARN("Entity model fallback for " << pathToUtf8(path) << ": " << loaded.error);
         definition.asset = loaded ? loaded.asset : m_placeholder;
         definition.usesPlaceholder = definition.asset == m_placeholder;
         if(previousAsset==definition.asset && definition.graph) continue;
@@ -162,7 +163,7 @@ void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot, model:
         // replacement retires instances; GPU rebuilds reuse the CPU cache.
         if(previousAsset) clearInstances();
         const std::filesystem::path graphPath = path.parent_path() /
-            (path.stem().u8string() + ".anim.json");
+            (pathToUtf8(path.stem()) + ".anim.json");
         model::AnimationGraphLoadResult loadedGraph =
             model::loadAnimationGraph(graphPath, *definition.asset);
         if (loadedGraph) {
@@ -170,11 +171,11 @@ void EntityModelRegistry::loadAll(const std::filesystem::path& assetRoot, model:
                 definition.type, *loadedGraph.graph);
             if (!contract.empty()) {
                 loadedGraph.graph.reset();
-                loadedGraph.error = graphPath.u8string() + ": " + contract;
+                loadedGraph.error = pathToUtf8(graphPath) + ": " + contract;
             }
         }
         if (!loadedGraph) {
-            LOG_WARN("Entity action graph fallback for " << graphPath.u8string()
+            LOG_WARN("Entity action graph fallback for " << pathToUtf8(graphPath)
                      << ": " << loadedGraph.error);
             definition.graph = fallbackGraph(*definition.asset, definition.type);
         } else definition.graph = std::move(loadedGraph.graph);

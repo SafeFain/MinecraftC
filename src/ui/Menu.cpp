@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "ui/Menu.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
@@ -479,7 +480,7 @@ void MainMenu::tick(float dt) {
     m_recovery->step();
     if(!m_recovery->done())return;
     m_recoverySucceeded=m_recovery->succeeded();
-    m_recoveryMessage=m_recoverySucceeded?m_recovery->backupPath().u8string():m_recovery->error();
+    m_recoveryMessage=m_recoverySucceeded?pathToUtf8(m_recovery->backupPath()):m_recovery->error();
     m_page=Page::PluginResult;m_warningOffset=0;rebuildButtons();
 }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/Utf8Path.h"
+
 #include "model/ModelAsset.h"
 
 #include <filesystem>
@@ -63,8 +65,8 @@ public:
         return found->second;
     }
     const LoadResult& load(const AssetSource& source, const std::filesystem::path& path) {
-        const auto key = std::make_pair(source.namespaceKey + ":" + source.root.generic_u8string(),
-                                        path.lexically_normal().generic_u8string());
+        const auto key = std::make_pair(source.namespaceKey + ":" + genericPathToUtf8(source.root),
+                                        genericPathToUtf8(path.lexically_normal()));
         auto found = m_sources.find(key);
         if (found == m_sources.end()) found = m_sources.emplace(key, loadGltf(source, path)).first;
         return found->second;

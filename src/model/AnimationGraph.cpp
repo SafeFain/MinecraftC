@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "model/AnimationGraph.h"
 #include "core/AssetStore.h"
 
@@ -13,7 +14,7 @@ namespace {
 using Json = nlohmann::json;
 
 std::string context(const std::filesystem::path& path, const std::string& error) {
-    return path.u8string() + ": " + error;
+    return pathToUtf8(path) + ": " + error;
 }
 
 bool finiteNonNegative(float value) {

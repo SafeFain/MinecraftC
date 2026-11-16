@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "core/AssetStore.h"
 #include "core/RuntimeClock.h"
 
@@ -15,7 +16,7 @@ const AssetStore* AssetStore::s_current = nullptr;
 AssetStore::AssetStore(const std::filesystem::path& root, uint64_t readyTimeoutMs)
     : m_impl(std::make_unique<Impl>()) {
     if (!root.empty()) m_root = std::filesystem::weakly_canonical(root);
-    const std::string native = root.u8string();
+    const std::string native = pathToUtf8(root);
     m_impl->storage = SDL_OpenTitleStorage(native.empty() ? nullptr : native.c_str(), 0);
     if (!m_impl->storage)
         throw std::runtime_error("Could not open title storage: " +
@@ -66,32 +67,32 @@ std::vector<uint8_t> AssetStore::readPath(const std::filesystem::path& path, siz
     if (s_current) {
         if (s_current->m_root.empty()) {
             if (path.is_relative())
-                return s_current->readBinary(path.generic_u8string(), maxBytes);
+                return s_current->readBinary(genericPathToUtf8(path), maxBytes);
             // Packaged storage has no filesystem root to relativize against.
             // Absolute plugin cache paths must keep using filesystem IO.
         } else {
             std::error_code error;
             const auto relative = std::filesystem::relative(path, s_current->m_root, error);
-            if (!error && validPath(relative.generic_u8string()))
-                return s_current->readBinary(relative.generic_u8string(), maxBytes);
+            if (!error && validPath(genericPathToUtf8(relative)))
+                return s_current->readBinary(genericPathToUtf8(relative), maxBytes);
         }
         // Registered user-package assets have explicit absolute paths outside
         // Title Storage. Relative asset names remain confined to Title Storage.
-        if(!path.is_absolute())throw std::runtime_error("Invalid relative asset path: "+path.u8string());
+        if(!path.is_absolute())throw std::runtime_error("Invalid relative asset path: "+pathToUtf8(path));
     }
-    SDL_IOStream* stream = SDL_IOFromFile(path.u8string().c_str(), "rb");
-    if (!stream) throw std::runtime_error("Could not open asset: " + path.u8string());
+    SDL_IOStream* stream = SDL_IOFromFile(pathToUtf8(path).c_str(), "rb");
+    if (!stream) throw std::runtime_error("Could not open asset: " + pathToUtf8(path));
     const std::unique_ptr<SDL_IOStream, decltype(&SDL_CloseIO)> ownedStream(stream, &SDL_CloseIO);
     const Sint64 size = SDL_GetIOSize(stream);
     if (size < 0) {
-        throw std::runtime_error("Could not size asset: " + path.u8string());
+        throw std::runtime_error("Could not size asset: " + pathToUtf8(path));
     }
     if (static_cast<Uint64>(size) > static_cast<Uint64>(maxBytes)) {
-        throw std::runtime_error("Asset byte budget exceeded: " + path.u8string());
+        throw std::runtime_error("Asset byte budget exceeded: " + pathToUtf8(path));
     }
     std::vector<uint8_t> bytes(static_cast<size_t>(size));
     if (size && SDL_ReadIO(stream, bytes.data(), bytes.size()) != bytes.size()) {
-        throw std::runtime_error("Could not read asset: " + path.u8string());
+        throw std::runtime_error("Could not read asset: " + pathToUtf8(path));
     }
     return bytes;
 }

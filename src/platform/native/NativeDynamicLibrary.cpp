@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "core/DynamicLibrary.h"
 #include <stdexcept>
 #if defined(__APPLE__)
@@ -28,7 +29,7 @@ bool DynamicLibrary::supported() {
 DynamicLibrary::DynamicLibrary(const std::filesystem::path& path) : m_impl(std::make_unique<Impl>()) {
 #if defined(_WIN32)
     m_impl->handle=LoadLibraryExW(path.c_str(),nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-    if(!m_impl->handle) throw std::runtime_error("Cannot load native plugin: " + path.u8string());
+    if(!m_impl->handle) throw std::runtime_error("Cannot load native plugin: " + pathToUtf8(path));
 #elif !defined(__ANDROID__) && !(defined(__APPLE__) && TARGET_OS_IPHONE)
     m_impl->handle=dlopen(path.c_str(),RTLD_NOW|RTLD_LOCAL);
     if(!m_impl->handle) {const char* error=dlerror();throw std::runtime_error(error?error:"Cannot load native plugin");}

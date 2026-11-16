@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "model/GltfLoader.h"
 #include "core/AssetStore.h"
 #include "core/AllocationBudget.h"
@@ -153,15 +154,15 @@ std::filesystem::path confinedPath(const AssetSource& source, const std::filesys
     const auto normalized = path.lexically_normal();
     const auto relative = normalized.is_absolute()
         ? normalized.lexically_relative(source.root.lexically_normal()) : normalized;
-    if (!AssetStore::validPath(relative.generic_u8string()))
-        throw std::runtime_error("asset dependency escapes source root: " + path.generic_u8string());
+    if (!AssetStore::validPath(genericPathToUtf8(relative)))
+        throw std::runtime_error("asset dependency escapes source root: " + genericPathToUtf8(path));
     // Filesystem sources also reject symlinks that escape their declared root.
     if (!source.read) {
         std::error_code ec;
         const auto canonicalRoot = std::filesystem::weakly_canonical(source.root, ec);
         if (!ec) {
             const auto canonical = std::filesystem::weakly_canonical(source.root / relative, ec);
-            if (!ec && !AssetStore::validPath(canonical.lexically_relative(canonicalRoot).generic_u8string()))
+            if (!ec && !AssetStore::validPath(genericPathToUtf8(canonical.lexically_relative(canonicalRoot))))
                 throw std::runtime_error("asset symlink escapes source root");
         }
     }
@@ -738,7 +739,7 @@ static LoadResult loadSourceGltf(const AssetSource& assetSource, const std::file
     options.memory.free_func=[](void*,void* pointer) {AllocationBudget::release(pointer);};
     cgltf_data* parsed = nullptr;
     cgltf_result result = cgltf_parse(&options, bytes.data(), bytes.size(), &parsed);
-    if (result != cgltf_result_success) return failure(modelPath.generic_u8string() +
+    if (result != cgltf_result_success) return failure(genericPathToUtf8(modelPath) +
         (parser.rejected?": model budget exceeded: parser: ":": glTF parse failed: ") + resultName(result));
     DataHandle data(parsed, &cgltf_free);
     validateBudgets(*data,budget);
@@ -917,13 +918,13 @@ static LoadResult loadSourceGltf(const AssetSource& assetSource, const std::file
         success.warnings.push_back(std::string("optional glTF extension ignored: ")+data->extensions_used[i]);
     return success;
     } catch (const std::exception& error) {
-        return failure(relative.generic_u8string() + ": " + error.what());
+        return failure(genericPathToUtf8(relative) + ": " + error.what());
     }
 }
 
 LoadResult loadGltf(const AssetSource& source,const std::filesystem::path& relative,const LoadLimits& limits) {
     auto result=loadSourceGltf(source,relative,limits);
-    if(!result) result.error=source.namespaceKey+":"+relative.generic_u8string()+": "+result.error;
+    if(!result) result.error=source.namespaceKey+":"+genericPathToUtf8(relative)+": "+result.error;
     return result;
 }
 

@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
 #include "game/WorldCatalog.h"
@@ -51,7 +52,7 @@ std::vector<WorldSummary> WorldCatalog::list() const {
             summary.generationVersion=metadata.generationVersion;summary.worldType=metadata.worldType;
             summary.compatible=report.compatible();summary.pluginCompatibility=report;
             summary.incompatibilityReason=report.blocker.empty()?metadata.pluginCompatibilityError:report.blocker;
-            summary.backupDirectory=std::filesystem::absolute(m_savesDirectory/".plugin-recovery").u8string();
+            summary.backupDirectory=pathToUtf8(std::filesystem::absolute(m_savesDirectory/".plugin-recovery"));
             worlds.push_back(std::move(summary));
         } catch (const std::runtime_error& error) {
             if(std::string(error.what())=="Save was made by a newer version") {

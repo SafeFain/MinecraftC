@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "game/Localization.h"
 #include "core/AssetStore.h"
 #include "game/ArabicShaper.h"
@@ -15,7 +16,7 @@ Localization::Strings Localization::loadFile(const std::filesystem::path& path) 
     nlohmann::json root;
     input >> root;
     if (!root.is_object())
-        throw std::runtime_error("Language file root is not an object: " + path.u8string());
+        throw std::runtime_error("Language file root is not an object: " + pathToUtf8(path));
     Strings strings;
     for (const auto& entry : root.items()) {
         if (entry.value().is_string())

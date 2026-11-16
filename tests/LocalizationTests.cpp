@@ -50,10 +50,10 @@ int main() try {
     const auto chinese=readDictionary(root/"assets/lang/zh_cn.json");
     const auto chineseOverrides=readDictionary(root/"assets/lang/overrides/zh_cn.json");
     require(localization.language()==Language::English &&
-            localization.text("menu.home.singleplayer")==english.at("menu.home.singleplayer"),
+            localization.text("menu.home.singleplayer")==english.at("menu.home.singleplayer").get<std::string>(),
             "English is the initial language and resolves the authored dictionary");
     localization.setLanguage(Language::SimplifiedChinese);
-    require(localization.text("menu.home.singleplayer")==chinese.at("menu.home.singleplayer"),
+    require(localization.text("menu.home.singleplayer")==chinese.at("menu.home.singleplayer").get<std::string>(),
             "changing language selects the corresponding dictionary");
     // Controlled grammar fixture protects formatting independently of shipped copy.
     auto& chinesePlugin=Plugins::mutableContentState().extensions.translations["zh_cn"];
@@ -68,11 +68,11 @@ int main() try {
         require(!name.empty() && localization.format("loading.enter_dimension",{name}).find(name)!=std::string::npos,
                 "dimension loading includes the localized dimension name");
     }
-    require(localization.dimensionName(DimensionId::Heaven)==chineseOverrides.at("official_heaven:dimension.heaven"),
+    require(localization.dimensionName(DimensionId::Heaven)==chineseOverrides.at("official_heaven:dimension.heaven").get<std::string>(),
             "host override takes precedence over the provider dictionary");
     for(const auto item:{ItemId::SKYROOT_PLANKS,ItemId::SUNSTONE_BRICKS}) {
         const auto& key=Plugins::content().extensions.nameKeys.at(Plugins::itemKey(item));
-        require(localization.itemName(item)==chineseOverrides.at(key),"item names honor host overrides");
+        require(localization.itemName(item)==chineseOverrides.at(key).get<std::string>(),"item names honor host overrides");
     }
     for (const Language language : languagesByEnglishName())
         require(localization.hasTranslation(language, "loading.lod"),
@@ -213,7 +213,7 @@ int main() try {
             require(!value.empty(),"translation is not empty");
             require(placeholders(value)==placeholders(entry.value().get<std::string>()),
                     "translation preserves positional placeholders");
-            require(value.find(u8"\uFFFD")==std::string::npos,"translation has no replacement character");
+            require(value.find("\uFFFD")==std::string::npos,"translation has no replacement character");
         }
         const auto& englishBundle=extensions.translations.at("en_us");
         for(const auto& entry:englishBundle) {
@@ -254,7 +254,7 @@ int main() try {
                     "every creative tab name is translated in every language");
     }
     localization.setLanguage(Language::English);
-    require(localization.text("menu.home.settings") == english.at("menu.home.settings"),
+    require(localization.text("menu.home.settings") == english.at("menu.home.settings").get<std::string>(),
             "switching back to English restores English strings");
 
     // Arabic strings are shaped into joined presentation forms and reordered
@@ -263,10 +263,10 @@ int main() try {
             "Arabic letters join into presentation forms in display order");
     require(shapeArabic("لا") == "ﻻ",
             "plain lam-alef uses the plain alef ligature");
-    require(shapeArabic("لآ")==u8"\uFEF5" && shapeArabic("لأ")==u8"\uFEF7" &&
-            shapeArabic("لإ")==u8"\uFEF9" && shapeArabic("بلا")==u8"\uFEFC\uFE91",
+    require(shapeArabic("لآ")=="\uFEF5" && shapeArabic("لأ")=="\uFEF7" &&
+            shapeArabic("لإ")=="\uFEF9" && shapeArabic("بلا")=="\uFEFC\uFE91",
             "all lam-alef variants and final joining retain their letters");
-    require(shapeArabic("بَت")==u8"\uFE96\uFE91\u064E",
+    require(shapeArabic("بَت")=="\uFE96\uFE91\u064E",
             "Arabic vowel marks do not break joining or detach from their base");
     require(shapeArabic("مرحبا\nالعالم")==shapeArabic("مرحبا")+"\n"+shapeArabic("العالم"),
             "Arabic multiline labels retain line order");
@@ -305,12 +305,12 @@ int main() try {
     Plugins::DimensionContent third;third.key="p1_test:realm";third.name="Third realm";third.nameKey="p1_test:realm_name";
     Plugins::mutableContentState().extensions.dimensions.emplace(3,third);
     Plugins::mutableContentState().extensions.translations["en_us"][third.nameKey]="Third realm";
-    Plugins::mutableContentState().extensions.translations["zh_cn"][third.nameKey]=u8"第三维度";
-    Plugins::mutableContentState().extensions.translations["ar_sa"][third.nameKey]=u8"عالم ثالث";
+    Plugins::mutableContentState().extensions.translations["zh_cn"][third.nameKey]="第三维度";
+    Plugins::mutableContentState().extensions.translations["ar_sa"][third.nameKey]="عالم ثالث";
     localization.setLanguage(Language::SimplifiedChinese);
-    require(localization.dimensionName(static_cast<DimensionId>(3))==u8"第三维度","third registered dimension uses localized UI name");
+    require(localization.dimensionName(static_cast<DimensionId>(3))=="第三维度","third registered dimension uses localized UI name");
     localization.setLanguage(Language::Arabic);
-    require(localization.dimensionName(static_cast<DimensionId>(3))==shapeArabic(u8"عالم ثالث"),"third dimension uses Arabic shaping");
+    require(localization.dimensionName(static_cast<DimensionId>(3))==shapeArabic("عالم ثالث"),"third dimension uses Arabic shaping");
     localization.setLanguage(Language::Japanese);
     require(localization.dimensionName(static_cast<DimensionId>(3))=="Third realm","third dimension name falls back to English");
     const auto& aliases=Plugins::mutableContentState().extensions.translationAliases;

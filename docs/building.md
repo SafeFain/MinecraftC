@@ -1,6 +1,6 @@
 # Build and run
 
-MinecraftC requires CMake 3.16 or newer and a C++17 compiler. CMake fetches the
+MinecraftC requires CMake 3.16 or newer and a C++20 compiler. CMake fetches the
 pinned SDL 3.4.10 release by default. Add
 `-DMINECRAFTC_FETCH_DEPENDENCIES=ON` to fetch GLM 1.0.1 as well, or use
 `-DMINECRAFTC_USE_SYSTEM_SDL3=ON` for a compatible system SDL3.

@@ -1,6 +1,6 @@
 # Worldgen V2 native example
 
-This C++17 plugin registers `worldgen_v2_demo:islands` and an optional
+This C++20 plugin registers `worldgen_v2_demo:islands` and an optional
 `worldgen_v2_demo:markers` modifier through `Host::worldgenV2()`.
 It demonstrates five separated terrain layers, seed variation, a bulk volume
 callback, fine-cell crystal silhouettes with surface replacement, and a

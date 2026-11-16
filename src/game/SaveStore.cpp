@@ -1,3 +1,4 @@
+#include "core/Utf8Path.h"
 #include "world/RedstonePersistence.h"
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
@@ -1477,7 +1478,7 @@ WorldCompatibilityReport SaveStore::inspectCompatibility() const {
         if(!WorldGenContext::canLoadGeneration(metadata.generationVersion))throw std::runtime_error("World generation version is incompatible");
         uint64_t hash=compatibilityHashSeed();
         for(const auto& relative:worldFiles(m_worldDirectory)) {
-            hash=hashText(relative.generic_u8string(),hash);
+            hash=hashText(genericPathToUtf8(relative),hash);
             hash=hashText(std::to_string(std::filesystem::file_size(m_worldDirectory/relative)),hash);
             hash=hashFile(m_worldDirectory/relative,hash);
             if(durableFile(relative).kind)recover.recoverFileTo(relative,{});
@@ -1554,7 +1555,7 @@ void WorldRecovery::step() {
         if(m_phase==Phase::VerifySource) {
             if(m_next<m_sourceFiles.size()) {
                 const auto& relative=m_sourceFiles[m_next];
-                m_sourceHash=hashText(relative.generic_u8string(),m_sourceHash);
+                m_sourceHash=hashText(genericPathToUtf8(relative),m_sourceHash);
                 m_sourceHash=hashText(std::to_string(std::filesystem::file_size(m_world/relative)),m_sourceHash);
                 m_sourceHash=hashFile(m_world/relative,m_sourceHash);++m_next;return;
             }

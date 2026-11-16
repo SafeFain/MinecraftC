@@ -290,7 +290,7 @@ int main(int argc,char** argv) try {
                     if(cp>=0x3400&&cp<=0x9FFF)pluginCjk.insert(cp);
         // Characters absent from all shipped dictionaries exercise runtime names
         // and chat, rather than merely retesting startup font collection.
-        const auto runtimeGlyphs=decodeUtf8(u8"龘靐齉");
+        const auto runtimeGlyphs=decodeUtf8("龘靐齉");
         for(uint32_t cp:runtimeGlyphs)pluginCjk.insert(cp);
         pluginCjk.insert(0x10FFFF); // Unsupported text must produce a visible fallback.
         renderer.beginFrame();ui.beginUIFrame(width,height);
@@ -298,7 +298,7 @@ int main(int argc,char** argv) try {
             std::string glyph;appendUtf8(glyph,cp);
             const auto glyphWidth=ui.measureText(glyph,1).x;
             if(glyphWidth<=0)throw std::runtime_error("Plugin glyph missing from font atlas: "+glyph);
-            if(cp>=0x3400&&cp<=0x9FFF&&std::abs(glyphWidth-ui.measureText(u8"中",1).x)>.01f)
+            if(cp>=0x3400&&cp<=0x9FFF&&std::abs(glyphWidth-ui.measureText("中",1).x)>.01f)
                 throw std::runtime_error("Supported CJK glyph used fallback metrics: "+glyph);
             const auto before=ui.frameStats().vertices;
             ui.renderText(glyph,8,8,1,{1,1,1});
@@ -317,7 +317,7 @@ int main(int argc,char** argv) try {
             return pixels;
         };
         const auto blank=captureText(""),repeatedBlank=captureText("");
-        for(const auto* text:{u8"龘靐齉",u8"鱻麤灥",u8"𠀀",u8"\U0010FFFF"}) {
+        for(const auto* text:{"龘靐齉","鱻麤灥","𠀀","\U0010FFFF"}) {
             const auto image=captureText(text);
             PixelReadback::requireEffect(blank,repeatedBlank,image,width,height,
                 PixelReadback::uiRegion(0,0,width/2,height/3,height),"runtime/fallback glyph");
