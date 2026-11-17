@@ -34,21 +34,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Set up compiler cache
+        continue-on-error: true
         uses: mozilla-actions/sccache-action@v0.0.11
         with:
           version: v0.19.0
       - name: Start compiler cache
-        run: sccache --start-server
+        run: python3 tools/ci_sccache.py
       - name: Read project version
         shell: bash
         run: cmake -P tools/ci_version.cmake
       - name: Install graphics and virtual-display dependencies
         run: sudo apt-get update && sudo apt-get install -y glslc libvulkan-dev mesa-vulkan-drivers xorg-dev xvfb libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
       - name: Configure
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=ON
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release "-DCMAKE_C_COMPILER_LAUNCHER=${{ env.MINECRAFTC_COMPILER_LAUNCHER }}" "-DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.MINECRAFTC_COMPILER_LAUNCHER }}" -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=ON
       - name: Build
         run: cmake --build build-ci -j4
       - name: Compiler cache statistics
+        continue-on-error: true
         if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
         run: sccache --show-stats
       - name: Test
@@ -155,11 +157,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Set up compiler cache
+        continue-on-error: true
         uses: mozilla-actions/sccache-action@v0.0.11
         with:
           version: v0.19.0
       - name: Start compiler cache
-        run: sccache --start-server
+        run: python tools/ci_sccache.py
       - name: Read project version
         shell: pwsh
         run: cmake -P tools/ci_version.cmake
@@ -194,10 +197,11 @@ jobs:
         run: ./tools/ci_msvc_environment.ps1 -Architecture ${{ matrix.platform }}
       - name: Configure
         # GPU readbacks execute in the provisioned Linux Lavapipe lane.
-        run: cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=OFF
+        run: cmake -S . -B build-ci -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_C_COMPILER_LAUNCHER=${{ env.MINECRAFTC_COMPILER_LAUNCHER }}" "-DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.MINECRAFTC_COMPILER_LAUNCHER }}" -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_PORTABLE_LAYOUT=ON -DMINECRAFTC_STATIC_MSVC_RUNTIME=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
         run: cmake --build build-ci --config Release --parallel 4
       - name: Compiler cache statistics
+        continue-on-error: true
         if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
         run: sccache --show-stats
       - name: Test
@@ -262,11 +266,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Set up compiler cache
+        continue-on-error: true
         uses: mozilla-actions/sccache-action@v0.0.11
         with:
           version: v0.19.0
       - name: Start compiler cache
-        run: sccache --start-server
+        run: python3 tools/ci_sccache.py
       - name: Read project version
         shell: bash
         run: cmake -P tools/ci_version.cmake
@@ -293,10 +298,11 @@ jobs:
       - name: Configure universal build
         # GPU readbacks execute in the provisioned Linux Lavapipe lane.
         # SDL's architecture-specific PCH includes are incompatible with sccache.
-        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DMINECRAFTC_VULKAN_TESTS=OFF
+        run: cmake -S . -B build-ci -DCMAKE_BUILD_TYPE=Release "-DCMAKE_C_COMPILER_LAUNCHER=${{ env.MINECRAFTC_COMPILER_LAUNCHER }}" "-DCMAKE_CXX_COMPILER_LAUNCHER=${{ env.MINECRAFTC_COMPILER_LAUNCHER }}" -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON -DMINECRAFTC_FETCH_DEPENDENCIES=ON -DMINECRAFTC_MOLTENVK_ROOT="$MINECRAFTC_MOLTENVK_ROOT" -DMINECRAFTC_PORTABLE_LAYOUT=ON -DCMAKE_INSTALL_MESSAGE=NEVER -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DMINECRAFTC_VULKAN_TESTS=OFF
       - name: Build
         run: cmake --build build-ci -j4
       - name: Compiler cache statistics
+        continue-on-error: true
         if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
         run: sccache --show-stats
       - name: Test native slice
@@ -370,11 +376,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Set up compiler cache
+        continue-on-error: true
         uses: mozilla-actions/sccache-action@v0.0.11
         with:
           version: v0.19.0
       - name: Start compiler cache
-        run: sccache --start-server
+        run: python3 tools/ci_sccache.py
       - name: Read project version
         shell: bash
         run: cmake -P tools/ci_version.cmake
@@ -424,6 +431,7 @@ jobs:
           python3 tools/ci_ios.py cache-start
           python3 tools/ci_ios.py run simulator-build cmake --build build-ios-simulator --config Release --parallel 4
       - name: Simulator compiler cache statistics
+        continue-on-error: true
         if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
         run: python3 tools/ci_ios.py cache-stats simulator
       - name: Verify iOS Simulator bundle
@@ -587,6 +595,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$archive" -parallelizeTargets -jobs 4 archive CODE_SIGNING_ALLOWED=NO
       - name: Device compiler cache statistics
+        continue-on-error: true
         if: ${{ !cancelled() && env.SCCACHE_PATH != '' }}
         run: python3 tools/ci_ios.py cache-stats device
       - name: Verify archived iOS device app

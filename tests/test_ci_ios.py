@@ -73,6 +73,22 @@ class IosCiTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ci.configure("../outside", root)
 
+    def test_disabled_cache_clears_restored_xcode_launcher(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ,
+                {"SCCACHE_PATH": "old-cache", "MINECRAFTC_COMPILER_LAUNCHER": "",
+                 "MINECRAFTC_MOLTENVK_ROOT": "molten"}), patch.object(ci, "run") as run:
+            ci.configure("simulator", Path(tmp))
+            self.assertIn("-DCMAKE_XCODE_ATTRIBUTE_C_COMPILER_LAUNCHER=", run.call_args.args[0])
+
+    def test_disabled_cache_commands_do_not_invoke_sccache(self):
+        for command in ("cache-start", "cache-stats"):
+            with patch.dict(os.environ, {"SCCACHE_PATH": ""}), \
+                    patch.object(ci.sys, "argv", ["ci_ios.py", command, "simulator"]), \
+                    patch.object(ci.subprocess, "run") as run, patch.object(ci, "output") as output:
+                ci.main()
+                run.assert_not_called()
+                output.assert_not_called()
+
     def test_device_selection_filters_runtime_availability_and_family(self):
         devices = {"chosen": [
             {"name": "iPhone 16", "udid": "b", "isAvailable": True},

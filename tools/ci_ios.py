@@ -39,6 +39,7 @@ def fingerprint(root):
     # Cache files contain absolute paths and compiler/SDK probe results.
     facts = {key: os.environ.get(key, "") for key in
              ("ImageOS", "ImageVersion", "RUNNER_ARCH", "SCCACHE_PATH",
+              "MINECRAFTC_COMPILER_LAUNCHER",
               "MINECRAFTC_MOLTENVK_ROOT")}
     facts["workspace"] = str(root.resolve())
     if not facts["ImageVersion"]:
@@ -66,7 +67,8 @@ def configure(lane, root):
     build = root / ("build-ios-" + lane)
     args = ["cmake", "-S", str(root), "-B", str(build), "-G", "Xcode",
             "-DCMAKE_SYSTEM_NAME=iOS", "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON",
-            "-DCMAKE_XCODE_ATTRIBUTE_C_COMPILER_LAUNCHER=" + os.environ["SCCACHE_PATH"],
+            "-DCMAKE_XCODE_ATTRIBUTE_C_COMPILER_LAUNCHER=" + os.environ.get(
+                "MINECRAFTC_COMPILER_LAUNCHER", os.environ.get("SCCACHE_PATH", "")),
             "-DCMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_MODULES=NO",
             "-DCMAKE_XCODE_ATTRIBUTE_COMPILER_INDEX_STORE_ENABLE=NO",
             "-DCMAKE_XCODE_ATTRIBUTE_CLANG_USE_RESPONSE_FILE=NO",
@@ -194,6 +196,8 @@ def main():
         timed("Simulator smoke total", lambda: smoke(root / "build-ios-simulator/Release-iphonesimulator/MinecraftC.app"))
     elif command == "run":
         timed(args[0], lambda: run(args[1:]))
+    elif command in ("cache-start", "cache-stats") and not os.environ.get("SCCACHE_PATH"):
+        note("Compiler cache", "disabled")
     elif command == "cache-start":
         if subprocess.run(["sccache", "--show-stats"], stdout=subprocess.DEVNULL,
                           stderr=subprocess.DEVNULL, check=False).returncode:

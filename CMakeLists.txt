@@ -580,6 +580,10 @@ endif()
 if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     include(tools/test_policy.cmake)
+    minecraftc_add_test(NAME ci_compiler_cache_fallback
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ci_sccache.py)
+    minecraftc_add_test(NAME ci_ios_configuration_and_smoke_guards
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ci_ios.py)
     add_executable(pixel_readback_tests tests/PixelReadbackTests.cpp)
     minecraftc_add_test(NAME pixel_readback_negative_controls COMMAND pixel_readback_tests)
     minecraftc_add_test(NAME test_harness_isolation_and_readback_guards
