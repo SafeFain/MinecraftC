@@ -1,4 +1,5 @@
 #pragma once
+#include "plugins/Runtime.h"
 #include "plugins/PluginManager.h"
 #include "plugins/ContentQueries.h"
 #include "plugins/ContentMutation.h"
@@ -152,7 +153,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         require(!profileBeforeFault.empty(),"guest profile exists before fault");
         require(plugins.command("/legacy_fixture:gift"),"operation queued before fault");
         require(plugins.command("/lan_fixture:fault"),"faulting command found");
-        require(!Plugins::mutableContentState().runtimeFault.empty(),"callback failure marks runtime fault");
+        require(!Plugins::runtimeFault().empty(),"callback failure marks runtime fault");
         faultGuest.player.inventory().slot(0)={ItemId::DIAMOND,64,0};
         host.closeLanRoom();
         require(bytes(savedProfile)==profileBeforeFault,"faulted departure does not overwrite guest profile");

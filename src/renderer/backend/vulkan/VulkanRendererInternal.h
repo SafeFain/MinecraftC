@@ -1,5 +1,6 @@
 #pragma once
 
+#include "plugins/Runtime.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
 
 #include "core/AssetStore.h"
@@ -15,7 +16,6 @@
 #include "renderer/backend/vulkan/VulkanIndexRebase.h"
 #include "renderer/backend/vulkan/VulkanPipelineFactory.h"
 #include "renderer/backend/vulkan/VulkanResources.h"
-#include "plugins/ContentMutation.h"
 #include "plugins/ContentQueries.h"
 #include "Config.h"
 #include "world/Block.h"
@@ -2142,7 +2142,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
     }
 
     void preparePlugins(uint32_t imageIndex) {
-        if(Plugins::mutableContentState().extensions.renderPasses.empty())return;
+        if(Plugins::content().extensions.renderPasses.empty())return;
         try {
             if(!pluginBackend)pluginBackend=std::make_unique<vkp::VulkanPluginBackend>(device,allocator,commandPool,graphicsQueue);
             std::array<std::vector<vkp::PluginSceneSubmission>,MC_RENDER_STAGE_COUNT> scenes;
@@ -2158,7 +2158,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             };
             for(const auto& draw:submittedLodDraws)basic(draw);
             for(const auto& draw:submittedDraws)basic(draw);
-            const bool entityPass=std::any_of(Plugins::mutableContentState().extensions.renderPasses.begin(),Plugins::mutableContentState().extensions.renderPasses.end(),[](const auto& p){return p.stage==MC_RENDER_ENTITIES;});
+            const bool entityPass=std::any_of(Plugins::content().extensions.renderPasses.begin(),Plugins::content().extensions.renderPasses.end(),[](const auto& p){return p.stage==MC_RENDER_ENTITIES;});
             auto model=[&](const ModelPassSubmission& submission,ModelResource& resource,ModelPrimitive& primitive,const model::Material& material,const model::DrawBinding& binding) {
                 if(!entityPass)return;
                 vkp::PluginSceneSubmission p;p.vertex=primitive.vertex.handle;p.index=primitive.index.handle;p.count=primitive.indexCount;p.stride=sizeof(model::Vertex);p.uvOffset=offsetof(model::Vertex,uv);
@@ -2188,11 +2188,11 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
             }
             pluginBackend->prepare(static_cast<uint32_t>(currentFrame),swapchain.swapchainExtent.width,swapchain.swapchainExtent.height,static_cast<double>(RuntimeClock{}.now())*1e-9,submittedFrame.projection*submittedFrame.view,postProcess.worldOrigin,swapchain.sceneImageViews.at(imageIndex),swapchain.postSampler,scenes);
             pluginBackend->validate(swapchain.renderPass,swapchain.presentRenderPass,shadow.shadowRenderPass,swapchain.sampleCount,swapchain.voxelGiEnabled?3u:swapchain.surfaceDataEnabled?2u:1u);
-        }catch(const std::exception& error){Plugins::mutableContentState().runtimeFault=std::string("Plugin rendering failed: ")+error.what();}
+        }catch(const std::exception& error){Plugins::setRuntimeFault(std::string("Plugin rendering failed: ")+error.what());}
     }
-    bool pluginReplaces(uint32_t stage) const {return Plugins::mutableContentState().runtimeFault.empty()&&pluginBackend&&pluginBackend->replaces(stage);}
+    bool pluginReplaces(uint32_t stage) const {return Plugins::runtimeFault().empty()&&pluginBackend&&pluginBackend->replaces(stage);}
     void pluginSceneStage(VkCommandBuffer command,uint32_t stage,int phase=0) {
-        if(!pluginBackend||!Plugins::mutableContentState().runtimeFault.empty())return;
+        if(!pluginBackend||!Plugins::runtimeFault().empty())return;
         const auto colors=swapchain.voxelGiEnabled?3u:swapchain.surfaceDataEnabled?2u:1u;
         pluginBackend->record(command,swapchain.renderPass,swapchain.sampleCount,stage,colors,false,phase);
     }
@@ -2210,7 +2210,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         timestamp(command, 1);
         recordVoxelGiInjection(command);
         timestamp(command, 2);
-        if(pluginBackend&&Plugins::mutableContentState().runtimeFault.empty())pluginBackend->targets(command);
+        if(pluginBackend&&Plugins::runtimeFault().empty())pluginBackend->targets(command);
         recordShadowPass(command);
         recordScenePass(command, imageIndex);
         timestamp(command, 3);
@@ -2430,7 +2430,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
                     ++performance.drawCalls;
                 }
             }
-            if(pluginBackend&&Plugins::mutableContentState().runtimeFault.empty())pluginBackend->record(command,shadow.shadowRenderPass,VK_SAMPLE_COUNT_1_BIT,MC_RENDER_SHADOWS,0,true);
+            if(pluginBackend&&Plugins::runtimeFault().empty())pluginBackend->record(command,shadow.shadowRenderPass,VK_SAMPLE_COUNT_1_BIT,MC_RENDER_SHADOWS,0,true);
             vkCmdEndRenderPass(command);
         }
     }
@@ -3006,7 +3006,7 @@ struct VulkanRenderer::Impl : vkp::VulkanDeviceContext {
         vkCmdPushConstants(command, swapchain.postPipelineLayout,
             VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(postConstants), &postConstants);
         if(!pluginReplaces(MC_RENDER_POST))vkCmdDraw(command, 3, 1, 0, 0);
-        if(pluginBackend&&Plugins::mutableContentState().runtimeFault.empty())pluginBackend->record(command,swapchain.presentRenderPass,VK_SAMPLE_COUNT_1_BIT,MC_RENDER_POST,1);
+        if(pluginBackend&&Plugins::runtimeFault().empty())pluginBackend->record(command,swapchain.presentRenderPass,VK_SAMPLE_COUNT_1_BIT,MC_RENDER_POST,1);
         ++performance.drawCalls;
         ++performance.pipelineBinds;
         ++performance.descriptorBinds;

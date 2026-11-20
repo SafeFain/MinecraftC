@@ -5,7 +5,7 @@
 #include "core/Platform.h"
 #include "debug/Log.h"
 #include "game/SaveStore.h"
-#include "renderer/GameRenderer.h"
+#include "renderer/ChunkMeshDevice.h"
 #include "threading/ThreadPool.h"
 #include "world/BiomeMap.h"
 #include "world/Chunk.h"
@@ -21,6 +21,7 @@
 #include <limits>
 #include <system_error>
 #include <type_traits>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace {
 constexpr uint32_t CACHE_REVISION = 7;
@@ -1574,7 +1575,7 @@ void LodTerrainSystem::invalidateTile(Tile& tile) {
     }
 }
 
-void LodTerrainSystem::processCompleted(IGameRenderer* renderer,
+void LodTerrainSystem::processCompleted(IChunkMeshDevice* renderer,
                                         bool allowRefinements) {
     if (renderer) m_renderer = renderer;
     const LodWorkBudget budget = lodWorkBudget(m_settings.aggressiveness);

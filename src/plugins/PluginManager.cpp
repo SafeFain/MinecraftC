@@ -1,3 +1,6 @@
+#include "plugins/AtlasPublication.h"
+#include "plugins/AtlasQueries.h"
+#include "plugins/Runtime.h"
 #include "plugins/PluginManager.h"
 #include "plugins/ContentPackage.h"
 #include "plugins/ContentMutation.h"
@@ -286,7 +289,7 @@ PluginManager::PluginManager(RuntimePaths paths,std::shared_ptr<model::ModelAsse
     m_host.register_command=[](MC_PluginContext* c,const char* name,MC_EventCallback f,void* u){const int32_t result=checked(c,[&]{manager(c).addCommand(*c,name,f,u);});if(result&&c)c->registrationFailed=true;return result;};
     m_host.hud_rect=[](MC_PluginContext* c,float x,float y,float w,float h,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&m.operations.hudRect,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");m.operations.hudRect(x,y,w,h,{color[0],color[1],color[2],color[3]});});};
     m_host.hud_text=[](MC_PluginContext* c,float x,float y,const char* text,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&text&&m.operations.hudText,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::string(text).size()<=4096,"Invalid HUD text");m.operations.hudText(x,y,text,{color[0],color[1],color[2],color[3]});});};
-    m_host.hud_image=[](MC_PluginContext* c,float x,float y,float w,float h,const char* key,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&m.operations.hudImage,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");auto it=mutableContentState().materials.find(required(key));check(it!=mutableContentState().materials.end(),"Unknown HUD material");uint16_t tile=it->second.tile;m.operations.hudImage(x,y,w,h,tile,{color[0],color[1],color[2],color[3]});});};
+    m_host.hud_image=[](MC_PluginContext* c,float x,float y,float w,float h,const char* key,const float* color){return checked(c,[&]{auto& m=manager(c);hudColor(color);check(m.m_hudOperations++<Config::PLUGIN_MAX_HUD_COMMANDS,"HUD command budget exceeded");check(!m.m_readOnly&&m.m_phase==MC_HUD&&color&&m.operations.hudImage,"HUD drawing outside HUD event");check(std::isfinite(x)&&std::isfinite(y)&&std::isfinite(w)&&std::isfinite(h)&&w>=0&&h>=0,"Invalid HUD bounds");const auto material=required(key);check(content().materials.count(material),"Unknown HUD material");uint16_t tile=registeredMaterialTile(material);m.operations.hudImage(x,y,w,h,tile,{color[0],color[1],color[2],color[3]});});};
     m_host.config_read=[](MC_PluginContext* c,char* out,uint32_t cap){return checked(c,[&]{manager(c).storage(*c,false,false,nullptr,out,cap);});};
     m_host.config_write=[](MC_PluginContext* c,const char* value){return checked(c,[&]{manager(c).storage(*c,false,true,value,nullptr,0);});};
     m_host.world_data_read=[](MC_PluginContext* c,char* out,uint32_t cap){return checked(c,[&]{manager(c).storage(*c,true,false,nullptr,out,cap);});};
@@ -436,7 +439,7 @@ int32_t PluginManager::addCommand(MC_PluginContext& c,const char* name,MC_EventC
 }
 int32_t PluginManager::enqueue(MC_PluginContext& c,std::function<bool()> operation) {
     check(!m_readOnly,"Read-only callback cannot mutate state");
-    check(mutableContentState().runtimeFault.empty(),"Plugin runtime requires restart");
+    check(runtimeFault().empty(),"Plugin runtime requires restart");
     check(context().role!=MC_CLIENT,"Client gameplay mutations are unavailable");
     check(m_world&&m_phase!=MC_ENVIRONMENT&&m_phase!=MC_HUD&&m_phase!=MC_WORLD_CLOSE,"World mutations are unavailable in this phase");
     check(!m_info[c.index].manifest.visual,"Visual-only plugins cannot modify gameplay");
@@ -709,6 +712,8 @@ void PluginManager::buildNetworkDescription() {
 void PluginManager::initialize(bool safeMode) {
     check(!m_initialized,"Plugin manager already initialized");m_initialized=true;
     {std::lock_guard<std::mutex> lock(generationFaultMutex());generationFault().clear();}
+    setRuntimeFault({});
+    publishAtlasBindings({});
     const uint64_t revision=mutableContentState().revision;mutableContentState()=ContentState{};mutableContentState().revision=revision;
     const auto config=m_paths.dataRoot/"plugins.json";
     if(std::filesystem::exists(config))try {const auto j=readJson(config);for(const auto& p:j.object){check(p.second.type==Json::Type::Boolean,"Plugin enable setting must be boolean");m_enabled[p.first]=p.second.boolean;}}catch(const std::exception& e){LOG_WARN("Ignoring invalid plugin enable settings: "<<e.what());}
@@ -853,8 +858,8 @@ void PluginManager::dispatch(MC_Event& e) {
             const int32_t result=listener.callback(m_loaded[listener.plugin].context.get(),&candidate,listener.userdata);
             if(result!=0){
                 auto& info=m_info[listener.plugin];info.active=false;info.status="Callback failed; restart required";
-                mutableContentState().runtimeFault="Plugin callback failed: "+info.manifest.id;
-                LOG_ERROR(mutableContentState().runtimeFault);discardOperations();if(cancellable)e.cancelled=1;continue;
+                setRuntimeFault("Plugin callback failed: "+info.manifest.id);
+                LOG_ERROR(runtimeFault());discardOperations();if(cancellable)e.cancelled=1;continue;
             }
             if(cancellable)e.cancelled=cancelled||candidate.cancelled;
             if(e.kind==MC_DAMAGE_PRE&&std::isfinite(candidate.damage)&&candidate.damage>=0)e.damage=candidate.damage;
@@ -866,17 +871,17 @@ void PluginManager::dispatch(MC_Event& e) {
             }
         }catch(const std::exception& error){
             auto& info=m_info[listener.plugin];info.active=false;info.status="Exception across plugin ABI; restart required";
-            mutableContentState().runtimeFault="Plugin exception: "+info.manifest.id+": "+error.what();
-            LOG_ERROR(mutableContentState().runtimeFault);discardOperations();if(cancellable)e.cancelled=1;
+            setRuntimeFault("Plugin exception: "+info.manifest.id+": "+error.what());
+            LOG_ERROR(runtimeFault());discardOperations();if(cancellable)e.cancelled=1;
         }
     }
     m_dispatching=false;m_phase=previous;
-    if(!mutableContentState().runtimeFault.empty()&&cancellable)e.cancelled=1;
+    if(!runtimeFault().empty()&&cancellable)e.cancelled=1;
     if(e.kind==MC_WORLD_CLOSE){m_world=false;discardOperations();}
 }
 bool PluginManager::command(const std::string& line) {
     const auto split=line.find(' ');std::string name=line.substr(0,split);if(!name.empty()&&name[0]=='/')name.erase(0,1);
-    auto it=m_commands.find(name);if(it==m_commands.end()||!m_info[it->second.plugin].active||!mutableContentState().runtimeFault.empty())return false;
+    auto it=m_commands.find(name);if(it==m_commands.end()||!m_info[it->second.plugin].active||!runtimeFault().empty())return false;
     if(context().role==MC_CLIENT)return false;
     if(context().player && !(it->second.flags&MC_COMMAND_ALLOW_GUEST))return false;
     check(m_world&&!m_dispatching,"Plugin command requires a world");
@@ -886,7 +891,7 @@ bool PluginManager::command(const std::string& line) {
     int32_t result=-1;
     try {result=it->second.callback(m_loaded[it->second.plugin].context.get(),&e,it->second.userdata);}catch(const std::exception& error){LOG_ERROR(error.what());}
     m_dispatching=false;m_phase=phase;
-    if(result){auto& info=m_info[it->second.plugin];info.active=false;info.status="Command callback failed; restart required";mutableContentState().runtimeFault="Plugin command failed: "+name;discardOperations();LOG_ERROR(mutableContentState().runtimeFault);}
+    if(result){auto& info=m_info[it->second.plugin];info.active=false;info.status="Command callback failed; restart required";setRuntimeFault("Plugin command failed: "+name);discardOperations();LOG_ERROR(runtimeFault());}
     return true;
 }
 void PluginManager::flushOperations() {
@@ -897,7 +902,7 @@ void PluginManager::discardOperations(){m_queue.clear();for(auto& pair:m_actionR
 void PluginManager::pollFaults() {
     check(hostThread(),"Fault polling is main-thread only");
     std::lock_guard<std::mutex> lock(generationFaultMutex());
-    if(!generationFault().empty()){mutableContentState().runtimeFault=generationFault();generationFault().clear();discardOperations();}
+    if(!generationFault().empty()){setRuntimeFault(generationFault());generationFault().clear();discardOperations();}
 }
 void PluginManager::setEnabled(size_t i,bool enabled) {
     const auto& p=m_info.at(i);m_enabled[p.manifest.id]=enabled;

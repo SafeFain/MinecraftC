@@ -1,3 +1,5 @@
+#include "plugins/AtlasQueries.h"
+#include "plugins/Runtime.h"
 #include "TestSupport.h"
 #include "plugins/PluginManager.h"
 #include "plugins/ContentMutation.h"
@@ -100,9 +102,25 @@ int main(int argc,char** argv) try {
         const auto category=creativeInventoryItemsIn(CreativeItemCategory::BuildingBlocks);require(std::find(category.begin(),category.end(),item)!=category.end(),"custom items appear in creative catalog");
         std::array<ItemId,9> grid{};grid[0]=ItemId::COBBLESTONE;const auto* recipe=findCraftingRecipe(grid,1,1);require(recipe&&recipe->output.id==item&&recipe->output.count==4,"custom recipe actually selected");
         rejects([&]{Plugins::registerBlock({});},"frozen registry rejects mutation");
+        require(getFaceTextureIndex(block,FaceDir::TOP)==0 &&
+                Plugins::itemTile(static_cast<uint16_t>(item))==0,"unpublished plugin tiles use the startup fallback");
         const auto atlas=buildBlockAtlasData(paths.assetRoot);
+        require(getFaceTextureIndex(block,FaceDir::TOP)==0,"building an atlas published its bindings prematurely");
         require(atlas.texture.mipLevels.size()==4&&atlas.normalTexture.mipLevels.size()==4,"plugin atlas has tile-safe mip chain");
-        const auto tile=getFaceTextureIndex(block,FaceDir::TOP);require(tile==Plugins::pluginItem(item)->tile&&tile!=getFaceTextureIndex(BlockId::STONE,FaceDir::TOP),"shared block/item material slot");
+        publishBlockAtlas(atlas);
+        const auto tile=getFaceTextureIndex(block,FaceDir::TOP);require(tile==Plugins::itemTile(static_cast<uint16_t>(item))&&tile!=getFaceTextureIndex(BlockId::STONE,FaceDir::TOP),"shared block/item material slot");
+        const auto& materialKey=Plugins::pluginItem(item)->material;
+        auto& material=Plugins::mutableContentState().materials.at(materialKey);
+        const auto originalImage=material.image;
+        material.image=root/"damaged-material.png";
+        write(material.image,"not a PNG");
+        rejects([&]{(void)buildBlockAtlasData(paths.assetRoot);},"damaged overlay fails to rebuild");
+        material.image=originalImage;
+        require(getFaceTextureIndex(block,FaceDir::TOP)==tile &&
+                Plugins::registeredMaterialTile(materialKey)==tile,"failed atlas rebuild changed active bindings");
+        const auto rebuiltAtlas=buildBlockAtlasData(paths.assetRoot);
+        publishBlockAtlas(rebuiltAtlas);
+        require(getFaceTextureIndex(block,FaceDir::TOP)==tile,"atlas recovery changed the active slot");
         const auto gi=buildVoxelGiMaterials(atlas);require(gi.size()>static_cast<size_t>(crystalBlock)&&gi[static_cast<uint16_t>(crystalBlock)].emission.b>0,"custom material GI injection");
         int rectangles=0,text=0,operations=0;
         manager.operations.hudRect=[&](float,float,float,float,const glm::vec4&){++rectangles;};
@@ -139,7 +157,7 @@ int main(int argc,char** argv) try {
         if(Platform::DynamicLibrary::supported()) {
             manager.command("/native_demo:gift");const int beforeFault=operations;
             auto update=Plugins::event(MC_UPDATE_POST);manager.dispatch(update);manager.flushOperations();
-            require(!Plugins::mutableContentState().runtimeFault.empty()&&operations==beforeFault,"callback fault discards pending world mutations");
+            require(!Plugins::runtimeFault().empty()&&operations==beforeFault,"callback fault discards pending world mutations");
         }
         manager.shutdown();
         Plugins::PluginManager safe(paths);safe.initialize(true);require(Plugins::mutableContentState().blocks.empty()&&Plugins::mutableContentState().requirements.empty(),"safe mode loads no optional content");

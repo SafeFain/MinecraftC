@@ -1,6 +1,6 @@
 #include "world/ChunkMeshPipeline.h"
 
-#include "renderer/GameRenderer.h"
+#include "renderer/ChunkMeshDevice.h"
 #include "threading/ThreadPool.h"
 #include "world/Chunk.h"
 #include "world/ChunkMesh.h"
@@ -217,7 +217,7 @@ void ChunkMeshPipeline::enqueueMeshBuilds(int maxInFlight) {
     }
 }
 
-void ChunkMeshPipeline::processCompletedMeshes(IGameRenderer* renderer,
+void ChunkMeshPipeline::processCompletedMeshes(IChunkMeshDevice* renderer,
                                                int maxUploads,
                                                size_t maxUploadBytes) {
     if (!renderer) return;
@@ -276,7 +276,7 @@ void ChunkMeshPipeline::processCompletedMeshes(IGameRenderer* renderer,
     }
 }
 
-void ChunkMeshPipeline::buildMeshesSync(IGameRenderer* renderer, int maxCount) {
+void ChunkMeshPipeline::buildMeshesSync(IChunkMeshDevice* renderer, int maxCount) {
     if (!renderer) return;
     m_renderer = renderer;
 
@@ -314,7 +314,7 @@ void ChunkMeshPipeline::buildMeshesSync(IGameRenderer* renderer, int maxCount) {
 // Piston transitions are small, sparse edits, but their old mesh cannot remain
 // visible under the moving model or publish half a cross-chunk chain. Build from
 // immutable snapshots and publish every touched mesh before the next draw.
-void ChunkMeshPipeline::buildAtomicMeshes(IGameRenderer* renderer,const std::set<std::pair<int,int>>& coordinates) {
+void ChunkMeshPipeline::buildAtomicMeshes(IChunkMeshDevice* renderer,const std::set<std::pair<int,int>>& coordinates) {
     if(!renderer)return;
     m_renderer=renderer;
     for(const auto& coordinate:coordinates) {

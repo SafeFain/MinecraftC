@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "model/GltfLoader.h"
 #include "plugins/PluginManager.h"
 #include "ui/PluginMenu.h"
@@ -622,28 +623,28 @@ private:
         const FrameContext frame = beginFramePhases();
         if (m_window.isMinimized()) {
             m_session.setLocalControl(false);
-            if (Plugins::content().runtimeFault.empty()) updateFrameState(frame.dt, frame.now);
+            if (Plugins::runtimeFault().empty()) updateFrameState(frame.dt, frame.now);
             RuntimeClock::sleepMilliseconds(100);
             m_window.finishEventFrame();
             return !m_window.shouldClose() && m_running;
         }
         m_plugins.pollFaults();
         m_router.handleFrameInput(frame.dt);
-        if(Plugins::content().runtimeFault.empty())updateFrameState(frame.dt, frame.now);
-        if(!Plugins::content().runtimeFault.empty()) {
-            if(m_flow.state()!=GameState::MainMenu)m_flow.abortPluginSession(Plugins::content().runtimeFault);
+        if(Plugins::runtimeFault().empty())updateFrameState(frame.dt, frame.now);
+        if(!Plugins::runtimeFault().empty()) {
+            if(m_flow.state()!=GameState::MainMenu)m_flow.abortPluginSession(Plugins::runtimeFault());
             m_plugins.discardOperations();
         } else m_plugins.flushOperations();
         renderFrameScene(frame.dt, frame.now);
         renderFrameUi();
-        if(!Plugins::content().runtimeFault.empty()&&m_flow.state()!=GameState::MainMenu)m_flow.abortPluginSession(Plugins::content().runtimeFault);
+        if(!Plugins::runtimeFault().empty()&&m_flow.state()!=GameState::MainMenu)m_flow.abortPluginSession(Plugins::runtimeFault());
         finishFramePhases(frame.started);
         m_window.finishEventFrame();
         return !m_window.shouldClose() && m_running;
     }
     void cleanup() {
         m_lanDiscovery.stopBrowsing(); m_lanDiscovery.stopAdvertising();
-        if(!Plugins::content().runtimeFault.empty())m_session.abortPluginWorld();
+        if(!Plugins::runtimeFault().empty())m_session.abortPluginWorld();
         else {if (!m_savedForTermination) m_flow.saveCurrentWorld();m_session.leaveWorld();}
         m_plugins.shutdown();
         Debug::Log::shutdown();

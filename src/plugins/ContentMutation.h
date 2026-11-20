@@ -9,7 +9,7 @@
 // Registration and freeze APIs. Only startup and plugin loading may include
 // this header; runtime/gameplay code uses the read-only ContentQueries.h view.
 namespace Plugins {
-inline ContentState& mutableContentState() {return contentStorage();}
+ContentState& mutableContentState();
 inline void mutableContent(const std::string& key) {
     if(mutableContentState().frozen)throw std::runtime_error("Content registry is frozen");
     if(!validKey(key))throw std::runtime_error("Invalid content key: "+key);

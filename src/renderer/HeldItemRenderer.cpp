@@ -1,3 +1,4 @@
+#include "plugins/AtlasQueries.h"
 #include "plugins/ContentQueries.h"
 #include "renderer/HeldItemRenderer.h"
 #include "renderer/EquipmentAppearance.h"
@@ -222,7 +223,7 @@ HeldItemRenderer::CachedMesh HeldItemRenderer::meshFor(ItemId id) {
               getBlockProps(*props.placedBlock).shape==RenderShape::Boxes)) {
         mesh=buildHeldBlockShapeMesh(*props.placedBlock,m_blockTiles);block=true;
     }else if(const auto* item=Plugins::pluginItem(id);item&&item->icon.empty()&&!Plugins::content().itemIconOverrides.count(static_cast<uint16_t>(id))) {
-        const float s=static_cast<float>(m_blockTiles);const int tile=item->tile;
+        const float s=static_cast<float>(m_blockTiles);const int tile=Plugins::itemTile(static_cast<uint16_t>(id));
         const float u0=(tile%m_blockTiles+.5f/16)/s,u1=(tile%m_blockTiles+1-.5f/16)/s;
         const float v0=(tile/m_blockTiles+.5f/16)/s,v1=(tile/m_blockTiles+1-.5f/16)/s;
         quad(mesh,{-.5f,-.5f,.04f},{.5f,-.5f,.04f},{.5f,.5f,.04f},{-.5f,.5f,.04f},{u0,v0},{u1,v0},{u1,v1},{u0,v1});

@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "plugins/PluginManager.h"
 #include "Config.h"
 #include "model/GltfLoader.h"
@@ -178,7 +179,7 @@ void PluginManager::ambientDefinition(MC_PluginContext& c,const MC_AmbientDefini
     AmbientContent a;a.owner=c.index;a.key=key;a.dimension=d.dimension;a.stateBytes=d.state_bytes;a.replaceNative=d.replace_native!=0;
     const auto callback=d.update;const auto userdata=d.userdata;const auto index=c.index;
     a.update=[this,callback,userdata,index](const MC_AmbientContext& view,void* state) {
-        if(!m_info[index].active||!mutableContentState().runtimeFault.empty())return false;
+        if(!m_info[index].active||!runtimeFault().empty())return false;
         const auto previous=m_phase;m_phase=MC_ENVIRONMENT;bool success=false;
         try{success=callback(&view,state,userdata)==0;if(!success)callbackFault(index,"Ambient callback failed");}
         catch(...){callbackFault(index,"Exception across ambient ABI");}

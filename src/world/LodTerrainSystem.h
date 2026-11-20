@@ -21,7 +21,7 @@
 #include <glm/glm.hpp>
 
 class Chunk;
-class IGameRenderer;
+class IChunkMeshDevice;
 class SaveStore;
 class ThreadPool;
 class WorldGenerator;
@@ -116,7 +116,7 @@ public:
     void update(const glm::dvec3& playerPosition, int nearDistanceChunks,
                 const std::vector<Chunk*>& activeChunks,
                 bool allowRefinements = true);
-    void processCompleted(IGameRenderer* renderer,
+    void processCompleted(IChunkMeshDevice* renderer,
                           bool allowRefinements = true);
     void releaseGpuMeshes(bool retainCpuGeometry = false);
 
@@ -190,7 +190,7 @@ private:
     ThreadPool* m_threadPool = nullptr;
     SaveStore* m_saveStore = nullptr;
     WorldGenerator* m_generator = nullptr;
-    IGameRenderer* m_renderer = nullptr;
+    IChunkMeshDevice* m_renderer = nullptr;
     std::filesystem::path m_cacheRoot;
     std::unordered_map<LodTileKey, std::unique_ptr<Tile>, LodTileKeyHash> m_tiles;
     std::vector<Request> m_desired;

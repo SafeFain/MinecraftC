@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "TestSupport.h"
 #include "app/GameSession.h"
 #include "SessionScenario.h"
@@ -145,7 +146,7 @@ int main(int argc, char** argv) try {
                     require(session.remotePlayers().size() == (netherMode?0u:1u) && session.entityState().entities().size() == 2 &&
                             !presenter.visibleChunks.empty() && session.roomRoster().size() == 2,"joined scene is missing replicated players/entities/terrain/roster");
                     if(netherMode)require(session.activeDimension()==DimensionId::Nether&&session.inventory().slot(0).id==ItemId::NETHERITE_SWORD&&session.inventory().slot(0).damage==17&&session.inventory().slot(0).count==1&&session.playerState().statusEffects().level(StatusEffectType::FireResistance)>0,"native dimension inventory/effects missing");
-                    if(pluginMode)require(Plugins::content().runtimeFault.empty(),"plugin callbacks failed during Vulkan presentation");
+                    if(pluginMode)require(Plugins::runtimeFault().empty(),"plugin callbacks failed during Vulkan presentation");
                     if(pluginMode)require(session.worldState().getBlock(1,1,5)==Plugins::resolveBlock("official_content:crystal_block"),"plugin terrain missing from joined Vulkan scene");
                     const auto rgba = VulkanDiagnostics::readCapture(renderer); require(rgba.size() == static_cast<size_t>(width)*height*4,"invalid Vulkan capture");
                     std::ofstream output(root / "joined.ppm",std::ios::binary); output << "P6\n" << width << ' ' << height << "\n255\n";

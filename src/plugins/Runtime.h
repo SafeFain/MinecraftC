@@ -4,6 +4,9 @@
 #include <string>
 
 namespace Plugins {
+const std::string& runtimeFault();
+void setRuntimeFault(std::string message);
+
 struct ActorContext {uint64_t player=0;uint32_t dimension=0,role=MC_LOCAL;};
 inline std::function<ActorContext()>& contextProvider(){static std::function<ActorContext()> value;return value;}
 inline const ActorContext*& scopedContext(){static thread_local const ActorContext* value=nullptr;return value;}

@@ -1,4 +1,5 @@
 #pragma once
+#include "plugins/Runtime.h"
 #include "plugins/PluginManager.h"
 #include "plugins/ContentMutation.h"
 #include "plugins/ContentQueries.h"
@@ -26,7 +27,7 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     AssetStore rootedAssets(assets);
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
     auto check=[](bool value,const char* reason){if(!value)throw std::runtime_error(reason);};
-    check(Plugins::mutableContentState().runtimeFault.empty(),"extension initialization fault");
+    check(Plugins::runtimeFault().empty(),"extension initialization fault");
     for(const auto& info:plugins.plugins())if(info.enabled)check(info.active,"example package rejected");
     EntityModelRegistry models;models.loadAll(assets);
     check(!models.definition(static_cast<EntityType>(Plugins::resolveEntity("model_data:custom"))).usesPlaceholder,"package model/animation loads with rooted Title Storage active");
@@ -89,8 +90,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
     faulty.column=[](const MC_GenerationContext*,int32_t,int32_t,MC_SurfaceSample*,void*)->int32_t{return -1;};
     WorldGenerator broken(12,WorldType::Normal,DimensionId::Overworld,config);
     const auto failed=std::async(std::launch::async,[&]{try{Chunk chunk(0,0);broken.generate(chunk);}catch(...){return true;}return false;}).get();
-    check(failed&&Plugins::mutableContentState().runtimeFault.empty(),"worker failure isolated from main content state");
-    plugins.pollFaults();check(!Plugins::mutableContentState().runtimeFault.empty(),"worker generation failure reaches main-thread fault boundary");
+    check(failed&&Plugins::runtimeFault().empty(),"worker failure isolated from main content state");
+    plugins.pollFaults();check(!Plugins::runtimeFault().empty(),"worker generation failure reaches main-thread fault boundary");
     plugins.shutdown();std::filesystem::remove_all(root);std::cout<<"Plugin entity/worldgen extension integration passed\n";return 0;
 }
 }

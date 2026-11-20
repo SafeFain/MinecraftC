@@ -8,7 +8,6 @@
 #include "world/BiomeLocator.h"
 #include "core/RuntimeClock.h"
 #include "world/ChunkMesh.h"
-#include "renderer/GameRenderer.h"
 #include "threading/ThreadPool.h"
 #include "debug/Log.h"
 #include "Config.h"

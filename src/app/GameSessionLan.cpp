@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "app/GameSession.h"
 #include "debug/Log.h"
 #include "game/SurvivalSession.h"
@@ -100,7 +101,7 @@ void GameSession::admitLanPlayer(uint64_t id) {
 }
 
 void GameSession::saveLanPlayer(LanPlayerRuntime& guest) {
-    if(!Plugins::content().runtimeFault.empty())return;
+    if(!Plugins::runtimeFault().empty())return;
     auto& profile = guest.profile;
     auto savedPosition=guest.player.getPosition();
     auto& runtime=ensureDimension(profile.dimension);
@@ -145,10 +146,10 @@ void GameSession::removeLanPlayer(uint64_t id) {
 }
 
 void GameSession::closeLanRoom() {
-    if(hostingLan() && saveStore && Plugins::content().runtimeFault.empty())flushDimensions(true);
+    if(hostingLan() && saveStore && Plugins::runtimeFault().empty())flushDimensions(true);
     if (hostingLan()) closeAuthorityWindow(player, simulation(), hostWindow, hostWindowView);
     lodJobs.clear();
-    lanHost.close(Plugins::content().runtimeFault);
+    lanHost.close(Plugins::runtimeFault());
     for (auto& runtime : simulations) if (runtime) runtime->world.setBlockMutationCallback({});
     chunkJournal.clear();
     while (!guests.empty()) removeLanPlayer(guests.begin()->first);

@@ -9,7 +9,7 @@
 #include "world/World.h"
 #include "Config.h"
 #include "game/SaveStore.h"
-#include "renderer/GameRenderer.h"
+#include "renderer/ChunkMeshDevice.h"
 #include "threading/ThreadPool.h"
 #include "world/Chunk.h"
 #include "world/ChunkStore.h"
@@ -43,92 +43,17 @@ void require(bool condition, const char* message) {
     }
 }
 
-// Minimal IGameRenderer: records chunk mesh upload/release calls and no-ops
-// everything else. Only the paths World touches are observable.
-class StubRenderer final : public IGameRenderer {
+class StubRenderer final : public IChunkMeshDevice {
 public:
     int uploadCount = 0;
     int releaseCount = 0;
     size_t lastUploadBytes = 0;
 
-    // ── IRenderDevice ──────────────────────────────────────────────
-    RenderDeviceCapabilities capabilities() const override { return {}; }
-    RenderMeshHandle createMesh(const MeshData&) override { return {}; }
-    void destroyMesh(RenderMeshHandle) override {}
-    RenderTextureHandle createTexture(const TextureData&,
-                                      const TextureSamplerDesc&) override {
-        return {};
-    }
-    void destroyTexture(RenderTextureHandle) override {}
-    RenderMaterialHandle createMaterial(const MaterialDesc&) override {
-        return {};
-    }
-    void destroyMaterial(RenderMaterialHandle) override {}
-    void beginFrame(const FrameData&) override {}
-    void draw(const DrawCommand&) override {}
-    void endFrame() override {}
-    void resize(int, int) override {}
-    void waitIdle() override {}
-
-    // ── IGameRenderer ──────────────────────────────────────────────
-    void initialize(Window&, const std::filesystem::path&) override {}
-    void reinitialize(const std::filesystem::path&) override {}
-    void beginFrame() override {}
-    void setVisualQuality(VisualQuality) override {}
-    void setEnhancedVisuals(bool) override {}
-    void setLeafTransparency(bool) override {}
-    void finishScene(const PostProcessState&) override {}
-    void setEnvironment(const RenderEnvironment&, const glm::vec3&) override {}
-    void renderSky(const RenderEnvironment&, const glm::mat4&,
-                   const glm::vec3&, bool) override {}
-    void renderChunk(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
-                     bool) override {}
-    void renderLod(const ChunkMesh&, const glm::mat4&, const glm::mat4&,
-                   const glm::vec4&,
-                   float, float, bool) override {}
-    void renderChunkShadows(ShadowQuality, const glm::mat4&, const glm::mat4&,
-                            const glm::dvec3&,
-                            const std::vector<ShadowChunkSubmission>&) override {
-    }
     void uploadChunkMesh(ChunkMesh& mesh) override {
         ++uploadCount;
         lastUploadBytes = mesh.uploadBytes();
     }
     void releaseChunkMesh(ChunkMesh&) override { ++releaseCount; }
-    void beginTranslucent() override {}
-    void endTranslucent() override {}
-    void bindBlockShader() const override {}
-    void unbindBlockShader() const override {}
-    void renderWireframe(const glm::vec3&, const glm::vec3&,
-                         const glm::mat4&, const glm::vec3&) override {}
-    void renderEntity(const glm::vec3&, const glm::vec3&, const glm::vec3&,
-                      int, const glm::mat4&) override {}
-    void renderCompatibilityEntityCube(const glm::vec3&, const glm::vec3&,
-                                       const glm::vec3&, int, float,
-                                       const glm::mat4&,
-                                       SmoothLightSample) override {}
-    model::ModelRenderer& modelRenderer() override {
-        throw std::logic_error(
-            "modelRenderer is not used by orchestration tests");
-    }
-    void flushModels(const glm::mat4&) override {}
-    void beginViewModel(const glm::mat4&) override {}
-    void renderEntityPart(const glm::vec3&, const glm::vec3&,
-                          const glm::vec3&, float, const glm::vec3&, int,
-                          const glm::mat4&, SmoothLightSample) override {}
-    void renderParticles(const std::vector<ParticleRenderData>&,
-                         const glm::mat4&, const glm::vec3&, const glm::vec3&,
-                         float) override {}
-    void renderClouds(const glm::dvec3&, const glm::mat4&, uint64_t, float,
-                      int) override {}
-    void setViewProjection(const glm::mat4&) override {}
-    void setFrustum(const Frustum& frustum) override { m_frustum = frustum; }
-    const Frustum& getFrustum() const override { return m_frustum; }
-    RenderTextureHandle getBlockAtlasTexture() const override { return {}; }
-    uint32_t blockAtlasTilesPerSide() const override { return 1; }
-
-private:
-    Frustum m_frustum;
 };
 
 // Worker tasks hold raw World pointers; drain them before the World goes out

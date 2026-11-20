@@ -301,6 +301,7 @@ void VulkanRenderer::initialize(Window& window,
     m_entityMaterial = createMaterial(material);
     if(!m_modelAssets) m_modelAssets=std::make_shared<model::ModelAssetCache>();
     m_modelRenderer = model::createVulkanModelRenderer(*this,m_modelAssets);
+    publishBlockAtlas(atlas);
 }
 
 void VulkanRenderer::reinitialize(const std::filesystem::path& assetRoot) {

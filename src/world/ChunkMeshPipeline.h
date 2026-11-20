@@ -9,7 +9,7 @@
 
 class Chunk;
 class ChunkStore;
-class IGameRenderer;
+class IChunkMeshDevice;
 class ThreadPool;
 class World;
 
@@ -31,13 +31,13 @@ public:
 
     // Check for completed async mesh builds and upload them to GPU.
     // maxUploads caps uploads per frame to avoid pipeline stalls.
-    void processCompletedMeshes(IGameRenderer* renderer, int maxUploads = 4,
+    void processCompletedMeshes(IChunkMeshDevice* renderer, int maxUploads = 4,
                                 size_t maxUploadBytes =
                                     Config::MESH_UPLOAD_BYTES_PER_FRAME);
 
     // Synchronous build (for first frame or when thread pool unavailable).
-    void buildMeshesSync(IGameRenderer* renderer, int maxCount = 16);
-    void buildAtomicMeshes(IGameRenderer*,const std::set<std::pair<int,int>>&);
+    void buildMeshesSync(IChunkMeshDevice* renderer, int maxCount = 16);
+    void buildAtomicMeshes(IChunkMeshDevice*,const std::set<std::pair<int,int>>&);
 
     void invalidateGpuMeshes();
     void restoreGpuMeshes();
@@ -53,5 +53,5 @@ private:
     World& m_world;
     ChunkStore& m_chunks;
     ThreadPool* m_threadPool = nullptr;
-    IGameRenderer* m_renderer = nullptr;
+    IChunkMeshDevice* m_renderer = nullptr;
 };

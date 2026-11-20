@@ -1,4 +1,5 @@
 #include "TestSupport.h"
+#include "core/RuntimeClock.h"
 #include "core/Window.h"
 #include "renderer/backend/vulkan/VulkanDiagnostics.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"

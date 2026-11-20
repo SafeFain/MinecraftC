@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "TestSupport.h"
 #include "PixelReadback.h"
 #include "plugins/PluginManager.h"
@@ -100,6 +101,13 @@ int main(int argc,char** argv) try {
             throw std::runtime_error("Disabled Heaven provider left gameplay content available");
         Window window(width,height,"MinecraftC UI smoke",Window::SurfaceMode::Vulkan,false,false);
         VulkanRenderer renderer;renderer.initialize(window,assets);
+        if (extensions) {
+            const auto block = Plugins::resolveBlock("legacy_icon:cube");
+            const auto slot = getFaceTextureIndex(block, FaceDir::TOP);
+            renderer.reinitialize(assets);
+            if (slot == 0 || getFaceTextureIndex(block, FaceDir::TOP) != slot)
+                throw std::runtime_error("Graphics recovery changed the plugin block atlas slot");
+        }
         renderer.setVisualQuality(VisualQuality::Low);renderer.setEnhancedVisuals(false);
         if(natural||defaultTextures) {
             if(natural&&Plugins::content().itemIconOverrides.empty())throw std::runtime_error("Natural pack failed to load");
@@ -116,10 +124,10 @@ int main(int argc,char** argv) try {
                 if(posedModel){model::ModelDraw model;model.model=posedModel;model.instance=&posed;renderer.modelRenderer().queue(model);renderer.flushModels(glm::mat4(1));}
                 renderer.finishScene(PostProcessState{});if(frame==3)VulkanDiagnostics::requestCapture(renderer);renderer.endFrame();window.finishEventFrame();}renderer.waitIdle();pixels=VulkanDiagnostics::readCapture(renderer);if(pixels.empty())throw std::runtime_error("Plugin image readback unavailable");return pixels;};
             Plugins::mutableContentState().extensions.renderPasses.clear();const auto baseline=image(), repeatedBaseline=image();Plugins::mutableContentState().extensions.renderPasses=passes;const auto custom=image();
-            if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
+            if(!Plugins::runtimeFault().empty())throw std::runtime_error(Plugins::runtimeFault());
             PixelReadback::requireEffect(baseline,repeatedBaseline,custom,width,height,{0,0,width,height},"custom SPIR-V post pass");
             renderer.resize(width,height);image();renderer.suspendPresentation();renderer.resumePresentation();image();
-            if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
+            if(!Plugins::runtimeFault().empty())throw std::runtime_error(Plugins::runtimeFault());
             MC_RenderHandle scenePipeline=0;size_t owner=0;
             for(const auto& resource:Plugins::mutableContentState().extensions.renderResources)if(resource.second.key=="render_demo:offscreen"){scenePipeline=resource.first;owner=resource.second.owner;}
             if(!scenePipeline)throw std::runtime_error("Scene test pipeline unavailable");
@@ -134,7 +142,7 @@ int main(int argc,char** argv) try {
             model::Node node;node.skin=0;node.primitives={0};model->nodes.push_back(node);model->sceneRoots={0};model->skins.push_back({{0},{glm::mat4(1)}});
             posed.jointPalettes={{glm::mat4(1)}};posedModel=renderer.modelRenderer().upload(model);
             const auto unshifted=image(), repeatedPose=image();posed.jointPalettes[0][0][3][0]=.5f;const auto shifted=image();
-            if(!Plugins::mutableContentState().runtimeFault.empty())throw std::runtime_error(Plugins::mutableContentState().runtimeFault);
+            if(!Plugins::runtimeFault().empty())throw std::runtime_error(Plugins::runtimeFault());
             if(!sawScene)throw std::runtime_error("Custom scene redraw never received a scene");
             PixelReadback::requireEffect(unshifted,repeatedPose,shifted,width,height,
                 {width/4,height/4,width,height*3/4},"custom skeletal pose");
@@ -512,7 +520,7 @@ int main(int argc,char** argv) try {
         PixelReadback::requireEffect(cubeImage,repeatedCube,slabImage,width,height,iconRegion,"slab partial geometry");
         shapeImage(Plugins::resolveBlock("block_shapes_data:stair"));shapeImage(Plugins::resolveBlock("block_shapes_data:door"));
         shapeImage(Plugins::resolveBlock("block_shapes_data:button"));shapeImage(Plugins::resolveBlock("block_shapes_data:box"));
-        const auto legacyItem=Plugins::resolveItem("legacy_icon:item");const auto legacyTile=Plugins::pluginItem(legacyItem)->tile;
+        const auto legacyItem=Plugins::resolveItem("legacy_icon:item");const auto legacyTile=Plugins::itemTile(static_cast<uint16_t>(legacyItem));
         if(contentPackage) {
             for(const auto& info:plugins.plugins())if(info.manifest.id=="package_demo"&&!info.active)throw std::runtime_error(info.status);
             const auto block=Plugins::resolveBlock("package_demo:blue_brick");
@@ -520,7 +528,7 @@ int main(int argc,char** argv) try {
             const auto pixels=shapeImage(block);
             PixelReadback::requireEffect(cubeImage,repeatedCube,pixels,width,height,iconRegion,"package material");
             const auto blockItem=iconImage([&]{ui.drawItemIcon(16,16,64,64,{brick,1,0});});
-            const auto tile=Plugins::pluginItem(brick)->tile;
+            const auto tile=Plugins::itemTile(static_cast<uint16_t>(brick));
             const auto material=iconImage([&]{ui.drawAtlasIcon(16,16,64,64,tile,glm::vec4(1));});
             if(tile!=getFaceTextureIndex(block,FaceDir::TOP)||blockItem!=material)throw std::runtime_error("Package block/item material mapping differs");
             iconImage([&]{ui.drawItemIcon(16,16,64,64,{crystal,1,0});});

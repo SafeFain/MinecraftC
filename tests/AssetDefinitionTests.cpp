@@ -1,5 +1,6 @@
 #include "TestSupport.h"
 #include "HeavenContentFixture.h"
+#include "plugins/AtlasPublication.h"
 #include "world/Block.h"
 #include "world/Chunk.h"
 #include "game/Item.h"
@@ -29,6 +30,7 @@ int testAssets() {
     installHeavenFixture();
     const std::string root = MINECRAFTC_SOURCE_DIR;
     const BlockAtlasData atlas = buildBlockAtlasData(root + "/assets");
+    publishBlockAtlas(atlas);
     std::ifstream metadataInput(root + "/assets/textures/generated/atlas.json");
     const auto metadata = nlohmann::json::parse(metadataInput);
     const auto materialSlot = [&](const char* name) {
@@ -105,7 +107,7 @@ int testAssets() {
     for (size_t slot = 0; slot < legacyAtlas.sequences.size(); ++slot) {
         const Plugins::MaterialContent* replacement=nullptr;
         for(const auto& entry:Plugins::content().materials)
-            if(entry.second.tile==slot&&!entry.second.images.empty())replacement=&entry.second;
+            if(legacyAtlas.pluginBindings->materials.at(entry.first)==slot&&!entry.second.images.empty())replacement=&entry.second;
         const auto& sequence=legacyAtlas.sequences[slot];
         require(sequence.slots[0]==slot,"legacy atlas changed a foundation slot");
         if(replacement) {
@@ -115,11 +117,16 @@ int testAssets() {
                 require(sequence.slots[i]<legacyAtlas.sequences.size(),"provider legacy frames escaped atlas");
         } else require(sequence.variants==1&&sequence.frames==1,"legacy atlas did not synthesize identity sequences");
     }
-    { std::ofstream file(fixtureTextures / "atlas.json"); file << currentMetadata; }
+    const auto stoneSlot = getAtlasTextureIndex(BlockTexture::Stone);
+    auto badMetadata = nlohmann::json::parse(currentMetadata);
+    badMetadata["textures"]["stone"]["index"] = 65535;
+    { std::ofstream file(fixtureTextures / "atlas.json"); file << badMetadata.dump(); }
     { std::ofstream file(fixtureTextures / "atlas_sequences.bin", std::ios::binary); file << "invalid"; }
     bool rejected = false;
     try { (void)buildBlockAtlasData(fixtureRoot); } catch (const std::runtime_error&) { rejected = true; }
     require(rejected, "malformed declared sequence table was silently accepted");
+    require(getAtlasTextureIndex(BlockTexture::Stone) == stoneSlot,
+            "failed atlas build replaced published base texture definitions");
     loadTextureAssetDefinitions(sourceTextures / "atlas.json",
         std::filesystem::path(root) / "assets/textures/definitions/blocks.json",
         std::filesystem::path(root) / "assets/textures/definitions/items.json");

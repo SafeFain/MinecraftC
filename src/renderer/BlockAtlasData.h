@@ -4,7 +4,11 @@
 #include "renderer/VoxelGiMaterial.h"
 
 #include <filesystem>
+#include <memory>
 #include <unordered_map>
+
+struct BlockTextureDefinitions;
+namespace Plugins { struct AtlasBindings; }
 
 // std430-compatible, little-endian wire fields are decoded explicitly on load.
 struct MaterialSequence {
@@ -33,12 +37,16 @@ struct BlockAtlasData {
     uint32_t tilesPerSide = 0;
     uint32_t tileSize = 16;
     std::vector<MaterialSequence> sequences;
+    std::shared_ptr<const BlockTextureDefinitions> baseDefinitions;
+    std::shared_ptr<const Plugins::AtlasBindings> pluginBindings;
 };
 
 // Loads the generated logical-material atlas and constructs every mip by
 // alpha-weighted linear-light tile downsampling, so filtering cannot bleed across
 // slots. V4 semantic normal/property maps are linear; legacy atlases synthesize them.
 BlockAtlasData buildBlockAtlasData(const std::filesystem::path& assetRoot);
+// Call while mesh workers are idle, once the atlas is ready for use.
+void publishBlockAtlas(const BlockAtlasData& atlas);
 void appendPluginItemIcons(TextureData&,std::unordered_map<std::string,int>&,int columns,int& rows);
 
 VoxelGiMaterialTable buildVoxelGiMaterials(const BlockAtlasData& atlas);

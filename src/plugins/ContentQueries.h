@@ -11,7 +11,7 @@
 // the registration APIs; the frozen registry is the single source of truth for
 // built-in and plugin-provided ids.
 namespace Plugins {
-inline const ContentState& content() {return contentStorage();}
+const ContentState& content();
 inline bool availableBlock(BlockId id){const auto raw=static_cast<uint16_t>(id);return raw>=FIRST_CONTENT_ID?content().blocks.count(raw)!=0:content().validBlocks[raw]!=0;}
 inline bool availableItem(ItemId id){const auto raw=static_cast<uint16_t>(id);return raw>=FIRST_CONTENT_ID?content().items.count(raw)!=0:content().validItems[raw]!=0;}
 inline const BlockBehaviorContent* blockBehavior(BlockId id){const auto& entries=content().extensions.blockBehaviors;const auto it=entries.find(static_cast<uint16_t>(id));return it==entries.end()?nullptr:&it->second;}

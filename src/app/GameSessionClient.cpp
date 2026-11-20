@@ -3,6 +3,7 @@
 #include "network/EntityProtocol.h"
 #include "debug/Log.h"
 #include "plugins/ContentQueries.h"
+#include "renderer/GameRenderer.h"
 #include "world/WorldGenContext.h"
 #include <algorithm>
 #include <cmath>

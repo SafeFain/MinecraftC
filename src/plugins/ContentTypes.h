@@ -28,7 +28,6 @@ inline bool validKey(const std::string& key) {
     return true;
 }
 struct BlockContent {
-    bool tilesReady=false;
     uint16_t family=0;
     uint32_t familyKind=0, stateIndex=0, releaseTicks=30;
     bool manualOpen=true, villagerOpen=true, arrowTrigger=true;
@@ -38,7 +37,6 @@ struct BlockContent {
     BlockProperties properties;
     BlockSurvivalProperties survival;
     std::array<std::string,6> materials;
-    std::array<uint16_t,6> tiles{};
     uint8_t emission=0;
     ItemId drop=ItemId::EMPTY;
 };
@@ -47,7 +45,6 @@ struct ItemContent {
     std::string key, material,command;
     ItemProperties properties;
     CreativeItemCategory category=CreativeItemCategory::Materials;
-    uint16_t tile=0;
     uint16_t spawnEntity=MC_INVALID_ID;
 };
 struct MaterialContent {
@@ -57,7 +54,6 @@ struct MaterialContent {
     std::filesystem::path image, normal, properties;
     glm::vec4 color{1.0f};
     bool replace=false;
-    uint16_t tile=0;
 };
 struct ContentState {
     std::array<uint8_t,65536> validBlocks=[] {
@@ -73,7 +69,6 @@ struct ContentState {
     ExtensionContent extensions;
     bool frozen=false;
     uint64_t revision=0;
-    std::string runtimeFault;
     std::map<uint16_t,BlockContent> blocks;
     std::map<uint16_t,ItemContent> items;
     // Presentation overlays never create or mutate gameplay item definitions.
@@ -86,7 +81,4 @@ struct ContentState {
     std::map<std::string,std::string> networkDescription;
     std::array<std::vector<ItemId>,static_cast<size_t>(CreativeItemCategory::Count)> categories;
 };
-// One process-wide immutable-after-freeze registry. Read access goes through
-// ContentQueries.h; registration and freezing go through ContentMutation.h.
-inline ContentState& contentStorage() {static ContentState state;return state;}
 } // namespace Plugins

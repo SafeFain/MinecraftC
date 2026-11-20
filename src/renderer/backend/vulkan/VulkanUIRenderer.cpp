@@ -1,3 +1,4 @@
+#include "plugins/AtlasQueries.h"
 #include "plugins/ContentQueries.h"
 #include "renderer/BlockAtlasData.h"
 #include "renderer/EquipmentAppearance.h"
@@ -149,7 +150,7 @@ public:
                 const auto shape=getBlockProps(*item->properties.placedBlock).shape;
                 if(shape==RenderShape::Slab||shape==RenderShape::Stair||shape==RenderShape::Door||shape==RenderShape::Button||shape==RenderShape::Boxes){drawBlockIcon(x,y,w,h,*item->properties.placedBlock);return;}
             }
-            drawAtlasIcon(x,y,w,h,item->tile,glm::vec4(1));return;
+            drawAtlasIcon(x,y,w,h,Plugins::itemTile(static_cast<uint16_t>(stack.id)),glm::vec4(1));return;
         }
         std::string name=stack.id>=ItemId::NETHERRACK&&stack.id<ItemId::COUNT?itemCommandName(stack.id):getItemProps(stack.id).name;
         if(const auto* item=Plugins::pluginItem(stack.id);item&&!item->icon.empty())name=item->key;

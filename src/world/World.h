@@ -32,7 +32,7 @@
 #include "world/BlockLightLogic.h"
 #include "game/Weather.h"
 
-class IGameRenderer;
+class IChunkMeshDevice;
 class ThreadPool;
 class SaveStore;
 
@@ -271,7 +271,7 @@ public:
 
     // Check for completed async mesh builds and upload them to GPU.
     // maxUploads caps GL uploads per frame to avoid pipeline stalls.
-    void processCompletedMeshes(IGameRenderer* renderer, int maxUploads = 4,
+    void processCompletedMeshes(IChunkMeshDevice* renderer, int maxUploads = 4,
                                 size_t maxUploadBytes =
                                     Config::MESH_UPLOAD_BYTES_PER_FRAME) {
         if(!redstoneTickPending()) {
@@ -284,14 +284,14 @@ public:
     }
 
     // Synchronous build (for first frame or when thread pool unavailable)
-    void buildMeshesSync(IGameRenderer* renderer, int maxCount = 16) {
+    void buildMeshesSync(IChunkMeshDevice* renderer, int maxCount = 16) {
         m_meshes.buildMeshesSync(renderer, maxCount);
     }
     void invalidateGpuMeshes() {
         m_meshes.invalidateGpuMeshes();
         m_lod.releaseGpuMeshes(true);
     }
-    void restoreGpuMeshes(IGameRenderer* renderer = nullptr) {
+    void restoreGpuMeshes(IChunkMeshDevice* renderer = nullptr) {
         m_meshes.restoreGpuMeshes();
         m_lod.processCompleted(renderer);
     }
@@ -309,7 +309,7 @@ public:
     }
     bool lodCoverageReady() const { return m_lod.coverageReady(); }
     float lodCoverageFraction() const { return m_lod.coverageFraction(); }
-    void processCompletedLod(IGameRenderer* renderer,
+    void processCompletedLod(IChunkMeshDevice* renderer,
                              bool allowRefinements = true) {
         m_lod.processCompleted(renderer, allowRefinements);
     }

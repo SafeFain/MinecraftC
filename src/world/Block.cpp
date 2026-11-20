@@ -1,6 +1,8 @@
+#include "plugins/AtlasQueries.h"
 #include "plugins/ContentQueries.h"
 #include "world/BiomeBlockLogic.h"
 #include "world/Block.h"
+#include "world/BlockTextureDefinitions.h"
 #include "world/RedstoneBlocks.h"
 #include "core/AssetStore.h"
 
@@ -14,14 +16,11 @@
 
 namespace {
 constexpr size_t TEXTURE_COUNT = static_cast<size_t>(BlockTexture::Count);
-std::array<uint16_t, TEXTURE_COUNT> g_atlasIndices = [] {
-    std::array<uint16_t, TEXTURE_COUNT> result{};
-    for (size_t i = 0; i < result.size(); ++i) result[i] = static_cast<uint16_t>(i);
+BlockTextureDefinitions g_textureDefinitions = [] {
+    BlockTextureDefinitions result;
+    for (size_t i = 0; i < result.slots.size(); ++i) result.slots[i] = static_cast<uint16_t>(i);
     return result;
 }();
-std::array<std::array<BlockTexture, FACE_COUNT>, static_cast<size_t>(BlockId::COUNT)>
-    g_definitionFaces{};
-bool g_definitionFacesReady = false;
 
 constexpr std::array<const char*, TEXTURE_COUNT> TEXTURE_ASSET_NAMES = {{
     "dirt", "grass_top", "grass_side", "stone", "oak_log", "oak_log_top",
@@ -522,7 +521,7 @@ const std::array<BlockProperties, static_cast<size_t>(BlockId::COUNT)> BLOCK_TAB
     return table;
 }();
 
-BlockTexture getFaceTexture(BlockId id, FaceDir face) {
+BlockTexture getFaceTexture(BlockId id, FaceDir face, const BlockTextureDefinitions& definitions) {
     if(const auto s=Redstone::blockState(id)) {
         const auto dir=static_cast<Redstone::Face>(face);
         switch(s->kind) {
@@ -560,8 +559,8 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         const auto found=textureNames().find(b->materials.at(static_cast<size_t>(face)));
         return found==textureNames().end()?BlockTexture::Stone:found->second;
     }
-    if (g_definitionFacesReady) {
-        const BlockTexture defined = g_definitionFaces[static_cast<size_t>(id)]
+    if (definitions.facesReady) {
+        const BlockTexture defined = definitions.faces[static_cast<size_t>(id)]
                                                        [static_cast<size_t>(face)];
         if (defined != BlockTexture::Count) return defined;
     }
@@ -572,7 +571,7 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
         (door.material>=DoorMaterial::Crimson?static_cast<uint16_t>(BlockTexture::CrimsonDoorBottom)-14:static_cast<uint16_t>(BlockTexture::OakDoorBottom)) +
         static_cast<uint8_t>(door.material) * 2 + (door.upper ? 1 : 0));
     if (decodeButton(id, button)) return getFaceTexture(
-        button.material == DoorMaterial::Iron ? BlockId::STONE : woodPlanks(button.material), face);
+        button.material == DoorMaterial::Iron ? BlockId::STONE : woodPlanks(button.material), face, definitions);
     switch (id) {
         case BlockId::BIRCH_PLANKS: return BlockTexture::BirchPlanks;
         case BlockId::SPRUCE_PLANKS: return BlockTexture::SprucePlanks;
@@ -582,7 +581,7 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
     }
     ArchitecturalBlockState architectural;
     if (decodeArchitecturalBlock(id, architectural))
-        return getFaceTexture(architecturalBaseBlock(architectural.material), face);
+        return getFaceTexture(architecturalBaseBlock(architectural.material), face, definitions);
     if (isBed(id)) return face == FaceDir::TOP ? BlockTexture::WhiteBedTop :
                           face == FaceDir::BOTTOM ? BlockTexture::WhiteBedBottom :
                           BlockTexture::WhiteBedSide;
@@ -805,9 +804,17 @@ BlockTexture getFaceTexture(BlockId id, FaceDir face) {
     }
 }
 
-uint16_t getAtlasTextureIndex(BlockTexture texture) {
+BlockTexture getFaceTexture(BlockId id, FaceDir face) {
+    return getFaceTexture(id, face, g_textureDefinitions);
+}
+
+uint16_t getAtlasTextureIndex(BlockTexture texture, const BlockTextureDefinitions& definitions) {
     const size_t index = static_cast<size_t>(texture);
-    return index < g_atlasIndices.size() ? g_atlasIndices[index] : 0;
+    return index < definitions.slots.size() ? definitions.slots[index] : 0;
+}
+
+uint16_t getAtlasTextureIndex(BlockTexture texture) {
+    return getAtlasTextureIndex(texture, g_textureDefinitions);
 }
 
 const char* getBlockTextureAssetName(BlockTexture texture) {
@@ -816,13 +823,18 @@ const char* getBlockTextureAssetName(BlockTexture texture) {
 }
 
 uint16_t getFaceTextureIndex(BlockId id, FaceDir face) {
-    if (const auto* block = Plugins::pluginBlock(id);block&&(static_cast<uint16_t>(id)>=Plugins::FIRST_CONTENT_ID||block->tilesReady)) return block->tiles.at(static_cast<size_t>(face));
+    if (Plugins::pluginBlock(id)) {
+        const auto raw = static_cast<uint16_t>(id);
+        if (const auto tile = Plugins::blockFaceTile(raw, static_cast<size_t>(face))) return *tile;
+        if (raw >= Plugins::FIRST_CONTENT_ID) return 0;
+    }
     return getAtlasTextureIndex(getFaceTexture(id, face));
 }
 
-bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
-                                 const std::filesystem::path& blockDefinitionsPath,
-                                 const std::filesystem::path& itemDefinitionsPath) {
+static bool readTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
+                                        const std::filesystem::path& blockDefinitionsPath,
+                                        const std::filesystem::path& itemDefinitionsPath,
+                                        BlockTextureDefinitions& definitions) {
     const std::string atlas = readTextFile(atlasMetadataPath);
     const std::string blocks = readTextFile(blockDefinitionsPath);
     const std::string items = readTextFile(itemDefinitionsPath);
@@ -845,7 +857,7 @@ bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
     std::array<bool, 65536> used{};
     for (size_t texture = 0; texture < TEXTURE_COUNT; ++texture) {
         if (requested[texture] >= 0 && !used[requested[texture]]) {
-            g_atlasIndices[texture] = static_cast<uint16_t>(requested[texture]);
+            definitions.slots[texture] = static_cast<uint16_t>(requested[texture]);
             used[requested[texture]] = true;
         }
     }
@@ -854,18 +866,18 @@ bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
         if (requested[texture] >= 0) continue;
         while (next < used.size() && used[next]) ++next;
         if (next < used.size()) {
-            g_atlasIndices[texture] = static_cast<uint16_t>(next);
+            definitions.slots[texture] = static_cast<uint16_t>(next);
             used[next] = true;
         }
     }
 
-    for (auto& faces : g_definitionFaces) faces.fill(BlockTexture::Count);
+    for (auto& faces : definitions.faces) faces.fill(BlockTexture::Count);
     const std::regex blockEntry("\\\"([a-z0-9_]+)\\\"\\s*:\\s*\\{([^{}]*)\\}");
     for (std::sregex_iterator it(blocks.begin(), blocks.end(), blockEntry), end;
          it != end; ++it) {
         const auto block = blockNames().find((*it)[1].str());
         if (block == blockNames().end()) continue;
-        auto& faces = g_definitionFaces[static_cast<size_t>(block->second)];
+        auto& faces = definitions.faces[static_cast<size_t>(block->second)];
         const std::string object = (*it)[2].str();
         std::string value;
         if (quotedField(object, "all", value)) {
@@ -887,7 +899,29 @@ bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
         apply("left", {FaceDir::LEFT});
         apply("right", {FaceDir::RIGHT});
     }
-    g_definitionFacesReady = true;
+    definitions.facesReady = true;
+    return true;
+}
+
+BlockTextureDefinitions readBlockTextureDefinitions(
+    const std::filesystem::path& atlasMetadataPath, const std::filesystem::path& blockDefinitionsPath,
+    const std::filesystem::path& itemDefinitionsPath) {
+    auto definitions = g_textureDefinitions;
+    readTextureAssetDefinitions(atlasMetadataPath, blockDefinitionsPath, itemDefinitionsPath, definitions);
+    return definitions;
+}
+
+void publishBlockTextureDefinitions(const BlockTextureDefinitions& definitions) {
+    g_textureDefinitions = definitions;
+}
+
+bool loadTextureAssetDefinitions(const std::filesystem::path& atlasMetadataPath,
+                                 const std::filesystem::path& blockDefinitionsPath,
+                                 const std::filesystem::path& itemDefinitionsPath) {
+    auto definitions = g_textureDefinitions;
+    if (!readTextureAssetDefinitions(atlasMetadataPath, blockDefinitionsPath, itemDefinitionsPath, definitions))
+        return false;
+    publishBlockTextureDefinitions(definitions);
     return true;
 }
 

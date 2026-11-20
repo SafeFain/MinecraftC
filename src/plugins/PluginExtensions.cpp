@@ -1,3 +1,4 @@
+#include "plugins/Runtime.h"
 #include "plugins/PluginManager.h"
 #include "plugins/ContentMutation.h"
 #include "plugins/ContentQueries.h"
@@ -114,7 +115,7 @@ BlockId composeState(const MC_BlockState& s) {
 }
 void PluginManager::callbackFault(size_t i,const std::string& reason) {
     m_info.at(i).active=false;m_info.at(i).status=reason+"; restart required";
-    mutableContentState().runtimeFault="Plugin "+m_info.at(i).manifest.id+": "+reason;
+    setRuntimeFault("Plugin "+m_info.at(i).manifest.id+": "+reason);
     discardOperations();
 }
 int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d,uint16_t& id) {
@@ -149,7 +150,7 @@ int32_t PluginManager::entity(MC_PluginContext& ctx,const MC_EntityDefinition& d
     if(d.callback) {
         auto f=d.callback;auto u=d.userdata;auto* c=&ctx;const size_t i=ctx.index;
         e.callback=[this,f,u,c,i](uint32_t kind,const MC_EntitySnapshot& s,MC_EntityIntent& intent){
-            if(!m_info[i].active||!mutableContentState().runtimeFault.empty())return;
+            if(!m_info[i].active||!runtimeFault().empty())return;
             const auto previous=m_phase;m_phase=MC_UPDATE_PRE;
             try {if(f(c,kind,&s,&intent,u))callbackFault(i,"Entity callback failed");}
             catch(const std::exception&){callbackFault(i,"Exception across entity ABI");}
@@ -334,7 +335,7 @@ int32_t PluginManager::renderPass(MC_PluginContext& ctx,const MC_RenderPass& d) 
     auto f=d.callback;auto u=d.userdata;auto* c=&ctx;const size_t i=ctx.index;
     RenderPassContent p;p.key=key;p.owner=i;p.stage=d.stage;p.replace=d.replace;p.priority=d.priority;
     p.callback=[this,f,u,c,i](const MC_RenderFrame& frame){
-        if(!m_info[i].active||!mutableContentState().runtimeFault.empty())return;
+        if(!m_info[i].active||!runtimeFault().empty())return;
         const auto previous=m_phase;m_phase=MC_HUD;
         try{if(f(c,&frame,u))callbackFault(i,"Render callback failed");}
         catch(...){callbackFault(i,"Exception across render ABI");}

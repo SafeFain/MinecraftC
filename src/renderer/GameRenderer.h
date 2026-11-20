@@ -1,5 +1,6 @@
 #pragma once
 
+#include "renderer/ChunkMeshDevice.h"
 #include "renderer/RenderDevice.h"
 #include "minecraftc/extensions.h"
 #include "renderer/Frustum.h"
@@ -25,7 +26,7 @@ struct ShadowChunkSubmission {
 };
 namespace model { class ModelRenderer; }
 
-class IGameRenderer : public IRenderDevice {
+class IGameRenderer : public IRenderDevice, public IChunkMeshDevice {
 public:
     using IRenderDevice::beginFrame;
     virtual bool pluginDraw(size_t,const MC_RenderDraw&) {return false;}
@@ -60,8 +61,6 @@ public:
     virtual void renderChunkShadows(ShadowQuality, const glm::mat4& inverseViewProjection,
         const glm::mat4& view, const glm::dvec3& worldOrigin,
         const std::vector<ShadowChunkSubmission>&) = 0;
-    virtual void uploadChunkMesh(ChunkMesh&) = 0;
-    virtual void releaseChunkMesh(ChunkMesh&) = 0;
     virtual void beginTranslucent() = 0;
     virtual void endTranslucent() = 0;
     virtual void bindBlockShader() const = 0;

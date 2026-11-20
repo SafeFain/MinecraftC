@@ -92,7 +92,7 @@ std::vector<WorldSummary> GameSession::listWorlds() const {
 std::string GameSession::createWorld(const std::string& name, uint64_t seed,
                                      GameMode mode, Difficulty difficulty,
                                      bool cheats, WorldType type) {
-    if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
+    if(!Plugins::runtimeFault().empty())throw std::runtime_error(Plugins::runtimeFault());
     return worldCatalog.create(name, seed, mode, difficulty, cheats, type,creationGeneration);
 }
 
@@ -149,6 +149,8 @@ const EntityPresenter* GameSession::entityPresenter() const {
 }
 
 void GameSession::invalidateGpuMeshes() {
+    // Atlas reload updates the base texture definitions used by CPU mesh workers.
+    threadPool.waitIdle();
     for (auto& runtime : simulations)
         if (runtime) runtime->world.invalidateGpuMeshes();
 }
@@ -506,7 +508,7 @@ void GameSession::detachSaveStore() {
 void GameSession::leaveWorld() {
     closeLanRoom();
     if (terrainGenerated) { const Plugins::ActorScope scope(pluginContext());auto e=Plugins::event(MC_WORLD_CLOSE);Plugins::dispatch(e); }
-    if (!Plugins::content().runtimeFault.empty()) { abortPluginWorld(); return; }
+    if (!Plugins::runtimeFault().empty()) { abortPluginWorld(); return; }
     fishing.cancel(); fishingFeedback.clear();
     if (terrainGenerated || saveStore) {
         saveActiveDimensionState();
@@ -531,7 +533,7 @@ void GameSession::leaveWorld() {
 GameMode GameSession::startWorld(
     const std::string& worldId, bool newWorld,
     RuntimeClock::Tick loadingStarted) {
-    if(!Plugins::content().runtimeFault.empty())throw std::runtime_error(Plugins::content().runtimeFault);
+    if(!Plugins::runtimeFault().empty())throw std::runtime_error(Plugins::runtimeFault());
     if (saveStore) detachSaveStore();
     portalStates.clear();
     player.clearPluginCooldowns();
@@ -718,7 +720,7 @@ void GameSession::updatePlaying(
     auto pluginUpdate=Plugins::event(MC_UPDATE_PRE);pluginUpdate.dt=dt;
     const auto pluginPosition=player.getPosition();for(int i=0;i<3;++i)pluginUpdate.player[i]=pluginPosition[i];
     Plugins::dispatch(pluginUpdate);
-    if (!Plugins::content().runtimeFault.empty()) return;
+    if (!Plugins::runtimeFault().empty()) return;
     if (sleepState == SleepVisualState::Entering) {
         sleepProgress = std::min(1.0f, sleepProgress + dt / 0.6f);
         player.setSleepingVisual(true, sleepProgress);
@@ -749,7 +751,7 @@ void GameSession::updatePlaying(
         feedback.setRainVolume(
             weather().rainGradient() * (rainExposure ? 0.72f : 0.06f));
     if (!playerDead && (terrainGenerated || !hostingLan())) player.update(dt);
-    if (!Plugins::content().runtimeFault.empty()) return;
+    if (!Plugins::runtimeFault().empty()) return;
     updateFishing(dt);
     for (const auto& event : fishingFeedback) {
         Lan::GameEvent remote; remote.kind = Lan::EventKind::Fishing; remote.dimension = dimension; remote.position = event.position; remote.flags = static_cast<uint8_t>(event.kind);
@@ -861,7 +863,7 @@ void GameSession::updatePlaying(
         [](const LightningEvent& event) { return event.seconds <= 0.0f; }),
         lightningEvents.end());
 
-    if (!Plugins::content().runtimeFault.empty()) return;
+    if (!Plugins::runtimeFault().empty()) return;
     world().enqueueMeshBuilds();
     world().processCompletedMeshes(renderer, Config::MESH_UPLOADS_PER_FRAME);
     world().updateLod(player.getPosition());
@@ -869,7 +871,7 @@ void GameSession::updatePlaying(
 
     saveActiveDimensionState();
     pluginUpdate.kind=MC_UPDATE_POST;Plugins::dispatch(pluginUpdate);
-    if (!Plugins::content().runtimeFault.empty()) return;
+    if (!Plugins::runtimeFault().empty()) return;
     autosaveSeconds += dt;
     if (autosaveSeconds >= 30.0f) {
         requestAutosave(feedback.autosaveMetadataError);
@@ -1616,7 +1618,7 @@ void GameSession::advanceAutosave(const std::function<void()>& onError) {
 
 void GameSession::saveNow(const std::function<void()>& onError) {
     if(saveStore && EntityTransferJournal::exists(saveStore->worldDirectory()))return;
-    if (!Plugins::content().runtimeFault.empty()) return;
+    if (!Plugins::runtimeFault().empty()) return;
     if (!saveStore || (!terrainGenerated && !hostingLan())) return;
     try {
         updateSaveMetadata();
@@ -1700,7 +1702,7 @@ std::filesystem::path GameSession::pluginWorldDirectory() const {return saveStor
 
 void GameSession::abortPluginWorld() {
     const Plugins::ActorScope actor(pluginContext());
-    lanHost.close(Plugins::content().runtimeFault); guests.clear(); guestProfiles.reset();
+    lanHost.close(Plugins::runtimeFault()); guests.clear(); guestProfiles.reset();
     if(lanJoining)closeReplica();
     if(terrainGenerated){auto e=Plugins::event(MC_WORLD_CLOSE);Plugins::dispatch(e);}
     // Discard the live session, draining worker/cache work while its stores are
