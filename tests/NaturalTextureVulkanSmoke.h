@@ -1,11 +1,13 @@
 #pragma once
+#include "renderer/backend/vulkan/VulkanUIRenderer.h"
 #include "world/ChunkMesh.h"
 #include "world/ChunkMeshBuilder.h"
 
 inline int naturalTextureVulkanSmoke(Window& window,VulkanRenderer& renderer,
                                      const std::filesystem::path& assets,bool natural) {
     const int width=window.width(),height=window.height();
-    UIRenderer ui;ui.initialize(renderer,renderer.getBlockAtlasTexture(),assets);
+    UIRenderer ui;
+    ui.initialize(createVulkanUIBackend(renderer, renderer.getBlockAtlasTexture(), assets));
     HeldItemRenderer held;held.initialize(renderer,assets);
     std::vector<uint16_t> blocks(Config::CHUNK_VOLUME,0);
     int maxima[16][16]{};

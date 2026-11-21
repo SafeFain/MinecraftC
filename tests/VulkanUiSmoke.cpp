@@ -21,6 +21,7 @@
 #include "game/Command.h"
 #include "core/Utf8.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
+#include "renderer/backend/vulkan/VulkanUIRenderer.h"
 #include "renderer/backend/vulkan/VulkanDiagnostics.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
@@ -59,6 +60,43 @@ struct Access final : IContainerAccess,ITradeAccess {
     bool tradeUsable(uint64_t,const glm::dvec3&,const glm::vec3&,float) const override { return true; }
     void executeTrade(uint64_t,uint8_t,InventoryModel&) override {}
 };
+
+void verifyUiGraphicsRecovery(VulkanRenderer& renderer, UIRenderer& ui,
+                              Localization& localization, const std::filesystem::path& assets,
+                              int width, int height) {
+    const int tooltipX = width / 3;
+    const auto capture = [&](bool drawBlock) {
+        VulkanDiagnostics::requestCapture(renderer);
+        renderer.beginFrame();
+        ui.beginUIFrame(width, height);
+        ui.drawRect(0, 0, static_cast<float>(width), static_cast<float>(height), {0, 0, 0, 1});
+        if (drawBlock) ui.drawBlockIcon(16, 16, 48, 48, BlockId::DIRT);
+        ui.drawTooltip(static_cast<float>(tooltipX), static_cast<float>(height) / 2,
+                       {ItemId::DIRT, 1, 0});
+        ui.endUIFrame();
+        renderer.endFrame();
+        renderer.waitIdle();
+        return VulkanDiagnostics::readCapture(renderer);
+    };
+
+    localization.setLanguage(Language::SimplifiedChinese);
+    const auto before = capture(true);
+    ui.resetGraphics();
+    renderer.reinitialize(assets);
+    renderer.setVisualQuality(VisualQuality::Low);
+    renderer.setEnhancedVisuals(false);
+    renderer.resize(width, height);
+    ui.initialize(createVulkanUIBackend(renderer, renderer.getBlockAtlasTexture(), assets));
+    const auto after = capture(true);
+
+    PixelReadback::requireEffect(before, after, capture(false), width, height,
+        PixelReadback::uiRegion(16, 16, 48, 48, height), "UI block atlas after graphics recovery");
+    localization.setLanguage(Language::English);
+    PixelReadback::requireEffect(before, after, capture(true), width, height,
+        {tooltipX - 2, 0, width, height},
+        "UI tooltip localization after graphics recovery");
+    std::cout << "Vulkan UI graphics recovery preserved the block atlas and localization\n";
+}
 }
 
 int main(int argc,char** argv) try {
@@ -201,8 +239,11 @@ int main(int argc,char** argv) try {
             VulkanDiagnostics::setParticleTime(renderer, std::nullopt);
             held.reset();Plugins::contextProvider()={};std::cout<<"Plugin sky/cloud, held GLB, colored particles, optional audio mode and Vulkan rebuild/resume passed\n";
         }
-        UIRenderer ui;Localization localization;localization.load(assets);
-        ui.setLocalization(localization);ui.initialize(renderer,renderer.getBlockAtlasTexture(),assets);
+        Localization localization;localization.load(assets);
+        UIRenderer ui;
+        ui.setLocalization(localization);
+        ui.initialize(createVulkanUIBackend(renderer, renderer.getBlockAtlasTexture(), assets));
+        if (heavenOff) verifyUiGraphicsRecovery(renderer, ui, localization, assets, width, height);
         if(argc==3&&std::string(argv[2])=="--redstone") {redstoneVulkanSmoke(renderer,assets,width,height);return 0;}
         if(argc==3&&std::string(argv[2])=="--enchanting") {
             InventoryModel inventory; Access access; ContainerScreen screen(inventory);

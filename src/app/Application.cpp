@@ -60,6 +60,7 @@
 #include "renderer/ChunkRenderScene.h"
 #include "renderer/TexturedCubeScene.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
+#include "renderer/backend/vulkan/VulkanUIRenderer.h"
 #include <stdexcept>
 #include <chrono>
 #include <cmath>
@@ -210,6 +211,7 @@ private:
         m_clientSettings = ClientSettings::load(m_paths.settingsFile());
         m_ui.localization.load(m_paths.assetRoot);
         m_ui.localization.setLanguage(m_clientSettings.language);
+        m_ui.renderer.setLocalization(m_ui.localization);
         applyClientSettings(false);
 
         static_cast<VulkanRenderer&>(*m_renderer).setModelAssets(m_modelAssets);
@@ -223,9 +225,7 @@ private:
         m_session.initializeEntityModels(m_paths.assetRoot, *m_renderer);
         m_scene.initialize(*m_renderer, m_paths.assetRoot);
         m_audio.initialize(&m_assets);
-        m_ui.renderer.initialize(*m_renderer,
-            m_renderer->getBlockAtlasTexture(), m_paths.assetRoot);
-        m_ui.renderer.setLocalization(m_ui.localization);
+        initializeUiGraphics();
         m_window.setResizeCallback([this](int width, int height) {
             m_renderer->resize(width, height);
         });
@@ -483,6 +483,11 @@ private:
         LOG_INFO("MinecraftC initialized");
     }
 
+    void initializeUiGraphics() {
+        m_ui.renderer.initialize(createVulkanUIBackend(
+            *m_renderer, m_renderer->getBlockAtlasTexture(), m_paths.assetRoot));
+    }
+
     void restoreGraphics() {
         m_graphicsResetPending = false;
         m_session.invalidateGpuMeshes();
@@ -494,9 +499,7 @@ private:
         m_renderer->setLeafTransparency(m_clientSettings.transparentLeaves);
         m_session.initializeEntityModels(m_paths.assetRoot, *m_renderer);
         m_scene.restoreGraphics(*m_renderer, m_paths.assetRoot);
-        m_ui.renderer.initialize(*m_renderer,
-            m_renderer->getBlockAtlasTexture(), m_paths.assetRoot);
-        m_ui.renderer.setLocalization(m_ui.localization);
+        initializeUiGraphics();
         m_session.restoreGpuMeshes(m_renderer.get());
         m_renderer->resize(m_window.width(), m_window.height());
         LOG_INFO("Graphics resources restored after device reset");

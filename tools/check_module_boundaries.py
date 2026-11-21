@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check production source ownership, CMake dependency direction and private headers."""
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 import re
 import sys
@@ -17,9 +17,11 @@ PRIVATE_HEADERS = {
     ),
     "BlockTextureDefinitions.h": ("world/Block.cpp", "renderer/BlockAtlasData.cpp"),
     "VulkanRendererInternal.h": ("renderer/backend/vulkan/",),
+    "VulkanUIRenderer.h": ("app/Application.cpp", "renderer/backend/vulkan/"),
     "GameRenderer.h": ("app/", "entity/", "player/", "renderer/", "ui/"),
 }
 INCLUDE = re.compile(r'^\s*#\s*include\s*[<"]([^">]+)[">]', re.MULTILINE)
+TARGET_NAME = re.compile(r"\b(?:minecraftc(?:_[a-zA-Z0-9_]+)?|main)\b")
 
 
 def inside(path, directory):
@@ -37,7 +39,7 @@ def check(root, manifest):
     for line in manifest.read_text(encoding="utf-8").splitlines():
         name, layer, sources, links = line.split("\t")
         if layer:
-            modules[name] = (int(layer), links)
+            modules[name] = (int(layer), set(TARGET_NAME.findall(links)))
         for source in sources.split(";"):
             source = Path(source)
             path = inside((root / source).resolve(), src)
@@ -50,11 +52,24 @@ def check(root, manifest):
             owners[path].append(name)
 
     for name, (layer, links) in modules.items():
-        for dependency in sorted(set(re.findall(r"\b(?:minecraftc(?:_[a-zA-Z0-9_]+)?|main)\b", links))):
+        for dependency in sorted(links):
             if dependency in modules and modules[dependency][0] >= layer:
                 problems.append(f"{name}: invalid dependency on {dependency}")
             elif dependency.startswith("minecraftc_") and dependency not in modules and dependency != "minecraftc_moltenvk":
                 problems.append(f"{name}: unclassified dependency {dependency}")
+
+    pending = deque([("minecraftc_ui",)])
+    visited = {"minecraftc_ui"}
+    while pending:
+        path = pending.popleft()
+        target = path[-1]
+        if target == "minecraftc_render_vulkan":
+            problems.append(f"UI links the Vulkan backend: {' -> '.join(path)}")
+            break
+        if target in modules:
+            for dependency in sorted(modules[target][1] - visited):
+                visited.add(dependency)
+                pending.append((*path, dependency))
 
     for file in sorted(src.rglob("*")):
         path = file.relative_to(src)

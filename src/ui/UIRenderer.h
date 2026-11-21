@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <glm/glm.hpp>
@@ -10,48 +9,7 @@
 #include "world/Block.h"
 #include "game/Item.h"
 #include "game/Localization.h"
-#include "renderer/RenderHandles.h"
-
-class IGameRenderer;
-
-struct UiFrameStats {
-    size_t batches=0, vertices=0, indices=0;
-};
-
-class IUIRenderBackend {
-public:
-    virtual ~IUIRenderBackend() = default;
-    virtual void beginUIFrame(int width, int height) = 0;
-    virtual void setCanvas(float x, float y, float width, float height) = 0;
-    virtual void endUIFrame() = 0;
-    virtual UiFrameStats frameStats() const = 0;
-    virtual void drawRect(float x, float y, float width, float height,
-                          const glm::vec4& color) = 0;
-    virtual void drawRoundedRect(float x, float y, float width, float height,
-                                 float radius, const glm::vec4& color) = 0;
-    virtual void setOpacity(float opacity) = 0;
-    virtual void renderTextAlpha(const std::string& text, float x, float y,
-                                 float scale, const glm::vec3& color, float alpha) = 0;
-    virtual void drawAtlasIcon(float,float,float,float,uint16_t,const glm::vec4&) {}
-    virtual void drawBlockIcon(float x, float y, float width, float height,
-                               BlockId block) = 0;
-    virtual void setAnimationTime(float) {}
-    virtual void drawItemIcon(float x, float y, float width, float height,
-                              const ItemStack& stack) = 0;
-    virtual void drawDurability(float x, float y, float width,
-                                const ItemStack& stack) = 0;
-    virtual void drawPanel(float x, float y, float width, float height,
-                           const glm::vec4& fill) = 0;
-    virtual void drawTooltip(float x, float y, const ItemStack& stack) = 0;
-    virtual void renderText(const std::string& text, float x, float y,
-                            float scale, const glm::vec3& color) = 0;
-    virtual glm::vec2 measureText(const std::string& text, float scale) = 0;
-    virtual void setLocalization(const Localization* localization) = 0;
-};
-
-std::unique_ptr<IUIRenderBackend> createVulkanUIBackend(
-    IGameRenderer& renderer, RenderTextureHandle blockAtlasTexture,
-    const std::filesystem::path& assetRoot);
+#include "renderer/UIRenderBackend.h"
 
 class UIRenderer {
 public:
@@ -60,10 +18,7 @@ public:
     UIRenderer(const UIRenderer&) = delete;
     UIRenderer& operator=(const UIRenderer&) = delete;
 
-    void initialize(IGameRenderer& renderer, RenderTextureHandle blockAtlasTexture,
-                    const std::filesystem::path& assetRoot);
-    void reinitialize(IGameRenderer& renderer, RenderTextureHandle blockAtlasTexture,
-                      const std::filesystem::path& assetRoot);
+    void initialize(std::unique_ptr<IUIRenderBackend> backend);
     void resetGraphics();
     void setLocalization(const Localization& localization);
     const Localization& localization() const { return *m_localization; }

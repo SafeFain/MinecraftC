@@ -54,8 +54,8 @@ public:
                 ApplicationInputController& inputs, Window& window,
                 GameState state, bool showCrosshair);
 
-    UIRenderer renderer;
     Localization localization;
+    UIRenderer renderer;
     std::unique_ptr<Menu> activeMenu;
     MenuCallbacks menuCallbacks;
     Hotbar hotbar;

@@ -11,6 +11,7 @@
 #include "core/Clipboard.h"
 #include "renderer/backend/vulkan/VulkanDiagnostics.h"
 #include "renderer/backend/vulkan/VulkanRenderer.h"
+#include "renderer/backend/vulkan/VulkanUIRenderer.h"
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -115,7 +116,9 @@ int main(int argc, char** argv) try {
             Plugins::contextProvider()=[&]{return session.pluginContext();};
             GameScenePresenter presenter; presenter.initialize(renderer,assets);
             SmokeClipboard clipboard; GameUiController ui(session.inventory(),clipboard);ui.hotbar.setInventory(&session.inventory());
-            ui.localization.load(assets); ui.renderer.initialize(renderer,renderer.getBlockAtlasTexture(),assets); ui.renderer.setLocalization(ui.localization);
+            ui.localization.load(assets);
+            ui.renderer.setLocalization(ui.localization);
+            ui.renderer.initialize(createVulkanUIBackend(renderer, renderer.getBlockAtlasTexture(), assets));
             ClientSettings settings; settings.renderClouds = netherMode; settings.guiScale = 1;
             if(plugins)plugins->operations.hudText=[&](float x,float y,const std::string& text,const glm::vec4& color){ui.renderer.renderTextAlpha(text,x,y,1,glm::vec3(color),color.a);};
             ApplicationInputController inputs;

@@ -1,8 +1,9 @@
+#include "renderer/backend/vulkan/VulkanUIRenderer.h"
+
 #include "plugins/AtlasQueries.h"
 #include "plugins/ContentQueries.h"
 #include "renderer/BlockAtlasData.h"
 #include "renderer/EquipmentAppearance.h"
-#include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
 #include "ui/UIGeometry.h"
 #include "ui/UIColor.h"

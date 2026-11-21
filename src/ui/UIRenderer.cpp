@@ -1,21 +1,14 @@
 #include "ui/UIRenderer.h"
-#include "renderer/GameRenderer.h"
 
 #include <stdexcept>
+#include <utility>
 
 UIRenderer::~UIRenderer() = default;
 
-void UIRenderer::initialize(IGameRenderer& renderer,
-    RenderTextureHandle atlas, const std::filesystem::path& root) {
-    m_backend = createVulkanUIBackend(renderer, atlas, root);
-    if (!m_backend) throw std::runtime_error("Could not create UI renderer backend");
-    m_backend->setLocalization(m_localization);
-}
-
-void UIRenderer::reinitialize(IGameRenderer& renderer,
-    RenderTextureHandle atlas, const std::filesystem::path& root) {
-    resetGraphics();
-    initialize(renderer, atlas, root);
+void UIRenderer::initialize(std::unique_ptr<IUIRenderBackend> backend) {
+    if (!backend) throw std::invalid_argument("UI renderer requires a backend");
+    backend->setLocalization(m_localization);
+    m_backend = std::move(backend);
 }
 
 void UIRenderer::resetGraphics() { m_backend.reset(); }

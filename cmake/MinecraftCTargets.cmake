@@ -348,7 +348,7 @@ target_link_libraries(minecraftc_ui
     PUBLIC minecraftc_sdk minecraftc_text glm::glm
     PRIVATE minecraftc_assets minecraftc_content_registry minecraftc_core minecraftc_json
             minecraftc_network minecraftc_platform minecraftc_plugins
-            minecraftc_render_vulkan minecraftc_simulation_common)
+            minecraftc_simulation_common)
 
 set(MINECRAFTC_SCENE_SOURCES
     src/entity/EntityPresenter.cpp

@@ -63,15 +63,19 @@ Heaven query and frozen-reference paths.
 
 ### 2. Make the application own UI backend creation
 
-Pass the existing `IUIRenderBackend` into `UIRenderer` at startup and during
-graphics recovery. Keep the Vulkan factory declaration with the adapter and
-expose the backend contract at the layer shared by the two owners. Keep atlas
-borrowing, localization rebinding, and destruction order explicit in both paths.
+`Application` creates the Vulkan UI backend at startup and after a graphics
+reset. `UIRenderer` owns the injected backend and binds the current localization
+when it installs a replacement. Recovery releases the old backend before
+rebuilding renderer resources, then passes the rebuilt block atlas to the new
+backend as a borrowed texture. The contract lives in `renderer/UIRenderBackend.h`.
 
-Complete this batch when `minecraftc_ui` has no path to
-`minecraftc_render_vulkan`, the module guard rejects reintroducing the
-dependency, and a real Vulkan smoke exercises UI startup and graphics
-reinitialization with the relevant UI/readback regressions passing.
+The module guard rejects direct and transitive paths from `minecraftc_ui` to
+`minecraftc_render_vulkan` and keeps the factory header at the application
+composition point and in the adapter. Inspect the generated closure with
+`ninja -t graph minecraftc_ui` from a configured Ninja build. With
+`MINECRAFTC_VULKAN_TESTS=ON`, `plugin_vulkan_heaven_off_readback` compares a
+block icon and localized tooltip before and after rebuilding real Vulkan
+resources. Hiding the icon and switching languages provide negative controls.
 
 ### 3. Enforce targeted header boundaries
 
