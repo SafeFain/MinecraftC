@@ -51,6 +51,8 @@ set(MINECRAFTC_VULKAN_BACKEND_SOURCES
     src/renderer/backend/vulkan/VulkanRenderer.cpp
     src/renderer/backend/vulkan/VulkanResources.cpp
     src/renderer/backend/vulkan/VulkanUIRenderer.cpp
+    src/renderer/backend/vulkan/VulkanUIRenderer.h
+    src/renderer/backend/vulkan/VulkanRendererInternal.h
     src/renderer/backend/vulkan/VmaImplementation.cpp)
 add_library(minecraftc_platform STATIC
     src/platform/native/NativePlatform.cpp
@@ -128,11 +130,13 @@ minecraftc_add_engine_library(minecraftc_animation_graph
 minecraftc_add_engine_library(minecraftc_gltf
     src/model/GltfLoader.cpp)
 minecraftc_add_engine_library(minecraftc_content_registry
-    src/plugins/ContentRegistry.cpp)
+    src/plugins/ContentRegistry.cpp
+    src/plugins/ContentMutation.h)
 minecraftc_add_engine_library(minecraftc_plugin_runtime
     src/plugins/RuntimeFault.cpp)
 minecraftc_add_engine_library(minecraftc_atlas_bindings
-    src/plugins/AtlasBindings.cpp)
+    src/plugins/AtlasBindings.cpp
+    src/plugins/AtlasPublication.h)
 target_link_libraries(minecraftc_content_registry PUBLIC minecraftc_sdk glm::glm)
 target_link_libraries(minecraftc_plugin_runtime PUBLIC minecraftc_sdk)
 target_link_libraries(minecraftc_log PRIVATE minecraftc_platform)
@@ -178,6 +182,7 @@ set(MINECRAFTC_SIMULATION_COMMON_SOURCES
     src/game/Weather.cpp
     src/game/WorldCatalog.cpp
     src/world/Block.cpp
+    src/world/BlockTextureDefinitions.h
     src/world/BlockEntityLogic.cpp
     src/world/CaveGenerator.cpp
     src/world/Chunk.cpp
@@ -286,11 +291,13 @@ set(MINECRAFTC_RENDER_DATA_SOURCES
     src/renderer/CameraEffects.cpp
     src/renderer/CloudRenderData.cpp
     src/renderer/Frustum.cpp
+    src/renderer/GameRenderer.h
     src/renderer/HeldItemMesh.cpp
     src/renderer/HeldItemRenderer.cpp
     src/renderer/HeldToolModel.cpp
     src/renderer/RenderDevice.cpp
-    src/renderer/TexturedCubeScene.cpp)
+    src/renderer/TexturedCubeScene.cpp
+    src/renderer/UIRenderBackend.h)
 minecraftc_add_engine_library(minecraftc_render_data ${MINECRAFTC_RENDER_DATA_SOURCES})
 target_link_libraries(minecraftc_render_data
     PUBLIC minecraftc_sdk glm::glm

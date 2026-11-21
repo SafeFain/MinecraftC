@@ -35,7 +35,10 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tools/check_module_boundaries.py
                 ${CMAKE_SOURCE_DIR}
-                "${CMAKE_BINARY_DIR}/minecraftc-modules.tsv")
+                "${CMAKE_BINARY_DIR}/minecraftc-modules.tsv"
+                "${CMAKE_BINARY_DIR}/minecraftc-module-headers.tsv")
+    minecraftc_add_test(NAME module_boundary_guard_mutations
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_module_boundaries.py)
     minecraftc_add_test(NAME numbered_prerelease_versions
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_project_version.py
                 --cmake ${CMAKE_COMMAND})

@@ -79,17 +79,30 @@ resources. Hiding the icon and switching languages provide negative controls.
 
 ### 3. Enforce targeted header boundaries
 
-Keep source ownership and layer checks in CTest. Extend the manifest and checker
-with header ownership and allowed consumers for the boundaries touched in each
-batch. Start with the UI backend and content mutation/publication headers.
-Re-use the include scanner to measure propagation and check cycles. Exercise
-the boundary checker with small fixtures that introduce a forbidden include,
-an upward link, and duplicate production ownership.
+Production targets list the owned headers in
+[MinecraftCTargets.cmake](../cmake/MinecraftCTargets.cmake).
+[MinecraftCBoundaries.cmake](../cmake/MinecraftCBoundaries.cmake) generates the
+module and header manifests. The header manifest records each protected
+header's owner and allowed direct includers. Add optional test consumers by
+path, since the checker scans both production and test source trees in every
+desktop test configuration.
 
-Complete this batch when legal contract consumers pass, each injected violation
-fails, and both existing API-boundary and module-boundary checks pass. Apply
-ownership rules as headers acquire clear owners and account for platform and
-test-only variants in their respective build configurations.
+| Header | Owner | Direct production includers | Production translation units reached |
+| --- | --- | ---: | ---: |
+| `renderer/UIRenderBackend.h` | `minecraftc_render_data` | 2 | 16 |
+| `renderer/backend/vulkan/VulkanUIRenderer.h` | `minecraftc_render_vulkan` | 2 | 2 |
+| `plugins/ContentMutation.h` | `minecraftc_content_registry` | 9 | 8 |
+| `plugins/AtlasPublication.h` | `minecraftc_atlas_bindings` | 3 | 3 |
+
+These counts held across the boundary change. The include graph remains
+acyclic. Use `tools/check_module_dependencies.py --report --check-cycles` to
+review propagation before extending the manifest.
+
+`module_dependency_boundaries` checks the generated manifests against the
+source tree. `module_boundary_guard_mutations` verifies legal consumers and
+rejects forbidden includes, upward links, duplicate ownership, and a transitive
+UI link to Vulkan. `api_dependency_boundaries` continues to enforce the
+platform and graphics API rules.
 
 ### 4. Narrow simulation and session interfaces
 

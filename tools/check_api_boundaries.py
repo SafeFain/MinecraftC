@@ -51,7 +51,7 @@ HEADERS = {
 }
 
 
-def dependencies(source: str):
+def scan_cpp(source: str):
     splice_offsets = []
     removed = 0
     for splice in re.finditer(r"\\\r?\n", source):
@@ -70,6 +70,7 @@ def dependencies(source: str):
 
     code = LEXEMES.sub(mask, source)
     macros = {}
+    includes = []
     for directive in re.finditer(r"^[ \t]*#[ \t]*(define|include)\b[^\n]*", code, re.M):
         characters = list(directive.group())
         for offset, literal in literals.items():
@@ -89,9 +90,16 @@ def dependencies(source: str):
             argument = macros[argument]
         header = re.match(r'[<"]([^>"\n]+)[>"]', argument)
         if header:
-            for rule, pattern in HEADERS.items():
-                if pattern.match(header[1]):
-                    yield rule, source_line(directive.start()), header[1]
+            includes.append((source_line(directive.start()), header[1]))
+    return code, source_line, includes
+
+
+def dependencies(source: str):
+    code, source_line, includes = scan_cpp(source)
+    for line, header in includes:
+        for rule, pattern in HEADERS.items():
+            if pattern.match(header):
+                yield rule, line, header
     for rule, pattern in RULES.items():
         for match in pattern.finditer(code):
             yield rule, source_line(match.start()), match.group()

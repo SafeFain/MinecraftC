@@ -20,8 +20,11 @@ for platform prerequisites; run commands from the repository root.
 Register each new production implementation in its owning target in
 `cmake/MinecraftCTargets.cmake` or the application entry list in `CMakeLists.txt`.
 Test targets are declared in `cmake/MinecraftCTests.cmake`. Reconfigure after
-changing those lists. The `module_dependency_boundaries` test checks source
-ownership, target dependency direction, and private header use. See the
+changing those lists. To protect a header, list it in its owning target and
+declare its permitted includers in
+[MinecraftCBoundaries.cmake](../cmake/MinecraftCBoundaries.cmake). The
+`module_dependency_boundaries` test checks source and header ownership, target
+dependency direction, and header consumers. See the
 [modularization roadmap](modularization.md).
 
 Keep SDL, native OS and Vulkan APIs inside their existing adapters. Public

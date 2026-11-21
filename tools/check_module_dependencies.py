@@ -8,13 +8,14 @@ SDK, vendored and generated headers stay out of the graph.
 
 It is read-only. --report prints the measurements recorded by the decoupling
 task; --check-cycles fails when the file-level include graph contains a cycle.
-Contract-specific include rules are introduced by a later build-boundary task.
+The module boundary checker uses the same project include resolution.
 """
 
 from __future__ import annotations
 
 import argparse
 import pathlib
+import posixpath
 import re
 import sys
 from collections import defaultdict
@@ -53,14 +54,14 @@ def source_files(root: pathlib.Path) -> list[str]:
 
 
 def resolve_include(including: str, name: str, known: set[str]) -> str | None:
-    parent = pathlib.PurePosixPath(including).parent
+    parent = posixpath.dirname(including)
     candidates = [
-        (parent / name).as_posix(),
+        posixpath.join(parent, name),
         f"src/{name}",
         name,
     ]
     for candidate in candidates:
-        normalized = pathlib.PurePosixPath(candidate).as_posix()
+        normalized = posixpath.normpath(candidate)
         if normalized in known:
             return normalized
     return None
