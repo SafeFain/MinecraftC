@@ -4,6 +4,19 @@ endif()
 if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     include(tools/test_policy.cmake)
+
+    # Historical Heaven queries and structure fixtures require a distinct world
+    # implementation. Link this variant only where tests exercise those queries.
+    minecraftc_add_engine_library(minecraftc_simulation_test
+        ${MINECRAFTC_SIMULATION_WORLD_SOURCES}
+        tests/HeavenGeneratorQueryAdapters.cpp
+        tests/HeavenWorldQueryAdapters.cpp)
+    minecraftc_link_simulation_dependencies(minecraftc_simulation_test)
+    target_link_libraries(minecraftc_simulation_test PUBLIC minecraftc_simulation_common PRIVATE minecraftc_heaven)
+    target_compile_definitions(minecraftc_simulation_test PUBLIC MINECRAFTC_HEAVEN_TEST_QUERIES=1)
+    minecraftc_add_scene(minecraftc_scene_test minecraftc_simulation_test)
+    minecraftc_add_session(minecraftc_app_session_test minecraftc_scene_test)
+
     minecraftc_add_test(NAME ci_compiler_cache_fallback
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_ci_sccache.py)
     minecraftc_add_test(NAME ci_ios_configuration_and_smoke_guards
@@ -133,18 +146,12 @@ if(BUILD_TESTING)
     endif()
     minecraftc_add_test(NAME platform_paths_and_atomic_replace COMMAND platform_tests)
 
-    add_executable(asset_definition_tests
-        tests/AssetDefinitionTests.cpp
-        src/world/Chunk.cpp
-        src/world/Block.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/renderer/BlockAtlasData.cpp
-        src/renderer/RenderDevice.cpp)
+    add_executable(asset_definition_tests tests/AssetDefinitionTests.cpp)
     target_link_libraries(asset_definition_tests PRIVATE
-        minecraftc_image_decoder)
-    target_link_libraries(asset_definition_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_image_decoder minecraftc_assets minecraftc_json minecraftc_sdk glm::glm
+        minecraftc_simulation_common minecraftc_render_data minecraftc_heaven
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(asset_definition_tests PRIVATE src external/stb)
-    target_link_libraries(asset_definition_tests PRIVATE glm::glm)
     target_compile_definitions(asset_definition_tests PRIVATE
         MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -153,14 +160,13 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME asset_json_block_item_and_atlas_mapping
              COMMAND asset_definition_tests)
 
+    # Compile the cave generator with the test-only decorator setting.
     add_executable(cavegen_tests
         tests/CaveGeneratorTests.cpp
-        src/world/CaveGenerator.cpp
-        src/world/Noise.cpp
-    )
-    target_link_libraries(cavegen_tests PRIVATE minecraftc_sdk)
+        src/world/CaveGenerator.cpp)
+    target_link_libraries(cavegen_tests PRIVATE
+        minecraftc_sdk glm::glm minecraftc_terrain)
     target_include_directories(cavegen_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(cavegen_tests PRIVATE glm::glm)
     target_compile_definitions(cavegen_tests PRIVATE
         MINECRAFTC_CAVEGEN_NO_DECORATOR=1)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -168,25 +174,13 @@ if(BUILD_TESTING)
     endif()
     minecraftc_add_test(NAME cavegen_determinism_and_boundaries COMMAND cavegen_tests)
 
-    add_executable(worldgen_tests
-        tests/WorldGenerationTests.cpp src/game/NetherProgression.cpp src/game/Item.cpp
-        src/world/HeightPipeline.cpp
-        src/world/TreeGenerator.cpp
-        src/world/StructureGenerator.cpp
-        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
-        src/world/RegionGenerator.cpp
-        src/world/CaveGenerator.cpp
-        src/world/OreGenerator.cpp
-        src/world/Chunk.cpp
-        src/world/Noise.cpp
-        src/world/BiomeMap.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(worldgen_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(worldgen_tests tests/WorldGenerationTests.cpp)
+    target_link_libraries(worldgen_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_simulation_test
+        minecraftc_heaven minecraftc_content_registry minecraftc_atlas_bindings)
     target_sources(worldgen_tests PRIVATE tests/reference/heaven_v9/FrozenHeavenV9.cpp)
     target_include_directories(worldgen_tests PRIVATE
         src external/FastNoiseLite)
-    target_link_libraries(worldgen_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(worldgen_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -200,29 +194,13 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME heaven_p1_independent_migration_reference COMMAND worldgen_tests --heaven-migration-tests)
     minecraftc_add_test(NAME village_layout_counts_access_and_reservations COMMAND worldgen_tests --village-layout-tests)
 
-    add_executable(lod_terrain_tests
-        tests/LodTerrainTests.cpp
-        src/game/InventoryModel.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/game/SaveStore.cpp
-        src/world/BiomeMap.cpp
-        src/world/Block.cpp
-        src/world/CaveGenerator.cpp
-        src/world/Chunk.cpp
-        src/world/HeightPipeline.cpp
-        src/world/LodTerrainSystem.cpp
-        src/world/Noise.cpp
-        src/world/OreGenerator.cpp
-        src/world/RegionGenerator.cpp
-        src/world/StructureGenerator.cpp
-        src/world/TreeGenerator.cpp
-        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp)
+    add_executable(lod_terrain_tests tests/LodTerrainTests.cpp)
     target_link_libraries(lod_terrain_tests PRIVATE
-        minecraftc_log minecraftc_threading)
-    target_link_libraries(lod_terrain_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_log minecraftc_threading minecraftc_assets minecraftc_json minecraftc_sdk
+        glm::glm minecraftc_platform minecraftc_simulation minecraftc_heaven
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(lod_terrain_tests PRIVATE
         src external/FastNoiseLite)
-    target_link_libraries(lod_terrain_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(lod_terrain_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -231,53 +209,31 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME lod_terrain_determinism_cache_and_mesh COMMAND lod_terrain_tests)
     minecraftc_add_test(NAME lod_replica_replacement_uploads COMMAND lod_terrain_tests --replica-replacement-tests)
 
-    add_executable(terrain_preview
-        tools/terrain_preview.cpp
-        src/world/Block.cpp
-        src/world/BiomeMap.cpp
-        src/world/HeightPipeline.cpp
-        src/world/Noise.cpp)
-    target_link_libraries(terrain_preview PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(terrain_preview tools/terrain_preview.cpp)
+    target_link_libraries(terrain_preview PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(terrain_preview PRIVATE src external/FastNoiseLite)
-    target_link_libraries(terrain_preview PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terrain_preview PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
-    add_executable(terrain_benchmark
-        tools/terrain_benchmark.cpp
-        src/world/HeightPipeline.cpp
-        src/world/TreeGenerator.cpp
-        src/world/StructureGenerator.cpp
-        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
-        src/world/RegionGenerator.cpp
-        src/world/CaveGenerator.cpp
-        src/world/OreGenerator.cpp
-        src/world/Chunk.cpp
-        src/world/Noise.cpp
-        src/world/BiomeMap.cpp
-        src/world/Block.cpp)
-    target_link_libraries(terrain_benchmark PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(terrain_benchmark tools/terrain_benchmark.cpp)
+    target_link_libraries(terrain_benchmark PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_simulation
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(terrain_benchmark PRIVATE
         src external/FastNoiseLite)
-    target_link_libraries(terrain_benchmark PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(terrain_benchmark PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
-    add_executable(rendering_logic_tests
-        tests/RenderingLogicTests.cpp src/game/NetherProgression.cpp src/game/Item.cpp
-        src/renderer/Camera.cpp
-        src/renderer/CameraEffects.cpp
-        src/renderer/CloudRenderData.cpp
-        src/renderer/HeldItemMesh.cpp
-        src/renderer/HeldToolModel.cpp
-        src/renderer/RenderDevice.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(rendering_logic_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(rendering_logic_tests tests/RenderingLogicTests.cpp)
+    target_link_libraries(rendering_logic_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_render_data minecraftc_heaven minecraftc_content_registry
+        minecraftc_atlas_bindings)
     target_include_directories(rendering_logic_tests PRIVATE src)
-    target_link_libraries(rendering_logic_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(rendering_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -292,29 +248,15 @@ if(BUILD_TESTING)
     endif()
     minecraftc_add_test(NAME modern_ui_geometry_and_layout COMMAND ui_style_tests)
 
-    add_executable(vulkan_ui_smoke EXCLUDE_FROM_ALL
-        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp src/ui/PluginMenu.cpp
-        tests/VulkanUiSmoke.cpp
-        src/network/Protocol.cpp src/network/Connection.cpp src/network/Session.cpp
-        src/renderer/HeldItemRenderer.cpp src/renderer/HeldItemMesh.cpp src/renderer/HeldToolModel.cpp
-        src/game/ArabicShaper.cpp src/game/ClientSettings.cpp
-        src/game/InventoryInteraction.cpp src/game/InventoryModel.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp src/game/Language.cpp src/game/Localization.cpp
-        src/game/SurvivalRules.cpp src/game/SurvivalStats.cpp
-        src/game/VillagerTrade.cpp src/game/SaveStore.cpp
-        src/model/ModelRenderer.cpp
-        src/renderer/BlockAtlasData.cpp src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp
-        src/ui/ContainerScreen.cpp src/ui/Hotbar.cpp src/ui/Inventory.cpp
-        src/ui/Menu.cpp src/ui/LanMenu.cpp
-        src/ui/SettingsMenu.cpp src/ui/StbTruetypeImpl.cpp
-        src/ui/SurvivalInventory.cpp src/ui/TouchControls.cpp src/ui/UIRenderer.cpp
-        src/ui/VillagerTradeScreen.cpp src/world/BiomeMap.cpp src/world/Block.cpp)
+    add_executable(vulkan_ui_smoke EXCLUDE_FROM_ALL tests/VulkanUiSmoke.cpp)
     target_link_libraries(vulkan_ui_smoke PRIVATE
-        minecraftc_log minecraftc_core minecraftc_image_decoder
-        minecraftc_model_animation minecraftc_animation_graph minecraftc_gltf)
-    target_link_libraries(vulkan_ui_smoke PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
-    target_sources(vulkan_ui_smoke PRIVATE src/entity/EntityModelRegistry.cpp)
+        minecraftc_log minecraftc_core minecraftc_image_decoder minecraftc_model_animation
+        minecraftc_animation_graph minecraftc_gltf minecraftc_assets minecraftc_json
+        minecraftc_sdk glm::glm ${MINECRAFTC_VULKAN_TARGET} minecraftc_render_vulkan
+        minecraftc_platform_sdl minecraftc_platform minecraftc_simulation
+        minecraftc_plugins minecraftc_network minecraftc_text minecraftc_render_data
+        minecraftc_ui minecraftc_content_registry minecraftc_atlas_bindings
+        minecraftc_plugin_runtime)
     target_include_directories(vulkan_ui_smoke PRIVATE src external external/stb external/nlohmann external/cgltf)
     target_include_directories(vulkan_ui_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_ui_smoke PRIVATE
@@ -323,75 +265,44 @@ if(BUILD_TESTING)
         MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
         VMA_VULKAN_VERSION=1000000
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
-    target_link_libraries(vulkan_ui_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
-        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_ui_smoke PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
-    add_executable(held_tool_vulkan_smoke EXCLUDE_FROM_ALL
-        tests/HeldToolVulkanSmoke.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/model/ModelRenderer.cpp
-        src/player/PlayerRenderer.cpp
-        src/renderer/BlockAtlasData.cpp src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp src/renderer/RenderDevice.cpp
-        src/renderer/HeldItemMesh.cpp src/renderer/HeldToolModel.cpp
-        src/renderer/HeldItemRenderer.cpp src/world/Block.cpp)
+    add_executable(held_tool_vulkan_smoke EXCLUDE_FROM_ALL tests/HeldToolVulkanSmoke.cpp)
     target_link_libraries(held_tool_vulkan_smoke PRIVATE
-        minecraftc_log minecraftc_core minecraftc_image_decoder
-        minecraftc_model_animation minecraftc_animation_graph minecraftc_gltf)
-    target_link_libraries(held_tool_vulkan_smoke PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_log minecraftc_core minecraftc_image_decoder minecraftc_model_animation
+        minecraftc_animation_graph minecraftc_gltf minecraftc_assets minecraftc_json
+        minecraftc_sdk glm::glm minecraftc_render_vulkan minecraftc_platform_sdl
+        minecraftc_platform minecraftc_simulation_common minecraftc_render_data minecraftc_heaven
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(held_tool_vulkan_smoke PRIVATE src external external/stb external/cgltf)
-    target_link_libraries(held_tool_vulkan_smoke PRIVATE glm::glm
-        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(held_tool_vulkan_smoke PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 
     # Explicit display-dependent validation; ordinary builds/CTest stay headless.
-    add_executable(vulkan_decoration_smoke EXCLUDE_FROM_ALL
-        tests/VulkanDecorationSmoke.cpp src/game/NetherProgression.cpp src/game/Item.cpp
-        src/model/ModelRenderer.cpp
-        src/renderer/BlockAtlasData.cpp
-        src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp
-        src/renderer/RenderDevice.cpp
-        src/world/Block.cpp
-        src/world/Chunk.cpp
-        src/world/HeightPipeline.cpp
-        src/world/TreeGenerator.cpp
-        src/world/StructureGenerator.cpp
-        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
-        src/world/RegionGenerator.cpp
-        src/world/CaveGenerator.cpp
-        src/world/OreGenerator.cpp
-        src/world/Noise.cpp
-        src/world/BiomeMap.cpp)
+    add_executable(vulkan_decoration_smoke EXCLUDE_FROM_ALL tests/VulkanDecorationSmoke.cpp)
     target_link_libraries(vulkan_decoration_smoke PRIVATE
-        minecraftc_log minecraftc_image_decoder minecraftc_model_animation)
-    target_link_libraries(vulkan_decoration_smoke PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_log minecraftc_image_decoder minecraftc_model_animation minecraftc_assets
+        minecraftc_json minecraftc_sdk glm::glm minecraftc_render_vulkan minecraftc_platform_sdl
+        minecraftc_platform minecraftc_simulation_test minecraftc_render_data minecraftc_heaven
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(vulkan_decoration_smoke PRIVATE src external/stb external/FastNoiseLite)
-    target_link_libraries(vulkan_decoration_smoke PRIVATE
-        glm::glm minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_decoration_smoke PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
         target_compile_options(vulkan_decoration_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
-    # Share the decoration scene's world/mesh dependencies without adding
-    # display-dependent runs to ordinary CTest.
-    get_target_property(MINECRAFTC_STRUCTURE_SMOKE_SOURCES vulkan_decoration_smoke SOURCES)
-    list(REMOVE_ITEM MINECRAFTC_STRUCTURE_SMOKE_SOURCES tests/VulkanDecorationSmoke.cpp)
-    add_executable(vulkan_structure_smoke EXCLUDE_FROM_ALL
-        tests/VulkanStructureSmoke.cpp ${MINECRAFTC_STRUCTURE_SMOKE_SOURCES}
-        src/world/LodTerrainSystem.cpp src/game/SaveStore.cpp
-        src/entity/EntityModelRegistry.cpp)
+    # Display-dependent structure scene for manual use.
+    add_executable(vulkan_structure_smoke EXCLUDE_FROM_ALL tests/VulkanStructureSmoke.cpp)
     target_link_libraries(vulkan_structure_smoke PRIVATE
         minecraftc_threading minecraftc_model_animation minecraftc_animation_graph
-        minecraftc_gltf)
-    target_link_libraries(vulkan_structure_smoke PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_gltf minecraftc_assets minecraftc_json minecraftc_sdk glm::glm
+        ${MINECRAFTC_VULKAN_TARGET} minecraftc_render_vulkan minecraftc_platform_sdl
+        minecraftc_platform minecraftc_simulation minecraftc_render_data
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(vulkan_structure_smoke PRIVATE src external external/stb external/FastNoiseLite external/cgltf)
     target_include_directories(vulkan_structure_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_structure_smoke PRIVATE
@@ -399,48 +310,32 @@ if(BUILD_TESTING)
         MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
         MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
         VMA_VULKAN_VERSION=1000000)
-    target_link_libraries(vulkan_structure_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
-        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_structure_smoke PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
         target_compile_options(vulkan_structure_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
-    add_executable(vulkan_cloud_lod_smoke EXCLUDE_FROM_ALL
-        tests/VulkanCloudLodSmoke.cpp
-        src/model/ModelRenderer.cpp
-        src/renderer/BlockAtlasData.cpp
-        src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp
-        src/renderer/RenderDevice.cpp
-        src/world/Block.cpp
-        src/world/Chunk.cpp)
+    add_executable(vulkan_cloud_lod_smoke EXCLUDE_FROM_ALL tests/VulkanCloudLodSmoke.cpp)
     target_link_libraries(vulkan_cloud_lod_smoke PRIVATE
-        minecraftc_log minecraftc_image_decoder minecraftc_model_animation)
-    target_link_libraries(vulkan_cloud_lod_smoke PRIVATE minecraftc_assets minecraftc_sdk)
+        minecraftc_log minecraftc_image_decoder minecraftc_model_animation minecraftc_assets
+        minecraftc_sdk glm::glm minecraftc_render_vulkan minecraftc_platform_sdl
+        minecraftc_platform minecraftc_simulation_common minecraftc_render_data
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(vulkan_cloud_lod_smoke PRIVATE src external/stb)
-    target_link_libraries(vulkan_cloud_lod_smoke PRIVATE
-        glm::glm minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_cloud_lod_smoke PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
         target_compile_options(vulkan_cloud_lod_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
-    add_executable(vulkan_model_fog_smoke EXCLUDE_FROM_ALL
-        tests/VulkanModelFogSmoke.cpp
-        src/game/Item.cpp
-        src/model/ModelRenderer.cpp
-        src/renderer/BlockAtlasData.cpp
-        src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp
-        src/renderer/RenderDevice.cpp
-        src/world/Block.cpp
-        src/world/Chunk.cpp)
+    add_executable(vulkan_model_fog_smoke EXCLUDE_FROM_ALL tests/VulkanModelFogSmoke.cpp)
     target_link_libraries(vulkan_model_fog_smoke PRIVATE
-        minecraftc_log minecraftc_image_decoder minecraftc_model_animation)
-    target_link_libraries(vulkan_model_fog_smoke PRIVATE minecraftc_assets minecraftc_sdk)
+        minecraftc_log minecraftc_image_decoder minecraftc_model_animation minecraftc_assets
+        minecraftc_sdk glm::glm ${MINECRAFTC_VULKAN_TARGET} minecraftc_render_vulkan
+        minecraftc_platform_sdl minecraftc_platform minecraftc_simulation_common
+        minecraftc_render_data minecraftc_heaven minecraftc_content_registry
+        minecraftc_atlas_bindings)
     target_include_directories(vulkan_model_fog_smoke PRIVATE src external/stb)
     target_include_directories(vulkan_model_fog_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_model_fog_smoke PRIVATE
@@ -448,8 +343,6 @@ if(BUILD_TESTING)
         MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
         MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
         VMA_VULKAN_VERSION=1000000)
-    target_link_libraries(vulkan_model_fog_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
-        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_model_fog_smoke PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -459,10 +352,12 @@ if(BUILD_TESTING)
     # Display-dependent integration scene: run the host and client separately.
     add_executable(vulkan_lan_smoke EXCLUDE_FROM_ALL tests/VulkanLanSmoke.cpp)
     target_link_libraries(vulkan_lan_smoke PRIVATE
-        minecraftc_app_session_test minecraftc_log minecraftc_core minecraftc_threading
+        minecraftc_app_session minecraftc_log minecraftc_core minecraftc_threading
         minecraftc_image_decoder minecraftc_model_animation minecraftc_animation_graph
-        minecraftc_gltf)
-    target_link_libraries(vulkan_lan_smoke PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_gltf minecraftc_assets minecraftc_json minecraftc_sdk glm::glm
+        ${MINECRAFTC_VULKAN_TARGET} minecraftc_render_vulkan minecraftc_platform_sdl
+        minecraftc_platform ${CMAKE_DL_LIBS} minecraftc_content_registry
+        minecraftc_atlas_bindings minecraftc_plugin_runtime)
     target_include_directories(vulkan_lan_smoke PRIVATE
         src external external/stb external/cgltf external/FastNoiseLite)
     target_include_directories(vulkan_lan_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
@@ -472,27 +367,19 @@ if(BUILD_TESTING)
         MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
         MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
         VMA_VULKAN_VERSION=1000000)
-    target_link_libraries(vulkan_lan_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
-        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform ${CMAKE_DL_LIBS})
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_lan_smoke PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
         target_compile_options(vulkan_lan_smoke PRIVATE /W4 /permissive- /utf-8)
     endif()
 
-    add_executable(vulkan_gi_smoke EXCLUDE_FROM_ALL
-        tests/VulkanGiSmoke.cpp
-        src/model/ModelRenderer.cpp
-        src/renderer/BlockAtlasData.cpp
-        src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp
-        src/renderer/RenderDevice.cpp
-        src/world/Block.cpp
-        src/world/Chunk.cpp)
+    add_executable(vulkan_gi_smoke EXCLUDE_FROM_ALL tests/VulkanGiSmoke.cpp)
     target_link_libraries(vulkan_gi_smoke PRIVATE
-        minecraftc_log minecraftc_image_decoder minecraftc_model_animation)
-    target_link_libraries(vulkan_gi_smoke PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
-    target_sources(vulkan_gi_smoke PRIVATE src/game/NetherProgression.cpp src/game/Item.cpp)
+        minecraftc_log minecraftc_image_decoder minecraftc_model_animation minecraftc_assets
+        minecraftc_json minecraftc_sdk glm::glm ${MINECRAFTC_VULKAN_TARGET}
+        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform
+        minecraftc_simulation_common minecraftc_render_data minecraftc_heaven
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(vulkan_gi_smoke PRIVATE src external/stb)
     target_include_directories(vulkan_gi_smoke SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_gi_smoke PRIVATE
@@ -500,8 +387,6 @@ if(BUILD_TESTING)
         MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
         MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
         VMA_VULKAN_VERSION=1000000)
-    target_link_libraries(vulkan_gi_smoke PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
-        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_gi_smoke PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -520,18 +405,12 @@ if(BUILD_TESTING)
         endforeach()
     endif()
 
-    add_executable(vulkan_gi_benchmark EXCLUDE_FROM_ALL
-        tests/VulkanGiBenchmark.cpp
-        src/model/ModelRenderer.cpp
-        src/renderer/BlockAtlasData.cpp
-        src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp
-        src/renderer/RenderDevice.cpp
-        src/world/Block.cpp
-        src/world/Chunk.cpp)
+    add_executable(vulkan_gi_benchmark EXCLUDE_FROM_ALL tests/VulkanGiBenchmark.cpp)
     target_link_libraries(vulkan_gi_benchmark PRIVATE
-        minecraftc_log minecraftc_image_decoder minecraftc_model_animation)
-    target_link_libraries(vulkan_gi_benchmark PRIVATE minecraftc_assets minecraftc_sdk)
+        minecraftc_log minecraftc_image_decoder minecraftc_model_animation minecraftc_assets
+        minecraftc_sdk glm::glm ${MINECRAFTC_VULKAN_TARGET} minecraftc_render_vulkan
+        minecraftc_platform_sdl minecraftc_platform minecraftc_simulation_common
+        minecraftc_render_data minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(vulkan_gi_benchmark PRIVATE src external/stb)
     target_include_directories(vulkan_gi_benchmark SYSTEM PRIVATE external/VulkanMemoryAllocator/include)
     target_compile_definitions(vulkan_gi_benchmark PRIVATE
@@ -539,81 +418,61 @@ if(BUILD_TESTING)
         MINECRAFTC_VERSION_MINOR=${PROJECT_VERSION_MINOR}
         MINECRAFTC_VERSION_PATCH=${PROJECT_VERSION_PATCH}
         VMA_VULKAN_VERSION=1000000)
-    target_link_libraries(vulkan_gi_benchmark PRIVATE glm::glm ${MINECRAFTC_VULKAN_TARGET}
-        minecraftc_render_vulkan minecraftc_platform_sdl minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(vulkan_gi_benchmark PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
         target_compile_options(vulkan_gi_benchmark PRIVATE /W4 /permissive- /utf-8)
     endif()
 
-    add_executable(voxel_gi_tests
-        tests/VoxelGiTests.cpp
-        src/world/Block.cpp
-        src/world/Chunk.cpp)
-    target_link_libraries(voxel_gi_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
-    target_sources(voxel_gi_tests PRIVATE src/game/NetherProgression.cpp src/game/Item.cpp)
+    add_executable(voxel_gi_tests tests/VoxelGiTests.cpp)
+    target_link_libraries(voxel_gi_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_heaven minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(voxel_gi_tests PRIVATE src)
-    target_link_libraries(voxel_gi_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(voxel_gi_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME voxel_gi_clipmap_and_temporal COMMAND voxel_gi_tests)
 
-    add_executable(player_physics_tests
-        tests/PlayerPhysicsTests.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(player_physics_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(player_physics_tests tests/PlayerPhysicsTests.cpp)
+    target_link_libraries(player_physics_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(player_physics_tests PRIVATE src)
-    target_link_libraries(player_physics_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(player_physics_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME player_ledge_and_auto_jump_logic COMMAND player_physics_tests)
 
-    add_executable(nether_progression_tests tests/NetherProgressionTests.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp src/game/InventoryModel.cpp
-        src/game/InventoryTransaction.cpp src/game/InventoryInteraction.cpp
-        src/game/SurvivalRules.cpp src/world/Block.cpp src/world/BlockEntityLogic.cpp
-        src/network/Protocol.cpp)
-    target_link_libraries(nether_progression_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(nether_progression_tests tests/NetherProgressionTests.cpp)
+    target_link_libraries(nether_progression_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common minecraftc_network
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(nether_progression_tests PRIVATE src sdk external)
-    target_link_libraries(nether_progression_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(nether_progression_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME nether_native_brewing_smithing_and_effects COMMAND nether_progression_tests)
 
-    add_executable(inventory_tests
-        tests/InventoryTests.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/game/InventoryModel.cpp
-        src/game/VillagerTrade.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(inventory_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(inventory_tests tests/InventoryTests.cpp)
+    target_link_libraries(inventory_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_heaven minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(inventory_tests PRIVATE src)
-    target_link_libraries(inventory_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(inventory_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME survival_item_registry_and_inventory COMMAND inventory_tests)
 
-    add_executable(plugin_tests tests/PluginTests.cpp
-        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
-        src/world/Block.cpp src/world/Chunk.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp src/game/SurvivalRules.cpp src/game/InventoryModel.cpp
-        src/game/SaveStore.cpp src/game/WorldCatalog.cpp
-        src/renderer/BlockAtlasData.cpp src/renderer/RenderDevice.cpp)
+    add_executable(plugin_tests tests/PluginTests.cpp)
     target_link_libraries(plugin_tests PRIVATE
-        minecraftc_log minecraftc_image_decoder minecraftc_model_animation
-        minecraftc_gltf)
-    target_link_libraries(plugin_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_log minecraftc_image_decoder minecraftc_model_animation minecraftc_gltf
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_platform
+        package_fixture minecraftc_simulation_common minecraftc_plugins minecraftc_render_data
+        minecraftc_content_registry minecraftc_atlas_bindings minecraftc_plugin_runtime)
     target_include_directories(plugin_tests PRIVATE src external external/stb external/cgltf)
     target_compile_definitions(plugin_tests PRIVATE MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
-    target_link_libraries(plugin_tests PRIVATE glm::glm minecraftc_platform)
     minecraftc_add_test(NAME natural_texture_plugin COMMAND plugin_tests --natural-textures)
     minecraftc_add_test(NAME natural_texture_manifest_and_coverage COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_SOURCE_DIR}/tests/test_natural_pixels.py NaturalPixelsTests.test_full_coverage_and_sequences)
@@ -621,7 +480,6 @@ if(BUILD_TESTING)
         ${CMAKE_SOURCE_DIR}/tests/test_natural_pixels.py NaturalPixelsTests.test_reproducible_and_publishable)
     minecraftc_add_content_package(package_fixture
         ROOT "${CMAKE_SOURCE_DIR}/examples/plugins/package_demo" MODE BUILTIN)
-    target_link_libraries(plugin_tests PRIVATE package_fixture)
     minecraftc_add_test(NAME content_package_authoring_loading_and_delivery
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_content_package.py
             --plugin-tests $<TARGET_FILE:plugin_tests>
@@ -663,42 +521,32 @@ if(BUILD_TESTING)
         minecraftc_add_test(NAME plugin_loader_content_events_and_persistence COMMAND plugin_tests)
     endif()
 
-    add_executable(save_store_tests
-        tests/SaveStoreTests.cpp
-        src/game/SaveStore.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/game/InventoryModel.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(save_store_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(save_store_tests tests/SaveStoreTests.cpp)
+    target_link_libraries(save_store_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_platform
+        minecraftc_simulation_common minecraftc_heaven minecraftc_content_registry
+        minecraftc_atlas_bindings)
     target_include_directories(save_store_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(save_store_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(save_store_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME survival_save_roundtrip_and_corruption COMMAND save_store_tests)
 
-    add_executable(fishing_tests tests/FishingTests.cpp src/game/FishingSystem.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp src/game/InventoryModel.cpp src/game/SurvivalRules.cpp src/world/Block.cpp)
-    target_link_libraries(fishing_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(fishing_tests tests/FishingTests.cpp)
+    target_link_libraries(fishing_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(fishing_tests PRIVATE src)
-    target_link_libraries(fishing_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(fishing_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME classic_fishing_simulation_and_rules COMMAND fishing_tests)
 
-    add_executable(survival_rules_tests
-        tests/SurvivalRulesTests.cpp
-        src/game/SurvivalBlockLogic.cpp
-        src/game/InventoryModel.cpp
-        src/game/SurvivalRules.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(survival_rules_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(survival_rules_tests tests/SurvivalRulesTests.cpp)
+    target_link_libraries(survival_rules_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_heaven minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(survival_rules_tests PRIVATE src)
-    target_link_libraries(survival_rules_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(survival_rules_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -707,101 +555,82 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_heaven_content_reference.py
                 $<TARGET_FILE:survival_rules_tests>)
 
-    add_executable(fluid_logic_tests
-        tests/FluidLogicTests.cpp
-        src/world/Block.cpp)
-    target_link_libraries(fluid_logic_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(fluid_logic_tests tests/FluidLogicTests.cpp)
+    target_link_libraries(fluid_logic_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(fluid_logic_tests PRIVATE src)
-    target_link_libraries(fluid_logic_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(fluid_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME java_26_2_fluid_logic COMMAND fluid_logic_tests)
 
-    add_executable(survival_stats_tests
-        tests/SurvivalStatsTests.cpp
-        src/game/SurvivalStats.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(survival_stats_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(survival_stats_tests tests/SurvivalStatsTests.cpp)
+    target_link_libraries(survival_stats_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(survival_stats_tests PRIVATE src)
-    target_link_libraries(survival_stats_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(survival_stats_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME survival_health_hunger_and_starvation COMMAND survival_stats_tests)
 
-    add_executable(combat_rules_tests
-        tests/CombatRulesTests.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(combat_rules_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(combat_rules_tests tests/CombatRulesTests.cpp)
+    target_link_libraries(combat_rules_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(combat_rules_tests PRIVATE src)
-    target_link_libraries(combat_rules_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(combat_rules_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME java_1_9_combat_rules COMMAND combat_rules_tests)
 
-    add_executable(world_catalog_tests
-        tests/WorldCatalogTests.cpp
-        src/game/WorldCatalog.cpp
-        src/game/SaveStore.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/game/InventoryModel.cpp
-        src/world/Block.cpp
-    )
-    target_link_libraries(world_catalog_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(world_catalog_tests tests/WorldCatalogTests.cpp)
+    target_link_libraries(world_catalog_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_platform
+        minecraftc_simulation_common minecraftc_heaven minecraftc_content_registry
+        minecraftc_atlas_bindings)
     target_include_directories(world_catalog_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(world_catalog_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(world_catalog_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME survival_multiple_world_catalog COMMAND world_catalog_tests)
     minecraftc_add_test(NAME world_recovery_transactions COMMAND world_catalog_tests --recovery)
 
-    add_executable(command_tests
-        tests/CommandTests.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/world/Block.cpp
-        src/world/BiomeMap.cpp)
+    add_executable(command_tests tests/CommandTests.cpp)
     target_link_libraries(command_tests PRIVATE
-        minecraftc_core)
-    target_link_libraries(command_tests PRIVATE minecraftc_assets minecraftc_sdk)
+        minecraftc_core minecraftc_assets minecraftc_sdk glm::glm minecraftc_platform
+        minecraftc_simulation_common minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(command_tests PRIVATE src)
-    target_link_libraries(command_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(command_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME cheat_gamemode_command_parsing COMMAND command_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/data/java-1.21.11-gamerules.tsv)
 
-    add_executable(weather_logic_tests
-        tests/WeatherTests.cpp
-        src/game/Weather.cpp
-        src/world/BiomeMap.cpp)
+    add_executable(weather_logic_tests tests/WeatherTests.cpp)
     target_include_directories(weather_logic_tests PRIVATE src)
-    target_link_libraries(weather_logic_tests PRIVATE glm::glm)
+    target_link_libraries(weather_logic_tests PRIVATE
+        glm::glm minecraftc_simulation_common)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(weather_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME weather_cycle_precipitation_and_commands COMMAND weather_logic_tests)
 
-    add_executable(ground_navigation_tests tests/GroundNavigationTests.cpp
-        src/entity/GroundNavigation.cpp src/world/Block.cpp src/world/Chunk.cpp)
-    target_link_libraries(ground_navigation_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(ground_navigation_tests tests/GroundNavigationTests.cpp)
+    target_link_libraries(ground_navigation_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(ground_navigation_tests PRIVATE src)
-    target_link_libraries(ground_navigation_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(ground_navigation_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME entity_ground_navigation COMMAND ground_navigation_tests)
 
-    add_executable(entity_logic_tests tests/EntityLogicTests.cpp src/world/Block.cpp)
-    target_link_libraries(entity_logic_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(entity_logic_tests tests/EntityLogicTests.cpp)
+    target_link_libraries(entity_logic_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(entity_logic_tests PRIVATE src)
-    target_link_libraries(entity_logic_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(entity_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -823,19 +652,14 @@ if(BUILD_TESTING)
     endif()
     minecraftc_add_test(NAME world_chunk_override_index_decode COMMAND chunk_index_tests)
 
-    add_executable(entity_model_registry_tests
-        tests/EntityModelRegistryTests.cpp
-        src/entity/EntityModelRegistry.cpp
-
-        src/model/ModelRenderer.cpp)
+    add_executable(entity_model_registry_tests tests/EntityModelRegistryTests.cpp)
     target_link_libraries(entity_model_registry_tests PRIVATE
         minecraftc_log minecraftc_image_decoder minecraftc_model_animation
-        minecraftc_animation_graph minecraftc_gltf)
-    target_link_libraries(entity_model_registry_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_animation_graph minecraftc_gltf minecraftc_assets minecraftc_json
+        minecraftc_sdk glm::glm minecraftc_platform minecraftc_render_data
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(entity_model_registry_tests PRIVATE
         src external external/cgltf external/stb)
-    target_link_libraries(entity_model_registry_tests PRIVATE
-        glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(entity_model_registry_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -865,33 +689,23 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME thread_pool_priority_idle_and_shutdown COMMAND thread_pool_tests)
     set_tests_properties(thread_pool_priority_idle_and_shutdown PROPERTIES TIMEOUT 15)
 
-    add_executable(lighting_logic_tests tests/LightingLogicTests.cpp src/world/Block.cpp
-        src/world/Chunk.cpp src/world/ChunkStore.cpp src/world/WorldLighting.cpp)
-    target_link_libraries(lighting_logic_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(lighting_logic_tests tests/LightingLogicTests.cpp)
+    target_link_libraries(lighting_logic_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(lighting_logic_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(lighting_logic_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(lighting_logic_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     minecraftc_add_test(NAME rendering_cross_chunk_block_light COMMAND lighting_logic_tests)
 
-    add_executable(client_input_tests
-        tests/ClientInputTests.cpp
-        src/platform/sdl/SdlAudioSystem.cpp
-        src/platform/sdl/SdlGamepadManager.cpp
-
-        src/ui/TouchControls.cpp
-        src/game/ClientSettings.cpp
-        src/game/Language.cpp
-        src/game/InventoryInteraction.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/world/Block.cpp)
+    add_executable(client_input_tests tests/ClientInputTests.cpp)
     target_link_libraries(client_input_tests PRIVATE
-        minecraftc_log minecraftc_core)
-    target_link_libraries(client_input_tests PRIVATE minecraftc_assets minecraftc_sdk)
+        minecraftc_log minecraftc_core minecraftc_assets minecraftc_sdk glm::glm
+        ${MINECRAFTC_SDL_TARGET} minecraftc_platform minecraftc_simulation_common minecraftc_text
+        minecraftc_platform_sdl minecraftc_ui minecraftc_content_registry
+        minecraftc_atlas_bindings)
     target_include_directories(client_input_tests PRIVATE src)
-    target_link_libraries(client_input_tests PRIVATE
-        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(client_input_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -900,22 +714,13 @@ if(BUILD_TESTING)
     set_tests_properties(client_settings_bindings_and_inventory_gestures PROPERTIES
         ENVIRONMENT "SDL_AUDIODRIVER=dummy")
 
-    add_executable(input_routing_tests
-        tests/InputRoutingTests.cpp
-        src/app/ApplicationInputController.cpp
-
-        src/game/ClientSettings.cpp
-        src/game/Language.cpp
-        src/platform/sdl/SdlGamepadManager.cpp
-        src/platform/sdl/SdlWindow.cpp
-        src/ui/TouchControls.cpp)
+    add_executable(input_routing_tests tests/InputRoutingTests.cpp)
     target_link_libraries(input_routing_tests PRIVATE
-        minecraftc_log minecraftc_core)
+        minecraftc_log minecraftc_core glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform
+        minecraftc_text minecraftc_platform_sdl minecraftc_ui)
     target_include_directories(input_routing_tests PRIVATE src)
     target_compile_definitions(input_routing_tests PRIVATE
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
-    target_link_libraries(input_routing_tests PRIVATE
-        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(input_routing_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -923,96 +728,18 @@ if(BUILD_TESTING)
     endif()
     minecraftc_add_test(NAME application_input_routing COMMAND input_routing_tests)
 
-    add_executable(session_flow_tests
-        src/plugins/PluginManager.cpp src/plugins/PluginExtensions.cpp src/plugins/PluginCapabilities.cpp src/plugins/PluginCapabilityData.cpp src/plugins/PluginRenderData.cpp src/plugins/BuiltinPlugins.cpp
-        tests/SessionFlowTests.cpp
-        src/app/GameSession.cpp src/app/GameSessionNether.cpp
-        src/app/GameSessionLan.cpp
-        src/app/GameSessionLanLod.cpp
-        src/app/GameSessionLanEvents.cpp
-        src/app/GameSessionClient.cpp
-        src/app/GameSessionInventory.cpp
-        src/app/GameSessionLanSleep.cpp
-        src/app/DimensionSimulation.cpp
-        src/network/Protocol.cpp
-        src/network/Connection.cpp
-        src/network/Session.cpp
-        src/network/PlayerProfile.cpp
-        src/network/GameplayProtocol.cpp
-        src/network/ChunkProtocol.cpp
-        src/network/StateProtocol.cpp
-        src/network/EntityProtocol.cpp
-        src/game/InventoryTransaction.cpp
-        src/game/FishingSystem.cpp
-
-        src/entity/EntityManager.cpp
-        src/entity/EntityPresentation.cpp
-        src/entity/EntityReplication.cpp
-        src/entity/EntityExtensions.cpp src/entity/EntityBehavior.cpp
-        src/entity/EntityNavigation.cpp
-        src/entity/EntityVillageAi.cpp
-        src/entity/GroundNavigation.cpp
-        src/entity/EntityModelRegistry.cpp
-        src/entity/EntityPresenter.cpp
-        src/game/InventoryInteraction.cpp
-        src/game/InventoryModel.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/game/SaveStore.cpp
-        src/game/SurvivalBlockLogic.cpp
-        src/game/SurvivalRules.cpp
-        src/game/SurvivalSession.cpp
-        src/game/SurvivalStats.cpp
-        src/game/VillagerTrade.cpp
-        src/game/Weather.cpp
-        src/game/WorldCatalog.cpp
-
-
-        src/model/ModelRenderer.cpp
-        src/player/Player.cpp
-        src/player/PlayerVisual.cpp
-        src/platform/sdl/SdlGamepadManager.cpp
-        src/platform/sdl/SdlWindow.cpp
-        src/renderer/Camera.cpp
-        src/renderer/CameraEffects.cpp
-        src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp
-        src/renderer/ParticleSystem.cpp
-        src/renderer/RenderDevice.cpp
-
-        src/world/BiomeMap.cpp
-        src/world/Block.cpp
-        src/world/BlockEntityLogic.cpp
-        src/world/CaveGenerator.cpp
-        src/world/Chunk.cpp
-        src/world/ChunkMeshPipeline.cpp
-        src/world/LodTerrainSystem.cpp
-        src/world/ChunkStore.cpp
-        src/world/ChunkMesh.cpp
-        src/world/ChunkStreamer.cpp
-        src/world/FluidScheduler.cpp
-        src/world/WorldPersistence.cpp
-        src/world/HeightPipeline.cpp
-        src/world/Noise.cpp
-        src/world/OreGenerator.cpp
-        src/world/RegionGenerator.cpp
-        src/world/TreeGenerator.cpp
-        src/world/StructureGenerator.cpp
-        src/world/NetherPortalWorld.cpp src/world/World.cpp src/world/RedstoneWorld.cpp
-        src/world/WorldReplication.cpp
-        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
-        src/world/WorldLighting.cpp
-        src/world/WorldSimulation.cpp)
+    add_executable(session_flow_tests tests/SessionFlowTests.cpp)
     target_link_libraries(session_flow_tests PRIVATE
-        minecraftc_log minecraftc_core minecraftc_threading
-        minecraftc_image_decoder minecraftc_model_animation minecraftc_animation_graph
-        minecraftc_gltf)
-    target_link_libraries(session_flow_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_log minecraftc_core minecraftc_threading minecraftc_image_decoder
+        minecraftc_model_animation minecraftc_animation_graph minecraftc_gltf minecraftc_assets
+        minecraftc_json minecraftc_sdk glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform
+        minecraftc_app_session_test minecraftc_plugins minecraftc_network minecraftc_render_data
+        minecraftc_platform_sdl minecraftc_heaven minecraftc_content_registry
+        minecraftc_atlas_bindings minecraftc_plugin_runtime)
     target_include_directories(session_flow_tests PRIVATE
         src external external/FastNoiseLite external/cgltf external/stb)
     target_compile_definitions(session_flow_tests PRIVATE
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
-    target_link_libraries(session_flow_tests PRIVATE
-        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(session_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1023,9 +750,9 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME lan_game_replica COMMAND session_flow_tests --lan-replica-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(lan_game_replica PROPERTIES TIMEOUT 180 LABELS "slow;integration")
     add_executable(lod_subscription_tests tests/LodSubscriptionTests.cpp)
-    target_link_libraries(lod_subscription_tests PRIVATE minecraftc_sdk)
+    target_link_libraries(lod_subscription_tests PRIVATE
+        minecraftc_sdk glm::glm minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(lod_subscription_tests PRIVATE src)
-    target_link_libraries(lod_subscription_tests PRIVATE glm::glm)
     minecraftc_add_test(NAME lan_lod_subscription_replacement COMMAND lod_subscription_tests)
     set_tests_properties(lan_lod_subscription_replacement PROPERTIES TIMEOUT 15)
     minecraftc_add_test(NAME lan_gameplay_authority COMMAND session_flow_tests --lan-authority-tests)
@@ -1046,7 +773,6 @@ if(BUILD_TESTING)
     set_tests_properties(enchantment_integration PROPERTIES TIMEOUT 120)
     set_tests_properties(experience_integration PROPERTIES TIMEOUT 60)
     target_sources(session_flow_tests PRIVATE
-        src/renderer/BlockAtlasData.cpp
         tests/reference/heaven_v9/FrozenParticleSystem.cpp
         tests/reference/heaven_v9/FrozenHeavenV9.cpp)
     minecraftc_add_test(NAME heaven_p1_independent_particle_reference
@@ -1168,120 +894,18 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME chunk_io_queue_startup_drain_and_shutdown COMMAND chunk_io_queue_tests)
     set_tests_properties(chunk_io_queue_startup_drain_and_shutdown PROPERTIES TIMEOUT 30)
 
-    add_executable(application_flow_tests
-        tests/ApplicationFlowTests.cpp
-        src/app/ApplicationInputController.cpp
-        src/app/ApplicationInputRouter.cpp
-        src/app/GameFlowController.cpp
-        src/app/GameScenePresenter.cpp
-        src/app/GameSession.cpp src/app/GameSessionNether.cpp
-        src/app/GameSessionLan.cpp
-        src/app/GameSessionLanLod.cpp
-        src/app/GameSessionLanEvents.cpp
-        src/app/GameSessionClient.cpp
-        src/app/GameSessionInventory.cpp
-        src/app/GameSessionLanSleep.cpp
-        src/app/DimensionSimulation.cpp
-        src/network/Protocol.cpp
-        src/network/Connection.cpp
-        src/network/Session.cpp
-        src/network/PlayerProfile.cpp
-        src/network/GameplayProtocol.cpp
-        src/network/ChunkProtocol.cpp
-        src/network/StateProtocol.cpp
-        src/network/EntityProtocol.cpp
-        src/game/InventoryTransaction.cpp
-        src/game/FishingSystem.cpp
-        src/app/GameUiController.cpp
-
-
-        src/entity/EntityManager.cpp
-        src/entity/EntityPresentation.cpp
-        src/entity/EntityReplication.cpp
-        src/entity/EntityExtensions.cpp src/entity/EntityBehavior.cpp
-        src/entity/EntityNavigation.cpp
-        src/entity/EntityVillageAi.cpp
-        src/entity/GroundNavigation.cpp
-        src/entity/EntityModelRegistry.cpp
-        src/entity/EntityPresenter.cpp
-        src/game/ClientSettings.cpp
-        src/game/InventoryInteraction.cpp
-        src/game/InventoryModel.cpp
-        src/game/ArabicShaper.cpp
-        src/game/Language.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/game/SaveStore.cpp
-        src/game/SurvivalBlockLogic.cpp
-        src/game/SurvivalRules.cpp
-        src/game/SurvivalSession.cpp
-        src/game/SurvivalStats.cpp
-        src/game/VillagerTrade.cpp
-        src/game/Weather.cpp
-        src/game/WorldCatalog.cpp
-
-
-        src/model/ModelRenderer.cpp
-        src/player/Player.cpp
-        src/player/PlayerRenderer.cpp
-        src/player/PlayerVisual.cpp
-        src/platform/sdl/SdlAudioSystem.cpp
-        src/platform/sdl/SdlClipboard.cpp
-        src/platform/sdl/SdlGamepadManager.cpp
-        src/platform/sdl/SdlWindow.cpp
-        src/renderer/Camera.cpp
-        src/renderer/CameraEffects.cpp
-        src/renderer/CloudRenderData.cpp
-        src/renderer/Frustum.cpp
-        src/renderer/HeldItemMesh.cpp
-        src/renderer/HeldToolModel.cpp
-        src/renderer/HeldItemRenderer.cpp
-        src/renderer/ParticleSystem.cpp
-        src/renderer/RenderDevice.cpp
-
-        src/ui/ContainerScreen.cpp
-        src/ui/Hotbar.cpp
-        src/ui/Inventory.cpp
-        src/ui/Menu.cpp
-        src/ui/LanMenu.cpp
-        src/ui/SettingsMenu.cpp
-        src/ui/SurvivalInventory.cpp
-        src/ui/TouchControls.cpp
-        src/ui/VillagerTradeScreen.cpp
-        src/world/BiomeMap.cpp
-        src/world/Block.cpp
-        src/world/BlockEntityLogic.cpp
-        src/world/CaveGenerator.cpp
-        src/world/Chunk.cpp
-        src/world/ChunkMeshPipeline.cpp
-        src/world/LodTerrainSystem.cpp
-        src/world/ChunkStore.cpp
-        src/world/ChunkMesh.cpp
-        src/world/ChunkStreamer.cpp
-        src/world/FluidScheduler.cpp
-        src/world/WorldPersistence.cpp
-        src/world/HeightPipeline.cpp
-        src/world/Noise.cpp
-        src/world/OreGenerator.cpp
-        src/world/RegionGenerator.cpp
-        src/world/TreeGenerator.cpp
-        src/world/StructureGenerator.cpp
-        src/world/NetherPortalWorld.cpp src/world/World.cpp src/world/RedstoneWorld.cpp
-        src/world/WorldReplication.cpp
-        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
-        src/world/WorldLighting.cpp
-        src/world/WorldSimulation.cpp)
+    add_executable(application_flow_tests tests/ApplicationFlowTests.cpp)
     target_link_libraries(application_flow_tests PRIVATE
-        minecraftc_log minecraftc_core minecraftc_threading
-        minecraftc_image_decoder minecraftc_model_animation minecraftc_animation_graph
-        minecraftc_gltf)
-    target_link_libraries(application_flow_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_log minecraftc_core minecraftc_threading minecraftc_image_decoder
+        minecraftc_model_animation minecraftc_animation_graph minecraftc_gltf minecraftc_assets
+        minecraftc_json minecraftc_sdk glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform
+        minecraftc_app_session minecraftc_network minecraftc_text minecraftc_render_data
+        minecraftc_platform_sdl minecraftc_ui minecraftc_heaven minecraftc_content_registry
+        minecraftc_atlas_bindings minecraftc_plugin_runtime)
     target_include_directories(application_flow_tests PRIVATE
         src external external/FastNoiseLite external/cgltf external/stb)
-    target_sources(application_flow_tests PRIVATE src/renderer/BlockAtlasData.cpp)
     target_compile_definitions(application_flow_tests PRIVATE
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
-    target_link_libraries(application_flow_tests PRIVATE
-        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(application_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1291,46 +915,15 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME dropped_item_rendering COMMAND application_flow_tests
         --dropped-item-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
 
-    add_executable(world_orchestration_tests
-        tests/WorldOrchestrationTests.cpp
-        src/game/InventoryModel.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/game/SaveStore.cpp
-        src/game/SurvivalBlockLogic.cpp
-        src/game/SurvivalRules.cpp
-        src/game/Weather.cpp
-        src/world/BiomeMap.cpp
-        src/world/Block.cpp
-        src/world/BlockEntityLogic.cpp
-        src/world/CaveGenerator.cpp
-        src/world/Chunk.cpp
-        src/world/ChunkMeshPipeline.cpp
-        src/world/LodTerrainSystem.cpp
-        src/world/ChunkStore.cpp
-        src/world/ChunkMesh.cpp
-        src/world/ChunkStreamer.cpp
-        src/world/FluidScheduler.cpp
-        src/world/WorldPersistence.cpp
-        src/world/HeightPipeline.cpp
-        src/world/Noise.cpp
-        src/world/OreGenerator.cpp
-        src/world/RegionGenerator.cpp
-        src/world/TreeGenerator.cpp
-        src/world/StructureGenerator.cpp
-        src/world/NetherPortalWorld.cpp src/world/World.cpp src/world/RedstoneWorld.cpp
-        src/world/WorldReplication.cpp
-        src/world/BuiltinPortalGeneration.cpp src/world/NetherStructures.cpp src/world/NetherGenerator.cpp src/world/NetherPortal.cpp src/world/PluginGeneration.cpp src/world/WorldGenerator.cpp
-        src/world/WorldLighting.cpp
-        src/world/WorldSimulation.cpp)
+    add_executable(world_orchestration_tests tests/WorldOrchestrationTests.cpp)
     target_link_libraries(world_orchestration_tests PRIVATE
-        minecraftc_log minecraftc_threading)
-    target_link_libraries(world_orchestration_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_log minecraftc_threading minecraftc_assets minecraftc_json minecraftc_sdk
+        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform minecraftc_simulation_test
+        minecraftc_heaven minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(world_orchestration_tests PRIVATE
         src external external/FastNoiseLite)
     target_compile_definitions(world_orchestration_tests PRIVATE
         MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
-    target_link_libraries(world_orchestration_tests PRIVATE
-        glm::glm ${MINECRAFTC_SDL_TARGET} minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(world_orchestration_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1347,24 +940,15 @@ if(BUILD_TESTING)
     # whole orchestration test well under the job timeout with diagnostics.
     set_tests_properties(world_orchestration_state_transitions PROPERTIES TIMEOUT 600)
 
-    add_executable(localization_tests
-        tests/LocalizationTests.cpp
-
-        src/game/ArabicShaper.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/game/Language.cpp
-        src/game/Localization.cpp
-        src/ui/StbTruetypeImpl.cpp
-        src/world/Block.cpp
-        src/world/BiomeMap.cpp)
+    add_executable(localization_tests tests/LocalizationTests.cpp)
     target_link_libraries(localization_tests PRIVATE
-        minecraftc_core)
-    target_link_libraries(localization_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+        minecraftc_core minecraftc_assets minecraftc_json minecraftc_sdk glm::glm
+        ${MINECRAFTC_SDL_TARGET} minecraftc_simulation_common minecraftc_text minecraftc_heaven
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(localization_tests PRIVATE
         src external external/stb external/nlohmann)
     target_compile_definitions(localization_tests PRIVATE
         MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-    target_link_libraries(localization_tests PRIVATE glm::glm ${MINECRAFTC_SDL_TARGET})
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(localization_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1373,21 +957,11 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME localization_resources_utf8_and_cjk_font
              COMMAND localization_tests)
 
-    add_executable(survival_integration_tests
-        tests/SurvivalIntegrationTests.cpp
-        src/game/InventoryTransaction.cpp
-        src/game/InventoryInteraction.cpp
-        src/game/SurvivalRules.cpp
-        src/game/SurvivalSession.cpp
-        src/game/SurvivalBlockLogic.cpp
-        src/game/SaveStore.cpp
-        src/game/InventoryModel.cpp
-        src/game/NetherProgression.cpp src/game/Item.cpp
-        src/world/Block.cpp
-        src/world/BlockEntityLogic.cpp)
-    target_link_libraries(survival_integration_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(survival_integration_tests tests/SurvivalIntegrationTests.cpp)
+    target_link_libraries(survival_integration_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_platform
+        minecraftc_simulation_common minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(survival_integration_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(survival_integration_tests PRIVATE glm::glm minecraftc_platform)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(survival_integration_tests PRIVATE -Wall -Wextra -Wpedantic)
     endif()
@@ -1415,12 +989,12 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
-    add_executable(network_tests tests/NetworkTests.cpp src/network/GameplayProtocol.cpp
-        src/network/Protocol.cpp src/network/Connection.cpp src/network/Session.cpp
-        src/network/PlayerProfile.cpp src/game/NetherProgression.cpp src/game/Item.cpp src/game/InventoryModel.cpp src/world/Block.cpp)
-    target_link_libraries(network_tests PRIVATE minecraftc_assets minecraftc_json minecraftc_sdk)
+    add_executable(network_tests tests/NetworkTests.cpp)
+    target_link_libraries(network_tests PRIVATE
+        minecraftc_assets minecraftc_json minecraftc_sdk minecraftc_platform glm::glm
+        minecraftc_simulation_common minecraftc_network minecraftc_heaven
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(network_tests PRIVATE src)
-    target_link_libraries(network_tests PRIVATE minecraftc_platform glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(network_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1430,13 +1004,11 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
 endif()
 
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
-    add_executable(inventory_transaction_tests tests/InventoryTransactionTests.cpp
-        src/game/InventoryTransaction.cpp src/game/InventoryInteraction.cpp
-        src/game/InventoryModel.cpp src/game/NetherProgression.cpp src/game/Item.cpp src/game/SurvivalRules.cpp
-        src/world/Block.cpp)
-    target_link_libraries(inventory_transaction_tests PRIVATE minecraftc_assets minecraftc_sdk)
+    add_executable(inventory_transaction_tests tests/InventoryTransactionTests.cpp)
+    target_link_libraries(inventory_transaction_tests PRIVATE
+        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(inventory_transaction_tests PRIVATE src)
-    target_link_libraries(inventory_transaction_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(inventory_transaction_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1446,10 +1018,11 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
 endif()
 
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
-    add_executable(chunk_protocol_tests tests/ChunkProtocolTests.cpp src/network/Protocol.cpp src/network/ChunkProtocol.cpp)
-    target_link_libraries(chunk_protocol_tests PRIVATE minecraftc_json minecraftc_sdk)
+    add_executable(chunk_protocol_tests tests/ChunkProtocolTests.cpp)
+    target_link_libraries(chunk_protocol_tests PRIVATE
+        minecraftc_json minecraftc_sdk glm::glm minecraftc_network minecraftc_heaven
+        minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(chunk_protocol_tests PRIVATE src)
-    target_link_libraries(chunk_protocol_tests PRIVATE glm::glm)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(chunk_protocol_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1471,22 +1044,6 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS AND NOT APPLE)
 endif()
 
 if(BUILD_TESTING)
-    minecraftc_add_engine_library(minecraftc_simulation_test
-        ${MINECRAFTC_SIMULATION_WORLD_SOURCES}
-        tests/HeavenGeneratorQueryAdapters.cpp
-        tests/HeavenWorldQueryAdapters.cpp)
-    minecraftc_link_simulation_dependencies(minecraftc_simulation_test)
-    target_link_libraries(minecraftc_simulation_test PUBLIC minecraftc_simulation_common PRIVATE minecraftc_heaven)
-    target_compile_definitions(minecraftc_simulation_test PUBLIC MINECRAFTC_HEAVEN_TEST_QUERIES=1)
-    minecraftc_add_scene(minecraftc_scene_test minecraftc_simulation_test)
-    minecraftc_add_session(minecraftc_app_session_test minecraftc_scene_test)
-    get_property(heaven_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
-    foreach(heaven_test_target IN LISTS heaven_test_targets)
-        get_target_property(heaven_test_type ${heaven_test_target} TYPE)
-        if(heaven_test_type STREQUAL "EXECUTABLE" AND NOT heaven_test_target STREQUAL "minecraftc")
-            target_link_libraries(${heaven_test_target} PRIVATE minecraftc_simulation_test)
-        endif()
-    endforeach()
     minecraftc_add_test(NAME nether_native_mobs_barter_riding_and_persistence COMMAND session_flow_tests --nether-mob-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     minecraftc_add_test(NAME redstone_slime_survival_and_replication COMMAND session_flow_tests --redstone-mob-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     minecraftc_add_test(NAME nether_native_session_portals_and_anchors COMMAND session_flow_tests --nether-session-tests)
@@ -1510,9 +1067,10 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
         target_compile_options(redstone_tests PRIVATE /W4 /permissive- /utf-8)
     endif()
     minecraftc_add_test(NAME redstone_rules_and_scheduling COMMAND redstone_tests)
-    add_executable(redstone_ore_tests tests/RedstoneOreTests.cpp src/world/OreGenerator.cpp src/world/Noise.cpp)
+    add_executable(redstone_ore_tests tests/RedstoneOreTests.cpp)
     target_include_directories(redstone_ore_tests PRIVATE src external/FastNoiseLite)
-    target_link_libraries(redstone_ore_tests PRIVATE glm::glm)
+    target_link_libraries(redstone_ore_tests PRIVATE
+        glm::glm minecraftc_terrain)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(redstone_ore_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)
@@ -1522,65 +1080,6 @@ if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
 endif()
 
 if(BUILD_TESTING)
-    # Test drivers retain their local fixtures and compilation variants.
-    set(shared_simulation_sources ${MINECRAFTC_SIMULATION_COMMON_SOURCES}
-        ${MINECRAFTC_SIMULATION_WORLD_SOURCES} ${MINECRAFTC_TERRAIN_SOURCES})
-    get_property(test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
-    foreach(target IN LISTS test_targets)
-        get_target_property(target_type ${target} TYPE)
-        if(NOT target_type STREQUAL "EXECUTABLE" OR target STREQUAL MINECRAFTC_APP_TARGET)
-            continue()
-        endif()
-        get_target_property(target_sources ${target} SOURCES)
-        foreach(source IN LISTS shared_simulation_sources)
-            if(target STREQUAL "cavegen_tests" AND source STREQUAL "src/world/CaveGenerator.cpp")
-                continue()
-            endif()
-            list(REMOVE_ITEM target_sources "${source}" "${CMAKE_CURRENT_SOURCE_DIR}/${source}")
-        endforeach()
-        foreach(module IN ITEMS minecraftc_heaven minecraftc_plugins minecraftc_network
-                minecraftc_text minecraftc_render_data minecraftc_render_vulkan
-                minecraftc_platform_sdl minecraftc_ui minecraftc_scene_test minecraftc_app_session_test)
-            get_target_property(module_sources ${module} SOURCES)
-            set(uses_module FALSE)
-            foreach(source IN LISTS module_sources)
-                if(source IN_LIST target_sources OR "${CMAKE_CURRENT_SOURCE_DIR}/${source}" IN_LIST target_sources)
-                    set(uses_module TRUE)
-                    list(REMOVE_ITEM target_sources "${source}" "${CMAKE_CURRENT_SOURCE_DIR}/${source}")
-                endif()
-            endforeach()
-            if(uses_module)
-                target_link_libraries(${target} PRIVATE ${module})
-            endif()
-        endforeach()
-        set_property(TARGET ${target} PROPERTY SOURCES ${target_sources})
-    endforeach()
-    target_link_libraries(redstone_ore_tests PRIVATE minecraftc_terrain)
-
-    foreach(target IN ITEMS
-            application_flow_tests asset_definition_tests chunk_protocol_tests
-            client_input_tests combat_rules_tests command_tests entity_logic_tests
-            entity_model_registry_tests fishing_tests fluid_logic_tests ground_navigation_tests
-            held_tool_vulkan_smoke inventory_tests inventory_transaction_tests lighting_logic_tests
-            localization_tests lod_subscription_tests lod_terrain_tests
-            nether_progression_tests network_tests
-            player_physics_tests plugin_tests rendering_logic_tests save_store_tests
-            session_flow_tests survival_integration_tests survival_rules_tests survival_stats_tests
-            terrain_benchmark terrain_preview voxel_gi_tests vulkan_cloud_lod_smoke
-            vulkan_decoration_smoke vulkan_gi_benchmark vulkan_gi_smoke vulkan_lan_smoke
-            vulkan_model_fog_smoke vulkan_structure_smoke vulkan_ui_smoke
-            worldgen_tests world_catalog_tests world_orchestration_tests)
-        if(TARGET ${target})
-            target_link_libraries(${target} PRIVATE minecraftc_content_registry minecraftc_atlas_bindings)
-        endif()
-    endforeach()
-    foreach(target IN ITEMS
-            application_flow_tests plugin_tests session_flow_tests vulkan_lan_smoke vulkan_ui_smoke)
-        if(TARGET ${target})
-            target_link_libraries(${target} PRIVATE minecraftc_plugin_runtime)
-        endif()
-    endforeach()
-
     set_tests_properties(
         texture_recipes_sequences_and_workbench
         texture_generator_determinism_tiling_and_atlas

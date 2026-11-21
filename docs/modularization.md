@@ -34,19 +34,20 @@ See [production targets](../cmake/MinecraftCTargets.cmake),
 
 ### 1. Give focused tests explicit owners and dependencies
 
-Start with `pixel_readback_tests` and `model_animation_tests`. Move the
-implicit Heaven simulation linkage toward explicit consumers. Record which
-tests need normal simulation, which need the Heaven query variant, and which
-use frozen or purpose-built fixtures. Make this distinction in the target
-declarations and migrate in small groups.
+Test executables now declare their implementation libraries alongside their
+sources. The Heaven query variant is limited to `worldgen_tests`,
+`world_orchestration_tests`, `session_flow_tests`, and
+`vulkan_decoration_smoke`. Tests exercising official Heaven content through
+the content fixture link the provider separately. The cave test retains
+its decorator-free compilation, and the frozen Heaven references stay in
+their original test executables.
 
-The first batch is complete when a fresh build of just those two executables
-passes their CTest entries, and their generated build graph has no path to
-`minecraftc_simulation_test`, Heaven, SDL, or Vulkan. Verify representative
-Heaven and core simulation tests use their intended variants, then run full
-CTest. Preserve fixture definitions and registration of every existing test.
+On Windows x64 Ninja, the Heaven query variant went from 58 executable
+consumers to 4. The pixel readback test's build graph went from 340 object
+nodes to 1, and the model animation test's went from 341 to 3. Both graphs
+are free of simulation, Heaven, SDL, and Vulkan dependencies.
 
-After configuring a fresh Release build directory, run the focused checks:
+Run the isolation checks in a fresh Release directory:
 
 ```bash
 cmake -S . -B build-local/modularization-tests -DCMAKE_BUILD_TYPE=Release
@@ -55,6 +56,10 @@ cmake --build build-local/modularization-tests --config Release \
 ctest --test-dir build-local/modularization-tests -C Release --output-on-failure \
   -R '^(pixel_readback_negative_controls|model_animation_sampling_and_pose_math)$'
 ```
+
+With Ninja, inspect the closure for each executable with `ninja -t graph`.
+Run full CTest from the complete desktop build to cover the normal simulation,
+Heaven query and frozen-reference paths.
 
 ### 2. Make the application own UI backend creation
 
