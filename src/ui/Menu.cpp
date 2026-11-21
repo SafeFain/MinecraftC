@@ -6,7 +6,11 @@
 #include "plugins/ContentQueries.h"
 
 #include "core/Window.h"
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#else
 #include "core/RuntimeClock.h"
+#endif
 #include <algorithm>
 #include <stdexcept>
 #include "core/Utf8.h"

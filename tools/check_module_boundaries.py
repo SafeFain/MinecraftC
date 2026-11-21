@@ -10,7 +10,7 @@ from check_api_boundaries import scan_cpp, source_files
 from check_module_dependencies import resolve_include
 
 
-SOURCE_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".m", ".mm"}
+SOURCE_SUFFIXES = {".c", ".cc", ".cpp", ".cppm", ".cxx", ".m", ".mm"}
 HEADER_SUFFIXES = {".h", ".hh", ".hpp", ".hxx", ".inl", ".inc"}
 TARGET_NAME = re.compile(r"\b(?:minecraftc(?:_[a-zA-Z0-9_]+)?|main)\b")
 

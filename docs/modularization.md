@@ -166,8 +166,20 @@ positive and negative coordinates.
   while the `ModelAnimation.h` incremental case went from 201 s to 374 s.
   Its final log reported MSVC /LTCG restarts. Repeat the measurement before
   attributing the difference or changing IPO policy.
-- Treat C++20 named modules as a separate toolchain experiment after these
-  boundaries settle. Any proposal needs its own CMake and platform support
-  decision and an incremental-build comparison.
+
+## C++20 named-module pilot
+
+On native Windows x64, configure a separate MSVC/Ninja build with
+`-DMINECRAFTC_EXPERIMENTAL_CXX_MODULES=ON` alongside the usual dependency
+options. The pilot uses named interfaces for `WorldGenContext` and
+`RuntimeClock` in selected production translation units. Their headers remain
+the definition source and are available to the rest of the project. The
+default build uses the headers on every platform.
+
+Run CTest with `BUILD_TESTING=ON` to check linking and passing values between
+module and header callers. For incremental validation, check that Ninja
+records the original headers as dependencies of the module interface objects.
+Compare clean, no-op and incremental builds in separate directories with the
+same compiler, generator, parallelism and cache settings.
 
 See [development and validation](development.md).

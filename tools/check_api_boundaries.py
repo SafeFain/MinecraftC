@@ -119,7 +119,9 @@ ALLOWED_PREFIXES = {
 def source_files(root: pathlib.Path):
     for directory in ("src", "tests"):
         for path in (root / directory).rglob("*"):
-            if path.is_file() and path.suffix.lower() in {".h", ".hpp", ".hh", ".hxx", ".c", ".cc", ".cpp", ".cxx", ".m", ".mm", ".inl", ".inc"}:
+            if path.is_file() and path.suffix.lower() in {
+                ".h", ".hpp", ".hh", ".hxx", ".c", ".cc", ".cpp", ".cppm", ".cxx", ".m", ".mm", ".inl", ".inc",
+            }:
                 yield path
 
 

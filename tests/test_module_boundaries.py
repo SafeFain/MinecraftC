@@ -91,6 +91,14 @@ class ModuleBoundaryChecks(unittest.TestCase):
         result = self.scan(modules=(*MODULES, ("minecraftc_extra", "7", UI_SOURCE, "")))
         self.assert_rejected(result, f"{UI_SOURCE}: expected one production owner")
 
+    def test_named_module_interface_requires_a_production_owner(self):
+        interface = "src/core/Clock.cppm"
+        files = {interface: "export module minecraftc.core.clock;\n"}
+        self.assert_rejected(self.scan(files), f"{interface}: expected one production owner")
+        result = self.scan(files, (*MODULES, ("minecraftc_named_modules", "0", interface, "")))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("3 production sources", result.stdout)
+
     def test_missing_or_duplicate_cmake_header_ownership(self):
         for modules in ((("minecraftc_render_data", "4", "", ""), *MODULES[1:]),
                         (*MODULES, ("minecraftc_extra", "7", CONTRACT, ""))):

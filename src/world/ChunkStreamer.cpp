@@ -4,7 +4,11 @@
 #include <set>
 #include <tuple>
 
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#else
 #include "core/RuntimeClock.h"
+#endif
 #include "game/SaveStore.h"
 #include "threading/ThreadPool.h"
 #include "world/Chunk.h"

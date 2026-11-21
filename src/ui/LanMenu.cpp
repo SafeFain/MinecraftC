@@ -5,7 +5,11 @@
 #include "network/Protocol.h"
 #include "network/Session.h"
 #include "plugins/ContentQueries.h"
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.world.gen_context;
+#else
 #include "world/WorldGenContext.h"
+#endif
 #include "game/TextWrap.h"
 #include "core/InputCodes.h"
 #include <algorithm>

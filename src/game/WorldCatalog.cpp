@@ -4,7 +4,11 @@
 #include "game/WorldCatalog.h"
 #include "game/SaveStore.h"
 
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.world.gen_context;
+#else
 #include "world/WorldGenContext.h"
+#endif
 
 #include <algorithm>
 #include <cctype>

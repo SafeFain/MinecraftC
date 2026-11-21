@@ -20,8 +20,8 @@ import re
 import sys
 from collections import defaultdict
 
-EXTENSIONS = {".h", ".hpp", ".c", ".cpp", ".mm"}
-TU_EXTENSIONS = {".c", ".cpp", ".mm"}
+TU_EXTENSIONS = {".c", ".cpp", ".cppm", ".mm"}
+EXTENSIONS = TU_EXTENSIONS | {".h", ".hpp"}
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s+"([^"]+)"')
 # Public contracts that the decoupling milestones measure. New files simply
 # report "missing" until the milestone that introduces them lands.

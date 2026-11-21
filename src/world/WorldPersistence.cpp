@@ -9,7 +9,11 @@
 #include "world/ChunkStore.h"
 #include "world/FluidLogic.h"
 #include "world/Structure.h"
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.world.gen_context;
+#else
 #include "world/WorldGenContext.h"
+#endif
 #include "game/EnchantingRules.h"
 
 #include <algorithm>

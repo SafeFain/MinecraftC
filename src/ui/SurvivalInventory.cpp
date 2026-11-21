@@ -7,7 +7,11 @@
 #include "ui/UILayout.h"
 
 #include "core/Window.h"
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#else
 #include "core/RuntimeClock.h"
+#endif
 #include <algorithm>
 #include <string>
 

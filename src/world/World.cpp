@@ -6,7 +6,11 @@
 #include "world/NetherPortal.h"
 #include "world/VoxelRaycast.h"
 #include "world/BiomeLocator.h"
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#else
 #include "core/RuntimeClock.h"
+#endif
 #include "world/ChunkMesh.h"
 #include "threading/ThreadPool.h"
 #include "debug/Log.h"

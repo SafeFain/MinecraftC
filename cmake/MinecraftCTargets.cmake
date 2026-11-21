@@ -229,10 +229,19 @@ function(minecraftc_link_simulation_dependencies target)
                 minecraftc_plugin_runtime minecraftc_threading)
 endfunction()
 minecraftc_add_engine_library(minecraftc_simulation_common ${MINECRAFTC_SIMULATION_COMMON_SOURCES})
+minecraftc_enable_module_imports(minecraftc_simulation_common
+    src/game/SaveStore.cpp
+    src/game/WorldCatalog.cpp
+    src/world/NetherGenerator.cpp
+    src/world/NetherStructures.cpp
+    src/world/WorldPersistence.cpp)
 minecraftc_link_simulation_dependencies(minecraftc_simulation_common)
 target_link_libraries(minecraftc_simulation_common PUBLIC minecraftc_gameplay_rules)
 minecraftc_add_engine_library(minecraftc_simulation
     ${MINECRAFTC_SIMULATION_WORLD_SOURCES})
+minecraftc_enable_module_imports(minecraftc_simulation
+    src/world/ChunkStreamer.cpp
+    src/world/World.cpp)
 minecraftc_link_simulation_dependencies(minecraftc_simulation)
 target_link_libraries(minecraftc_simulation PUBLIC minecraftc_simulation_common)
 
@@ -357,6 +366,11 @@ set(MINECRAFTC_UI_SOURCES
     src/ui/UIRenderer.cpp
     src/ui/VillagerTradeScreen.cpp)
 minecraftc_add_engine_library(minecraftc_ui ${MINECRAFTC_UI_SOURCES})
+minecraftc_enable_module_imports(minecraftc_ui
+    src/ui/ContainerScreen.cpp
+    src/ui/LanMenu.cpp
+    src/ui/Menu.cpp
+    src/ui/SurvivalInventory.cpp)
 target_link_libraries(minecraftc_ui
     PUBLIC minecraftc_sdk minecraftc_text glm::glm
     PRIVATE minecraftc_assets minecraftc_content_registry minecraftc_core minecraftc_json

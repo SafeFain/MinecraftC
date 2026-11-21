@@ -34,7 +34,7 @@ class BoundaryChecks(unittest.TestCase):
                        '#define HEADER <vulkan/vulkan.h>\n#include HEADER',
                        'SDL_\\\nInit(0);',
                        "auto ticks = 1'000; SDL_Init(0); auto other = 2'000;"):
-            for suffix in (".cpp", ".inl", ".inc"):
+            for suffix in (".cpp", ".cppm", ".inl", ".inc"):
                 with self.subTest(source=source, suffix=suffix):
                     result = self.scan({"src/app/example" + suffix: source})
                     self.assertNotEqual(result.returncode, 0, result.stdout)

@@ -166,6 +166,7 @@ if(MSVC)
     add_compile_options(/utf-8)
 endif()
 
+include(cmake/MinecraftCNamedModules.cmake)
 include(cmake/MinecraftCTargets.cmake)
 
 set(MINECRAFTC_IOS_RESOURCES)
@@ -245,6 +246,7 @@ endif()
 target_sources(${MINECRAFTC_APP_TARGET} PRIVATE
     src/platform/sdl/SdlMain.cpp)
 target_include_directories(${MINECRAFTC_APP_TARGET} PRIVATE src)
+minecraftc_enable_module_imports(${MINECRAFTC_APP_TARGET} src/app/RenderDemoApplication.cpp)
 target_compile_definitions(${MINECRAFTC_APP_TARGET} PRIVATE
     MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
 

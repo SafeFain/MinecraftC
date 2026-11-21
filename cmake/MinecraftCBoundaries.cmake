@@ -1,6 +1,6 @@
 # Production targets may only depend on targets from earlier layers.
 set(module_layers_0 minecraftc_sdk minecraftc_json minecraftc_engine_policy
-    minecraftc_engine_link_options minecraftc_assets minecraftc_platform)
+    minecraftc_engine_link_options minecraftc_assets minecraftc_platform minecraftc_named_modules)
 set(module_layers_1 minecraftc_log minecraftc_image_decoder minecraftc_model_animation
     minecraftc_content_registry minecraftc_plugin_runtime minecraftc_atlas_bindings)
 set(module_layers_2 minecraftc_core minecraftc_threading minecraftc_animation_graph
@@ -23,6 +23,11 @@ get_property(production_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
 foreach(target IN LISTS production_targets)
     foreach(property IN ITEMS SOURCES LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
         get_property(module_${property} TARGET ${target} PROPERTY ${property})
+    endforeach()
+    get_property(module_sets TARGET ${target} PROPERTY CXX_MODULE_SETS)
+    foreach(module_set IN LISTS module_sets)
+        get_property(module_files TARGET ${target} PROPERTY CXX_MODULE_SET_${module_set})
+        list(APPEND module_SOURCES ${module_files})
     endforeach()
     string(APPEND module_manifest
         "${target}\t${module_layer_${target}}\t${module_SOURCES}\t${module_LINK_LIBRARIES};${module_INTERFACE_LINK_LIBRARIES}\n")

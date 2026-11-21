@@ -1,7 +1,9 @@
 #include "app/Application.h"
 
 #include "Config.h"
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/RuntimeClock.h"
+#endif
 #include "core/Window.h"
 #include "debug/CrashHandler.h"
 #include "debug/Log.h"
@@ -18,6 +20,11 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+// MSVC needs the textual standard-library headers before this import.
+import minecraftc.core.runtime_clock;
+#endif
 
 class BasicRenderApplication final : public ApplicationHost {
 public:
