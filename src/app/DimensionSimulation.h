@@ -1,17 +1,18 @@
 #pragma once
 
 #include "entity/EntityManager.h"
-#include "game/SaveStore.h"
 #include "game/Weather.h"
 #include "world/World.h"
 #include "renderer/RenderEnvironment.h"
 #include <memory>
 
 class EntityPresenter;
+class SaveStore;
 
 // Each dimension retains its terrain, entity IDs, weather and tick clocks while
 // players travel. Store declaration order keeps streaming I/O dependencies alive.
 struct DimensionSimulation {
+    DimensionSimulation();
     ~DimensionSimulation();
     std::unique_ptr<SaveStore> store;
     World world;

@@ -1,4 +1,5 @@
 #pragma once
+#include "network/ProtocolError.h"
 #include "plugins/ContentQueries.h"
 
 #include <cstddef>
@@ -27,10 +28,6 @@ struct Message {
     MessageType type = MessageType::Ping;
     uint64_t sequence = 0;
     Bytes payload;
-};
-class ProtocolError : public std::runtime_error {
-public:
-    using std::runtime_error::runtime_error;
 };
 class Writer {
 public:

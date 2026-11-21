@@ -1,4 +1,5 @@
 #include "TestSupport.h"
+#include "game/SaveStore.h"
 #include "HeavenContentFixture.h"
 #include "app/GameSession.h"
 #include "EntityAiScenarios.h"

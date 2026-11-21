@@ -1,6 +1,7 @@
 #include "plugins/Runtime.h"
 #include "TestSupport.h"
 #include "app/GameSession.h"
+#include "game/SaveStore.h"
 #include "SessionScenario.h"
 #include "plugins/PluginManager.h"
 #include "app/GameScenePresenter.h"

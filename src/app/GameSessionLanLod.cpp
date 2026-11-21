@@ -1,8 +1,10 @@
 #include "app/GameSession.h"
+#include "network/LodProtocol.h"
+#include "game/SaveStore.h"
 #include "debug/Log.h"
 #include "world/WorldGenerator.h"
 #include <algorithm>
-#include <limits>
+#include <cmath>
 #include <map>
 #include <set>
 
@@ -81,7 +83,7 @@ Lan::Bytes buildColumns(Lan::LodUpdate update, std::map<ChunkKey, ColumnSource> 
 
 void GameSession::requestLanLod(LanPlayerRuntime& guest, const Lan::LodUpdate& request) {
     if (request.dimension != guest.profile.dimension || request.epoch != guest.chunkEpoch) return;
-    if (request.revision == std::numeric_limits<uint64_t>::max()) { guest.lodSubscriptions.cancel(request.key); return; }
+    if (request.revision == Lan::CANCEL_LOD_SUBSCRIPTION) { guest.lodSubscriptions.cancel(request.key); return; }
     if (inLodRange(guest, request.key)) guest.lodSubscriptions.request(request.key);
 }
 void GameSession::invalidateLanLod(DimensionId target, int x, int z) {
@@ -143,23 +145,12 @@ void GameSession::sendLanLod() {
     }
 }
 void GameSession::pollReplicaLod() {
-    const auto selected = world().selectedLodTiles();
-    const std::unordered_set<LodTileKey, LodTileKeyHash> wanted(selected.begin(), selected.end());
-    size_t sent = 0;
-    for (auto it = replicaLodRevisions.begin(); it != replicaLodRevisions.end();) {
-        if (wanted.count(it->first)) { ++it; continue; }
-        Lan::LodUpdate cancel; cancel.dimension = dimension; cancel.epoch = replicaEpoch; cancel.key = it->first; cancel.revision = std::numeric_limits<uint64_t>::max();
-        if (sent >= 2 || !lanClient.send({Lan::MessageType::LodRequest, 0, Lan::encodeLodUpdate(cancel, false)})) { ++it; continue; }
-        ++sent; it = replicaLodRevisions.erase(it);
-    }
-    size_t pending = 0;
-    for (const auto& entry : replicaLodRevisions) if (entry.second.pending) ++pending;
-    for (const auto& key : selected) {
-        if (sent >= 2 || pending >= 8) break;
-        if (!replicaLodRevisions.count(key) && replicaLodRevisions.size() >= Lan::MAX_LOD_SUBSCRIPTIONS) continue;
-        auto& revision = replicaLodRevisions[key];
-        if (revision.pending || revision.received >= revision.required) continue;
-        Lan::LodUpdate request; request.dimension = dimension; request.epoch = replicaEpoch; request.key = key;
-        if (lanClient.send({Lan::MessageType::LodRequest, 0, Lan::encodeLodUpdate(request, false)})) { ++sent; ++pending; revision.pending = true; }
-    }
+    replicaLodSubscriptions.poll(world().selectedLodTiles(), [&](const LodTileKey& key, uint64_t revision) {
+        Lan::LodUpdate request;
+        request.dimension = dimension;
+        request.epoch = replicaEpoch;
+        request.key = key;
+        request.revision = revision;
+        return lanClient.send({Lan::MessageType::LodRequest, 0, Lan::encodeLodUpdate(request, false)});
+    });
 }

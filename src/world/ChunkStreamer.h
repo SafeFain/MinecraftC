@@ -17,7 +17,7 @@
 #include <vector>
 
 #include "Config.h"
-#include "game/SaveStore.h"
+#include "game/ChunkSaveData.h"
 #include "world/RegionGenerationData.h"
 
 class Chunk;
@@ -261,7 +261,7 @@ private:
         std::vector<uint16_t> blocks;
         std::vector<BlockOverride> overrides;
         std::vector<PersistedBlockEntity> blockEntities;
-        std::vector<WorldMetadata::PersistedEntity> entities;
+        std::vector<EntityRecord> entities;
         uint32_t entityPopulationVersion = 0;
         std::vector<RegionGenerationData::PendingBlock> pluginStructures;
     };

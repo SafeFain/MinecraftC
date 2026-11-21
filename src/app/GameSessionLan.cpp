@@ -1,5 +1,6 @@
 #include "plugins/Runtime.h"
 #include "app/GameSession.h"
+#include "game/SaveStore.h"
 #include "debug/Log.h"
 #include "game/SurvivalSession.h"
 #include "plugins/ContentQueries.h"

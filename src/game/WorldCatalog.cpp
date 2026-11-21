@@ -2,6 +2,7 @@
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
 #include "game/WorldCatalog.h"
+#include "game/SaveStore.h"
 
 #include "world/WorldGenContext.h"
 

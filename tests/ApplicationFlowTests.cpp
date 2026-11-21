@@ -29,6 +29,7 @@
 #include "platform/sdl/SdlClipboard.h"
 #include "renderer/GameRenderer.h"
 #include "ui/Menu.h"
+#include "game/SaveStore.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
 #include "debug/Log.h"

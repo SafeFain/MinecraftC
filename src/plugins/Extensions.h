@@ -1,5 +1,6 @@
 #pragma once
 #include "minecraftc/extensions.h"
+#include "plugins/GenerationConfig.h"
 #include <array>
 #include <filesystem>
 #include <functional>
@@ -22,13 +23,6 @@ struct EntityContent {
     float health=10, speed=2, damage=2;
     std::array<float,3> size{{.6f,1,.6f}};
     std::function<void(uint32_t,const MC_EntitySnapshot&,MC_EntityIntent&)> callback;
-};
-struct GenerationConfig {
-    std::string generator, revision, parameters="{}";
-    std::vector<std::pair<std::string,std::string>> modifiers;
-    bool operator==(const GenerationConfig& b) const {
-        return generator==b.generator&&revision==b.revision&&parameters==b.parameters&&modifiers==b.modifiers;
-    }
 };
 struct DimensionContent {
     uint64_t seedDomain=0;
@@ -212,12 +206,5 @@ inline void failGeneration(const std::string& key) {
     std::lock_guard<std::mutex> lock(generationFaultMutex());
     generationFault()="Plugin generation failed: "+key;
     throw std::runtime_error(generationFault());
-}
-inline uint64_t generationFingerprint(const GenerationConfig& config) {
-    uint64_t hash=1469598103934665603ULL;
-    auto add=[&](const std::string& s){for(unsigned char c:s){hash^=c;hash*=1099511628211ULL;}hash^=255;hash*=1099511628211ULL;};
-    add(config.generator);add(config.revision);add(config.parameters);
-    for(const auto& m:config.modifiers){add(m.first);add(m.second);}
-    return hash;
 }
 } // namespace Plugins

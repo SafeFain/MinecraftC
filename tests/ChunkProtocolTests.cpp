@@ -2,6 +2,7 @@
 #include "network/ChunkProtocol.h"
 #include "network/PistonProtocol.h"
 #include "network/LodProtocol.h"
+#include "network/LodSubscriptions.h"
 #include "network/EventProtocol.h"
 #include "world/Block.h"
 #include "Config.h"

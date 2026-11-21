@@ -753,8 +753,6 @@ if(BUILD_TESTING)
     minecraftc_add_test(NAME lan_game_replica COMMAND session_flow_tests --lan-replica-tests ${CMAKE_CURRENT_SOURCE_DIR}/assets)
     set_tests_properties(lan_game_replica PROPERTIES TIMEOUT 180 LABELS "slow;integration")
     add_executable(lod_subscription_tests tests/LodSubscriptionTests.cpp)
-    target_link_libraries(lod_subscription_tests PRIVATE
-        minecraftc_sdk glm::glm minecraftc_content_registry minecraftc_atlas_bindings)
     target_include_directories(lod_subscription_tests PRIVATE src)
     minecraftc_add_test(NAME lan_lod_subscription_replacement COMMAND lod_subscription_tests)
     set_tests_properties(lan_lod_subscription_replacement PROPERTIES TIMEOUT 15)
@@ -1008,9 +1006,7 @@ endif()
 
 if(BUILD_TESTING AND NOT ANDROID AND NOT IOS)
     add_executable(inventory_transaction_tests tests/InventoryTransactionTests.cpp)
-    target_link_libraries(inventory_transaction_tests PRIVATE
-        minecraftc_assets minecraftc_sdk glm::glm minecraftc_simulation_common
-        minecraftc_content_registry minecraftc_atlas_bindings)
+    target_link_libraries(inventory_transaction_tests PRIVATE minecraftc_gameplay_rules)
     target_include_directories(inventory_transaction_tests PRIVATE src)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(inventory_transaction_tests PRIVATE -Wall -Wextra -Wpedantic)

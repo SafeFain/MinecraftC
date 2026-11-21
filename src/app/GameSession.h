@@ -8,6 +8,7 @@
 #include "app/LanPlayerRuntime.h"
 #include "app/GameSessionServices.h"
 #include "network/GameplayProtocol.h"
+#include "network/LodSubscriptions.h"
 #include "network/ChunkProtocol.h"
 #include "network/StateProtocol.h"
 #include "network/EntityProtocol.h"
@@ -17,7 +18,7 @@
 #include <array>
 #include <chrono>
 #include "entity/EntityManager.h"
-#include "game/SaveStore.h"
+#include "game/WorldMetadata.h"
 #include "game/FishingSystem.h"
 #include "game/SessionAccess.h"
 #include "game/Weather.h"
@@ -39,6 +40,8 @@
 class IGameRenderer;
 class EntityPresenter;
 class Localization;
+class SaveStore;
+class WorldRecovery;
 struct ParsedCommand;
 
 class GameSession : public IContainerAccess, public ITradeAccess, public IInventoryCommands {
@@ -296,8 +299,7 @@ private:
     struct LodJob { uint64_t peer, epoch, revision, subscription; DimensionId dimension; LodTileKey key; std::future<Lan::Bytes> result; };
     std::vector<LodJob> lodJobs;
     uint64_t lodLastPeer = 0;
-    struct ReplicaLodRevision { uint64_t received = 0, required = 1; bool pending = false; };
-    std::unordered_map<LodTileKey, ReplicaLodRevision, LodTileKeyHash> replicaLodRevisions;
+    Lan::ReplicaLodSubscriptions replicaLodSubscriptions;
     void requestLanLod(LanPlayerRuntime& guest, const Lan::LodUpdate& request);
     void sendLanLod();
     void pollReplicaLod();

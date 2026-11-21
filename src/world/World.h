@@ -30,6 +30,7 @@
 #include "world/BlockEntity.h"
 #include "world/RedstoneWorldState.h"
 #include "world/BlockLightLogic.h"
+#include "game/GameRuleRegistry.h"
 #include "game/Weather.h"
 
 class IChunkMeshDevice;

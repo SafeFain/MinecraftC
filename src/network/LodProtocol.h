@@ -6,7 +6,6 @@
 #include "world/Block.h"
 
 namespace Lan {
-constexpr size_t MAX_LOD_SUBSCRIPTIONS = 4096;
 struct LodUpdate {
     DimensionId dimension = DimensionId::Overworld;
     uint64_t epoch = 1, revision = 0;
@@ -51,10 +50,5 @@ inline LodUpdate decodeLodUpdate(const Bytes& bytes, bool includeColumns) {
         for (uint16_t i = 0; i < count; ++i) column.spans.push_back({static_cast<int16_t>(r.u16()), static_cast<int16_t>(r.u16()), static_cast<BlockId>(decodeBlockId(r.u16()))});
     }
     r.finish(); (void)encodeLodUpdate(value, includeColumns); return value;
-}
-inline bool lodContainsChunk(const LodTileKey& key, int x, int z) {
-    const int64_t side = int64_t{1} << key.level;
-    return x >= int64_t{key.x} * side && x < (int64_t{key.x} + 1) * side &&
-           z >= int64_t{key.z} * side && z < (int64_t{key.z} + 1) * side;
 }
 }

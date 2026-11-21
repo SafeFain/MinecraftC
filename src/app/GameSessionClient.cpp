@@ -1,4 +1,5 @@
 #include "app/GameSession.h"
+#include "network/LodProtocol.h"
 #include "network/PistonProtocol.h"
 #include "network/EntityProtocol.h"
 #include "debug/Log.h"
@@ -36,7 +37,7 @@ void GameSession::closeReplica() {
     }
     player.setRoomPlayerId(0);player.clearPluginCooldowns();
     lanClient.close(); lanJoining = false; replicaWorldInfo = replicaOwnerState = false;
-    replicaLodRevisions.clear();
+    replicaLodSubscriptions.clear();
     for (auto& runtime : simulations) if (runtime) runtime->world.clearReplicaLod();
     replicaEpoch = 0; replicaInput = {}; replicaLastInputSent = -1;
     replicaBlockAssembler.clear();
@@ -71,7 +72,7 @@ void GameSession::applyReplicaState(const Lan::AuthorityState& state) {
         player.bindWorld(world(), &entities()); player.setAuthority(false);player.setRoomPlayerId(lanClient.peerId());
         updateLanInterests();
         replicaEpoch = state.epoch; replicaRevisions.clear(); replicaRecovery.clear();
-        replicaLodRevisions.clear(); world().clearReplicaLod();
+        replicaLodSubscriptions.clear(); world().clearReplicaLod();
         resetTransientState(false, state.tick, RuntimeClock{}.now());
         loadingReason = dimension != DimensionId::Overworld ? LoadingReason::Dimension : LoadingReason::World;
         player.setOrientation(state.self.yaw, state.self.pitch);
@@ -143,8 +144,7 @@ void GameSession::pollReplica(double now) {
             else if (message.type == Lan::MessageType::LodInvalidate) {
                 const auto update = Lan::decodeLodUpdate(message.payload, false);
                 if (update.epoch == replicaEpoch && update.dimension == dimension) {
-                    auto found = replicaLodRevisions.find(update.key);
-                    if (found != replicaLodRevisions.end()) { found->second.required = std::max(found->second.required, update.revision); found->second.pending = false; }
+                    replicaLodSubscriptions.invalidate(update.key, update.revision);
                 }
             }
             else if (message.type == Lan::MessageType::EntityState) {
@@ -168,11 +168,9 @@ void GameSession::pollReplica(double now) {
             if (message.type == Lan::MessageType::LodColumns) {
                 const auto update = Lan::decodeLodUpdate(message.payload, true);
                 if (update.epoch != replicaEpoch || update.dimension != dimension) continue;
-                auto found = replicaLodRevisions.find(update.key);
-                if (found == replicaLodRevisions.end()) continue;
-                auto& revision = found->second; revision.pending = false;
-                if (update.revision < revision.required || update.revision <= revision.received) continue;
-                world().applyReplicaLod(update.key, update.revision, update.columns); revision.received = update.revision;
+                replicaLodSubscriptions.receive(update.key, update.revision, [&] {
+                    world().applyReplicaLod(update.key, update.revision, update.columns);
+                });
             } else if(message.type==Lan::MessageType::BlockTransaction) {
                 Lan::Reader fragment(message.payload);if(fragment.u8()!=2 || fragment.u64()!=replicaEpoch)continue;
                 const auto assembled=replicaBlockAssembler.push(message.payload);if(!assembled)continue;

@@ -1,11 +1,25 @@
 #pragma once
 
-#include "network/LodProtocol.h"
+#include "network/ProtocolError.h"
+#include "world/LodTileKey.h"
+
+#include <algorithm>
 #include <limits>
 #include <optional>
+#include <span>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace Lan {
+constexpr size_t MAX_LOD_SUBSCRIPTIONS = 4096;
+constexpr uint64_t CANCEL_LOD_SUBSCRIPTION = std::numeric_limits<uint64_t>::max();
+
+inline bool lodContainsChunk(const LodTileKey& key, int x, int z) {
+    const int64_t side = int64_t{1} << key.level;
+    return x >= int64_t{key.x} * side && x < (int64_t{key.x} + 1) * side &&
+           z >= int64_t{key.z} * side && z < (int64_t{key.z} + 1) * side;
+}
+
 // Owns subscription identity independently of worker scheduling and transport.
 // A cancelled/re-added key is a new consumer even if its revision starts at one.
 // Old completion must neither deliver data nor release the new consumer's work.
@@ -65,4 +79,70 @@ private:
     uint64_t m_nextSubscription=1;
     std::unordered_map<LodTileKey,Entry,LodTileKeyHash> m_entries;
 };
-}
+
+// Tracks only the current replica stream. The session resets on epoch changes,
+// decides which tiles it wants, and owns all transport and world updates.
+class ReplicaLodSubscriptions {
+public:
+    void clear() { m_revisions.clear(); }
+
+    void invalidate(const LodTileKey& key, uint64_t required) {
+        const auto found = m_revisions.find(key);
+        if (found == m_revisions.end()) return;
+        auto& revision = found->second;
+        revision.required = std::max(revision.required, required);
+        revision.pending = false;
+    }
+
+    template<class Apply>
+    void receive(const LodTileKey& key, uint64_t number, Apply apply) {
+        const auto found = m_revisions.find(key);
+        if (found == m_revisions.end()) return;
+        auto& revision = found->second;
+        revision.pending = false;
+        if (number < revision.required || number <= revision.received) return;
+        apply();
+        revision.received = number;
+    }
+
+    // A failed send leaves the subscription eligible for a later poll.
+    template<class Send>
+    void poll(std::span<const LodTileKey> selected, Send send) {
+        constexpr size_t sendBudget = 2;
+        constexpr size_t pendingLimit = 8;
+        const std::unordered_set<LodTileKey, LodTileKeyHash> wanted(selected.begin(), selected.end());
+
+        size_t sent = 0;
+        for (auto it = m_revisions.begin(); it != m_revisions.end();) {
+            if (wanted.count(it->first) || sent >= sendBudget ||
+                !send(it->first, CANCEL_LOD_SUBSCRIPTION)) {
+                ++it;
+                continue;
+            }
+            ++sent;
+            it = m_revisions.erase(it);
+        }
+
+        size_t pending = 0;
+        for (const auto& entry : m_revisions) if (entry.second.pending) ++pending;
+        for (const auto& key : selected) {
+            if (sent >= sendBudget || pending >= pendingLimit) break;
+            if (m_revisions.size() >= MAX_LOD_SUBSCRIPTIONS && !m_revisions.count(key)) continue;
+            auto& revision = m_revisions[key];
+            if (revision.pending || revision.received >= revision.required || !send(key, 0)) continue;
+            revision.pending = true;
+            ++sent;
+            ++pending;
+        }
+    }
+
+private:
+    struct Revision {
+        uint64_t received = 0;
+        uint64_t required = 1;
+        bool pending = false;
+    };
+
+    std::unordered_map<LodTileKey, Revision, LodTileKeyHash> m_revisions;
+};
+} // namespace Lan

@@ -1,6 +1,7 @@
 #include "TestSupport.h"
 #include "HeavenContentFixture.h"
 #include "game/WorldCatalog.h"
+#include "game/SaveStore.h"
 #include "world/WorldGenContext.h"
 
 #include <cstdlib>

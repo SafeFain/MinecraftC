@@ -12,6 +12,7 @@
 #include "core/Utf8.h"
 #include "game/ArabicShaper.h"
 #include "game/TextWrap.h"
+#include "game/SaveStore.h"
 
 namespace {
 struct ThirdPartyCredit {
@@ -130,6 +131,8 @@ void Menu::activateSelected(std::vector<Button>& buttons, int selectedIdx) {
 }
 
 // ── Main Menu ─────────────────────────────────────────────────────────────
+
+MainMenu::~MainMenu() = default;
 
 MainMenu::MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds,
                    ClientSettings& settings, Localization& localization,

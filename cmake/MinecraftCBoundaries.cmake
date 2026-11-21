@@ -4,7 +4,7 @@ set(module_layers_0 minecraftc_sdk minecraftc_json minecraftc_engine_policy
 set(module_layers_1 minecraftc_log minecraftc_image_decoder minecraftc_model_animation
     minecraftc_content_registry minecraftc_plugin_runtime minecraftc_atlas_bindings)
 set(module_layers_2 minecraftc_core minecraftc_threading minecraftc_animation_graph
-    minecraftc_gltf minecraftc_terrain)
+    minecraftc_gltf minecraftc_terrain minecraftc_gameplay_rules)
 set(module_layers_3 minecraftc_simulation_common minecraftc_platform_sdl)
 set(module_layers_4 minecraftc_simulation minecraftc_heaven minecraftc_network
     minecraftc_text minecraftc_render_data)
@@ -79,7 +79,7 @@ minecraftc_header_boundary(src/plugins/AtlasPublication.h minecraftc_atlas_bindi
     src/plugins/PluginManager.cpp
     src/renderer/BlockAtlasData.cpp
     tests/AssetDefinitionTests.cpp)
-minecraftc_header_boundary(src/world/BlockTextureDefinitions.h minecraftc_simulation_common
+minecraftc_header_boundary(src/world/BlockTextureDefinitions.h minecraftc_gameplay_rules
     src/world/Block.cpp
     src/renderer/BlockAtlasData.cpp)
 minecraftc_header_boundary(src/renderer/backend/vulkan/VulkanRendererInternal.h minecraftc_render_vulkan

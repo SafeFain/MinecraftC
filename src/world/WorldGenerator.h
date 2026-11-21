@@ -5,7 +5,8 @@
 #ifdef MINECRAFTC_HEAVEN_TEST_QUERIES
 #include "plugins/official_heaven/HeavenGenerator.h"
 #endif
-#include "plugins/Extensions.h"
+#include "minecraftc/extensions.h"
+#include "plugins/GenerationConfig.h"
 #include "world/BiomeMap.h"
 #include "world/HeightPipeline.h"
 #include "world/CaveGenerator.h"

@@ -1,11 +1,16 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 #include <utility>
 
-#include "game/SaveStore.h"
+#include "game/GameRules.h"
+#include "game/WorldCompatibility.h"
+#include "plugins/GenerationConfig.h"
+
+class SaveStore;
 
 struct WorldSummary {
     std::string id;

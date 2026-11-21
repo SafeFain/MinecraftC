@@ -1,5 +1,6 @@
 #include "world/World.h"
 #include "game/DimensionRules.h"
+#include "game/SaveStore.h"
 #include "world/RedstoneBlocks.h"
 #include "world/RedstoneWiring.h"
 #include "world/BlockEntityLogic.h"

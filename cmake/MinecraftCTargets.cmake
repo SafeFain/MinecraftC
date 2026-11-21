@@ -161,6 +161,20 @@ minecraftc_add_engine_library(minecraftc_terrain ${MINECRAFTC_TERRAIN_SOURCES})
 target_include_directories(minecraftc_terrain SYSTEM PUBLIC external/FastNoiseLite)
 target_link_libraries(minecraftc_terrain PUBLIC glm::glm)
 
+minecraftc_add_engine_library(minecraftc_gameplay_rules
+    src/game/InventoryInteraction.cpp
+    src/game/InventoryModel.cpp
+    src/game/InventoryTransaction.cpp
+    src/game/Item.cpp
+    src/game/NetherProgression.cpp
+    src/game/SurvivalRules.cpp
+    src/world/Block.cpp
+    src/world/BlockTextureDefinitions.h
+    src/world/BlockEntityLogic.cpp)
+target_link_libraries(minecraftc_gameplay_rules
+    PUBLIC minecraftc_sdk glm::glm
+    PRIVATE minecraftc_assets minecraftc_atlas_bindings minecraftc_content_registry)
+
 # Both simulation configurations reuse these sources, which are independent
 # of the Heaven-only World and WorldGenerator query declarations.
 set(MINECRAFTC_SIMULATION_COMMON_SOURCES
@@ -168,22 +182,13 @@ set(MINECRAFTC_SIMULATION_COMMON_SOURCES
     src/entity/EntityReplication.cpp
     src/entity/GroundNavigation.cpp
     src/game/FishingSystem.cpp
-    src/game/InventoryInteraction.cpp
-    src/game/InventoryModel.cpp
-    src/game/InventoryTransaction.cpp
-    src/game/Item.cpp
-    src/game/NetherProgression.cpp
     src/game/SaveStore.cpp
     src/game/SurvivalBlockLogic.cpp
-    src/game/SurvivalRules.cpp
     src/game/SurvivalSession.cpp
     src/game/SurvivalStats.cpp
     src/game/VillagerTrade.cpp
     src/game/Weather.cpp
     src/game/WorldCatalog.cpp
-    src/world/Block.cpp
-    src/world/BlockTextureDefinitions.h
-    src/world/BlockEntityLogic.cpp
     src/world/CaveGenerator.cpp
     src/world/Chunk.cpp
     src/world/ChunkMesh.cpp
@@ -225,6 +230,7 @@ function(minecraftc_link_simulation_dependencies target)
 endfunction()
 minecraftc_add_engine_library(minecraftc_simulation_common ${MINECRAFTC_SIMULATION_COMMON_SOURCES})
 minecraftc_link_simulation_dependencies(minecraftc_simulation_common)
+target_link_libraries(minecraftc_simulation_common PUBLIC minecraftc_gameplay_rules)
 minecraftc_add_engine_library(minecraftc_simulation
     ${MINECRAFTC_SIMULATION_WORLD_SOURCES})
 minecraftc_link_simulation_dependencies(minecraftc_simulation)

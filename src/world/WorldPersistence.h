@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "game/Item.h"
-#include "game/SaveStore.h"
+#include "game/ChunkSaveData.h"
 #include "world/Block.h"
 #include "world/BlockEntity.h"
 #include "world/Structure.h"

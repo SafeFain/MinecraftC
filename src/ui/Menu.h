@@ -8,12 +8,12 @@
 #include "Config.h"
 #include "ui/UILayout.h"
 #include "core/TextEditBuffer.h"
-#include "game/SaveStore.h"
 #include "game/WorldCatalog.h"
 #include "game/ClientSettings.h"
 #include "game/Localization.h"
 
 class UIRenderer;
+class WorldRecovery;
 namespace platform { class Clipboard; }
 
 // ── Game state ────────────────────────────────────────────────────────────
@@ -142,6 +142,7 @@ public:
     MainMenu(const MenuCallbacks& callbacks, std::vector<WorldSummary> worlds,
              ClientSettings& settings, Localization& localization,
              platform::Clipboard* clipboard);
+    ~MainMenu() override;
 
     void render(UIRenderer& ui, int screenWidth, int screenHeight) override;
     void onKeyPress(int key, int mods = 0) override;

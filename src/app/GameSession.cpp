@@ -1,6 +1,7 @@
 #include "plugins/ContentQueries.h"
 #include "plugins/Runtime.h"
 #include "app/GameSession.h"
+#include "game/SaveStore.h"
 #include "game/EnchantingRules.h"
 #include "game/DimensionRules.h"
 #include "game/EntityTransferJournal.h"

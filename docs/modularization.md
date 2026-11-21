@@ -106,23 +106,46 @@ platform and graphics API rules.
 
 ### 4. Narrow simulation and session interfaces
 
-Start by tracing the symbols used from `SaveStore.h` and moving data-only
-dependencies onto a small existing or dedicated contract where that reduces the
-build graph. The store continues to own encoding, I/O, and recovery. Next,
-identify inventory rules or deterministic generation inputs that can be linked
-by focused tests without the world runtime. Extract a target only when its
-inputs, source owner, and link direction are clear.
+The save layer exposes separate contracts for world metadata, compatibility
+reports, and chunk load data. Catalog and menu headers use the compatibility
+and generation configuration data. Chunk streaming and persistence consume
+the chunk records. `SaveStore` still owns encoding, I/O, and recovery.
+The generation configuration and its fingerprint are independent of the
+plugin extension registry.
 
-Then trace LAN responsibilities across the `GameSessionLan*` implementations.
-Separate replication state or translation where it can be exercised through a
-focused test. Keep session lifecycle and gameplay authority in `GameSession`
-and packet encoding in `minecraftc_network`.
+| Include measurement | Before | After |
+| --- | ---: | ---: |
+| Production translation units that reach `SaveStore.h` | 40 | 18 |
+| Project headers in the `WorldCatalog.h` closure | 24 | 3 |
+| Project headers in the `WorldPersistence.h` closure | 31 | 24 |
+| Project headers in the `ChunkStreamer.h` closure | 31 | 25 |
+| Project headers in the `LodSubscriptions.h` closure | 24 | 2 |
 
-Each extraction needs a smaller dependency closure for a named consumer and
-passing focused tests. Use save round trips and recovery, generation seed and
-region/singleton equivalence, or LAN authority and replication as applicable.
-Check negative coordinates for generation work, and compare seeded output
-against the existing generation version before accepting a generation split.
+`minecraftc_gameplay_rules` owns the item, block, inventory, recipe, and
+container rules that the transaction implementation needs. In the Windows
+Ninja build, `inventory_transaction_tests` went from 313 to 277 object nodes
+and no longer pulls in simulation, terrain generation, or the thread pool.
+The existing SDL asset dependency still supplies block definition reads.
+
+`ReplicaLodSubscriptions` owns client-side revisions, pending requests,
+and cancellation state. `GameSession` owns stream lifetime, dimension and
+epoch validation, transport, and application of the accepted columns.
+The LOD packet codec stays in the network layer. The focused subscription test
+now builds one object, down from four, and covers host and replica behavior,
+including backpressure, stale results, cancellation, and request budgets.
+In matched Windows x64 MSVC/Ninja Release builds, a clean subscription test
+build went from four compiler and four linker or archiver invocations to one
+of each. Both no-op builds ran zero. Changing `LodTerrainSystem.h` went from
+one compile and one link to zero. In the clean runs, Ninja recorded 85.34 s
+versus 11.00 s summed across compiler invocations and 11.75 s versus 3.19 s
+across link and archive invocations. The timings are single runs taken while
+the host also built other targets.
+
+Use the save round-trip and recovery tests, the authoritative inventory test,
+and the LAN replica, authority, and LOD subscription tests to validate these
+interfaces. Generation stays on version 23 with the original fingerprint
+calculation, and the existing seed and region/singleton checks cover both
+positive and negative coordinates.
 
 ## Compatibility and release gates
 

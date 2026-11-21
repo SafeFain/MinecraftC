@@ -27,6 +27,7 @@
 #include "ui/UIStyle.h"
 #include "ui/ExperienceHud.h"
 #include "ui/Menu.h"
+#include "game/SaveStore.h"
 #include "ui/SettingsMenu.h"
 #include "ui/Inventory.h"
 #include "ui/SurvivalInventory.h"
