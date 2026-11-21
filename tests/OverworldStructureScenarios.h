@@ -210,35 +210,51 @@ inline void testNewStructureGeneration(HeightPipeline& terrain, StructureGenerat
             }, [&](int x,int y,int z,BlockId id,StructureLootProfile loot,uint64_t lootSeed) {
                 singlePending.push_back({x,y,z,id,true,id==BlockId::CHEST||id==BlockId::FURNACE,loot,lootSeed});
             });
+        // Bounds-check region-relative coordinates before dividing into chunk indices.
+        const auto chunkAt = [&](const auto& destination, int x, int z) -> Chunk* {
+            const int localX = x - ox * Config::CHUNK_SIZE_X;
+            const int localZ = z - oz * Config::CHUNK_SIZE_Z;
+            if (localX < 0 || localX >= 3 * Config::CHUNK_SIZE_X ||
+                localZ < 0 || localZ >= 3 * Config::CHUNK_SIZE_Z) return nullptr;
+            return destination[localZ / Config::CHUNK_SIZE_Z * 3 + localX / Config::CHUNK_SIZE_X].get();
+        };
         const auto apply = [&](auto& destination, const auto& pending) {
             for (int pass = 0; pass < 2; ++pass) for (const auto& b : pending) {
                 if (b.overwrite != (pass == 1)) continue;
-                const int cx = floorChunk(b.worldX)-ox, cz = floorChunk(b.worldZ)-oz;
-                if (cx < 0 || cx >= 3 || cz < 0 || cz >= 3) continue;
-                Chunk& c = *destination[cz*3+cx];
-                const int x = b.worldX-c.worldX(), z = b.worldZ-c.worldZ();
-                const BlockId current = c.getBlock(x,b.worldY,z);
+                Chunk* chunk = chunkAt(destination, b.worldX, b.worldZ);
+                if (!chunk) continue;
+                const int x = b.worldX-chunk->worldX(), z = b.worldZ-chunk->worldZ();
+                const BlockId current = chunk->getBlock(x,b.worldY,z);
                 const bool leaves = current==BlockId::LEAVES || current==BlockId::BIRCH_LEAVES ||
                     current==BlockId::SPRUCE_LEAVES || current==BlockId::JUNGLE_LEAVES || current==BlockId::ACACIA_LEAVES;
                 if (!b.overwrite && current!=BlockId::AIR && current!=BlockId::SNOW && !leaves) continue;
-                c.setBlock(x,b.worldY,z,b.id);
+                chunk->setBlock(x,b.worldY,z,b.id);
             }
         };
         apply(owned,regionPending);
         apply(singleChunks,singlePending);
-        for (size_t i = 0; i < owned.size(); ++i)
-            require(std::equal(owned[i]->rawBlocks(),owned[i]->rawBlocks()+Config::CHUNK_VOLUME,
-                               singleChunks[i]->rawBlocks()), "new structure region/singleton voxel output differs");
+        for (size_t i = 0; i < owned.size(); ++i) {
+            const auto* blocks = owned[i]->rawBlocks();
+            const auto [regionBlock, singletonBlock] = std::mismatch(
+                blocks, blocks + Config::CHUNK_VOLUME, singleChunks[i]->rawBlocks());
+            if (regionBlock == blocks + Config::CHUNK_VOLUME) continue;
+            const auto index = regionBlock - blocks;
+            const auto x = owned[i]->worldX() + index % Config::CHUNK_SIZE_X;
+            const auto y = Config::WORLD_MIN_Y + index / (Config::CHUNK_SIZE_X * Config::CHUNK_SIZE_Z);
+            const auto z = owned[i]->worldZ() + index / Config::CHUNK_SIZE_X % Config::CHUNK_SIZE_Z;
+            std::cerr << structureCommandName(p.type) << " voxel at " << x << ',' << y << ',' << z
+                      << ": region=" << *regionBlock << " singleton=" << *singletonBlock << '\n';
+            require(false, "new structure region/singleton voxel output differs");
+        }
         std::map<std::tuple<int,int,int>,BlockId> expected;
         StructureGenerator::build(p,[&](int x,int y,int z,BlockId id) { expected[{x,y,z}]=id; },
             [&](int x,int z) { return terrain.sampleColumn(x,z).height; });
         size_t outside = 0, registered = 0;
         for (const auto& [position,id] : expected) {
             const auto [x,y,z] = position;
-            const int cx = floorChunk(x)-ox, cz = floorChunk(z)-oz;
-            if (cx>=0 && cx<3 && cz>=0 && cz<3)
-                require(owned[cz*3+cx]->getBlock(x-owned[cz*3+cx]->worldX(),y,
-                            z-owned[cz*3+cx]->worldZ()) == id, "new structure generated voxel differs from blueprint");
+            if (const Chunk* chunk = chunkAt(owned, x, z))
+                require(chunk->getBlock(x-chunk->worldX(),y,z-chunk->worldZ()) == id,
+                        "new structure generated voxel differs from blueprint");
             else {
                 ++outside;
                 require(std::any_of(regionPending.begin(),regionPending.end(),[&](const auto& b) {
