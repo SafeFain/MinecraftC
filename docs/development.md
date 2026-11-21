@@ -17,10 +17,17 @@ for platform prerequisites; run commands from the repository root.
 | UI and localization | `src/ui/`, `assets/lang/` |
 | Assets and tools | [asset pipeline](../ASSET_PIPELINE.md), `tools/` |
 
-CMake discovers new source files after reconfiguration. Test targets have explicit
-source lists. Keep SDL, native OS and Vulkan APIs inside their existing adapters;
-public gameplay/UI/render contracts stay backend-neutral. GPU resources belong
-to the main/render thread. Preserve serialized IDs and generation determinism.
+Register each new production implementation in its owning target in
+`cmake/MinecraftCTargets.cmake` or the application entry list in `CMakeLists.txt`.
+Test targets are declared in `cmake/MinecraftCTests.cmake`. Reconfigure after
+changing those lists. The `module_dependency_boundaries` test checks source
+ownership, target dependency direction, and private header use. See the
+[modularization roadmap](modularization.md).
+
+Keep SDL, native OS and Vulkan APIs inside their existing adapters. Public
+gameplay, UI and rendering contracts stay backend-neutral. GPU resources
+belong to the main/render thread. Preserve serialized IDs and generation
+determinism.
 
 ## Validation and tools
 
