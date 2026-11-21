@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.28)
 include("${CMAKE_CURRENT_LIST_DIR}/project_version.cmake")
 
 if("$ENV{GITHUB_REF}" MATCHES "^refs/tags/v" AND

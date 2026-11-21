@@ -1,4 +1,4 @@
-# Explicit registration helper, compatible with the project's CMake 3.16 floor.
+# Explicit test registration helper.
 # The wrapper changes only child TEMP/TMP/TMPDIR and preserves command arguments.
 function(minecraftc_add_test)
     cmake_parse_arguments(TEST "" "NAME;WORKING_DIRECTORY" "COMMAND" ${ARGN})

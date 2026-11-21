@@ -14,7 +14,7 @@ Android and iOS (MoltenVK on Apple platforms).
 
 ## Quick start
 
-Install CMake 3.16+, a C++20 compiler and Vulkan development/runtime support.
+Install CMake 3.28+, a C++20 compiler and Vulkan development/runtime support.
 CMake fetches SDL 3.4.10; the option below also fetches GLM 1.0.1.
 Linux needs X11/Wayland development headers. Apple builds need MoltenVK.
 See [platform build instructions](docs/building.md) for prerequisites.

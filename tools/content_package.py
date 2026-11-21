@@ -209,8 +209,9 @@ extern "C" MC_PLUGIN_EXPORT const MC_Plugin* MCPlugin_Query(uint32_t abi) {
     return abi==MC_PLUGIN_ABI?&plugin:nullptr;
 }
 '''
-CMAKE_TEMPLATE = '''cmake_minimum_required(VERSION 3.16)
+CMAKE_TEMPLATE = '''cmake_minimum_required(VERSION 3.28)
 project(PACKAGE_ID LANGUAGES CXX C)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(MINECRAFTC_SDK "" CACHE PATH "MinecraftC SDK directory")
 include("${MINECRAFTC_SDK}/cmake/ContentPackage.cmake")
 minecraftc_add_content_package(PACKAGE_ID ROOT "${CMAKE_CURRENT_SOURCE_DIR}" MODE MODULE)

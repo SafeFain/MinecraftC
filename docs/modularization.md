@@ -149,7 +149,7 @@ positive and negative coordinates.
 
 ## Compatibility and release gates
 
-- Keep C++20, CMake 3.16, current mobile and desktop build paths, plugin ABI 1,
+- Keep C++20, CMake 3.28 or newer, current mobile and desktop build paths, plugin ABI 1,
   serialized IDs, and current save, LAN, and world-generation semantics.
   Keep SDL/native/Vulkan APIs confined to their adapters and GPU resource
   ownership on the render thread.

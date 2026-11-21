@@ -1,5 +1,6 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.28)
 project(MinecraftCExtensionDemo LANGUAGES CXX)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(MINECRAFTC_SDK "${CMAKE_CURRENT_LIST_DIR}/../../../sdk" CACHE PATH "MinecraftC SDK directory")
 add_library(terrain_demo MODULE plugin.cpp)
 target_include_directories(terrain_demo PRIVATE "${MINECRAFTC_SDK}")

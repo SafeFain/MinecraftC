@@ -1,6 +1,6 @@
 # Android build
 
-Requirements: Android SDK 35, NDK 28.2.13676358, CMake 3.22.1, JDK 17, and
+Requirements: Android SDK 35, NDK 28.2.13676358, SDK CMake 3.31.5, JDK 17, and
 Gradle 8.9 or newer. The first configuration downloads the pinned SDL 3.4.10
 source archive and verifies its SHA-256 checksum.
 

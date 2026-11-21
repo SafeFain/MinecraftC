@@ -120,7 +120,9 @@ class ContentPackageTests(unittest.TestCase):
         host = self.root / "builtin host"
         host.mkdir()
         (host / "CMakeLists.txt").write_text(
-            'cmake_minimum_required(VERSION 3.16)\nproject(BuiltinPackageHost LANGUAGES CXX C)\n'
+            'cmake_minimum_required(VERSION 3.28)\n'
+            'project(BuiltinPackageHost LANGUAGES CXX C)\n'
+            'set(CMAKE_CXX_SCAN_FOR_MODULES OFF)\n'
             f'include("{sdk.as_posix()}/cmake/ContentPackage.cmake")\n'
             f'minecraftc_add_content_package(sample ROOT "{source.as_posix()}" MODE BUILTIN)\n'
             'get_property(entries GLOBAL PROPERTY MINECRAFTC_CONTENT_ENTRIES)\n'

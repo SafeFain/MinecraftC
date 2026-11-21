@@ -747,7 +747,7 @@ jobs:
             platform-tools
             platforms;android-35
             build-tools;35.0.0
-            cmake;3.22.1
+            cmake;3.31.5
             ndk;28.2.13676358
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v6

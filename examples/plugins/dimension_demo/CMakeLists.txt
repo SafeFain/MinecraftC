@@ -1,5 +1,6 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.28)
 project(dimension_demo LANGUAGES CXX)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 add_library(dimension_demo SHARED plugin.cpp)
 target_include_directories(dimension_demo PRIVATE ../../../sdk)
 target_compile_features(dimension_demo PRIVATE cxx_std_20)

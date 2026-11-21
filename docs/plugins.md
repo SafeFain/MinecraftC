@@ -231,7 +231,7 @@ worker results back before using the host. Pure world-generation extension callb
 run on workers and have no main-thread host access. Return zero on success; use `last_error` for
 failed host calls. Never throw across the ABI.
 
-Build the runnable example independently:
+Build the runnable example independently with CMake 3.28 or newer:
 
 ```sh
 cmake -S examples/plugins/native_demo -B build-local/plugins/native_demo

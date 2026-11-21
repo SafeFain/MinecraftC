@@ -1,6 +1,6 @@
 # Build and run
 
-MinecraftC requires CMake 3.16 or newer and a C++20 compiler. CMake fetches the
+MinecraftC requires CMake 3.28 or newer and a C++20 compiler. CMake fetches the
 pinned SDL 3.4.10 release by default. Add
 `-DMINECRAFTC_FETCH_DEPENDENCIES=ON` to fetch GLM 1.0.1 as well, or use
 `-DMINECRAFTC_USE_SYSTEM_SDL3=ON` for a compatible system SDL3.
@@ -28,7 +28,9 @@ sudo pacman -S --needed base-devel cmake git glm vulkan-headers \
   libxkbcommon wayland-protocols extra-cmake-modules pkgconf
 ```
 
-Then build from the repository root:
+Run `cmake --version` before configuring. If your distribution supplies an older
+version, install CMake 3.28 or newer and ensure its executable is first on your
+PATH. Then build from the repository root:
 
 ```bash
 cmake -S . -B build-local -DCMAKE_BUILD_TYPE=Release
@@ -84,7 +86,7 @@ cmake --build build-local -j2
 
 Android builds target arm64 devices running Android 10 (API 29) or newer and
 require Vulkan 1.0. The pinned toolchain uses SDK
-Platform 35, Build Tools 35.0.0, NDK 28.2.13676358, CMake 3.22.1, and JDK 17.
+Platform 35, Build Tools 35.0.0, NDK 28.2.13676358, CMake 3.31.5, and JDK 17.
 
 ```bash
 gradle -p android assembleDebug

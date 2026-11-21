@@ -15,9 +15,10 @@ python3 tools/content_package.py build content/my_expansion --output dist
 
 Use `--type native` to include `code/plugin.cpp` and a CMake project. `build` then
 configures CMake, builds the desktop module and copies it to `dist/my_expansion/`.
-Options include `--config Debug` and `--sdk /path/to/sdk`. CMake and a C++20 compiler
-must be available. Build caches are in `.content-package-build/` beside the output
-directory, outside the source. Public commands refuse to overwrite existing source
+Options include `--config Debug` and `--sdk /path/to/sdk`. Native builds require
+CMake 3.28 or newer and a C++20 compiler. Build caches are in
+`.content-package-build/` beside the output directory, outside the source.
+Public commands refuse to overwrite existing source
 or output directories; choose a new output parent for another build.
 
 Portable releases include the tool at `sdk/tools/content_package.py` and the shared

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.28)
 include("${CMAKE_CURRENT_SOURCE_DIR}/tools/project_version.cmake")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
@@ -11,6 +11,7 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -30,9 +31,6 @@ if(NOT ANDROID AND
        NOT IOS)
     message(FATAL_ERROR
         "MinecraftC supports Vulkan on Android, Linux, Windows, macOS, and iOS only")
-endif()
-if(IOS AND CMAKE_VERSION VERSION_LESS 3.28)
-    message(FATAL_ERROR "iOS builds require CMake 3.28 or newer")
 endif()
 if(MSVC AND MINECRAFTC_STATIC_MSVC_RUNTIME)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
