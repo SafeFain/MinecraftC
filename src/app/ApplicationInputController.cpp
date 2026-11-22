@@ -1,9 +1,17 @@
 #include "app/ApplicationInputController.h"
 
+#include "core/GamepadManager.h"
+
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Window.h"
+#endif
 #include "game/ClientSettings.h"
 
 #include <algorithm>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.window;
+#endif
 
 void ApplicationInputController::bind(
     Window& window, const ClientSettings& settings, Callbacks callbacks) {

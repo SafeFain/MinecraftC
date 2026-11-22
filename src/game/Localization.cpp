@@ -1,11 +1,22 @@
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Utf8Path.h"
+#endif
 #include "game/Localization.h"
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/AssetStore.h"
+#endif
 #include "game/ArabicShaper.h"
 #include "plugins/ContentQueries.h"
 
 #include <algorithm>
 #include <cctype>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+// Import before <sstream> to avoid GCC 14's LTO crash.
+import minecraftc.core.asset_store;
+import minecraftc.core.utf8_path;
+#endif
+
 #include <sstream>
 #include <stdexcept>
 

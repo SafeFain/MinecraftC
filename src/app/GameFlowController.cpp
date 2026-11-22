@@ -4,7 +4,9 @@
 #include "app/GameSession.h"
 #include "app/GameUiController.h"
 #include "audio/AudioSystem.h"
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Window.h"
+#endif
 #include "game/ClientSettings.h"
 #include "game/Command.h"
 #include "core/Clipboard.h"
@@ -14,6 +16,10 @@
 #include "Config.h"
 
 #include <glm/glm.hpp>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.window;
+#endif
 
 namespace {
 AudioMusicMode musicModeFor(DimensionId) { return AudioMusicMode::Overworld; }

@@ -1,11 +1,17 @@
 #include "renderer/TexturedCubeScene.h"
 
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/AssetStore.h"
+#endif
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <limits>
 #include <stdexcept>
 #include <stb_image.h>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.asset_store;
+#endif
 
 namespace {
 

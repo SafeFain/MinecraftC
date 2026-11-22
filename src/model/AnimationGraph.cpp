@@ -1,8 +1,18 @@
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Utf8Path.h"
+#endif
 #include "model/AnimationGraph.h"
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/AssetStore.h"
+#endif
 
 #include <nlohmann/json.hpp>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+// Import before <sstream> to avoid GCC 14's LTO crash with these modules.
+import minecraftc.core.asset_store;
+import minecraftc.core.utf8_path;
+#endif
 
 #include <algorithm>
 #include <cmath>

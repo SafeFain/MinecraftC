@@ -1,6 +1,8 @@
 #include "renderer/backend/vulkan/VulkanHelpers.h"
 
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/AssetStore.h"
+#endif
 
 #include <stb_image.h>
 
@@ -11,6 +13,10 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.asset_store;
+#endif
 
 namespace vkhelp {
 

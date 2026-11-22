@@ -6,7 +6,9 @@
 #include "ui/UIStyle.h"
 #include "app/ApplicationInputController.h"
 #include "app/GameSession.h"
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Window.h"
+#endif
 #include "game/ClientSettings.h"
 #include "game/SurvivalRules.h"
 #include "game/TextWrap.h"
@@ -15,6 +17,10 @@
 
 #include <algorithm>
 #include <cmath>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.window;
+#endif
 
 namespace {
 constexpr float commandLineHeight = 25.0f;

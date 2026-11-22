@@ -169,12 +169,15 @@ positive and negative coordinates.
 
 ## C++20 named-module builds
 
-The experiment uses named interfaces for `WorldGenContext` and `RuntimeClock`
-in selected production translation units. Their headers remain the definition
-source. Header builds remain the default on every platform.
+The experiment uses named interfaces for `AssetStore`, `RuntimeClock`,
+`Utf8Path`, `Window`, and `WorldGenContext` in selected production translation
+units. Their headers remain the definition source. Every platform uses the
+same interfaces and import sites. Header builds remain the default.
 
-The order of `RuntimeClock` imports and textual standard-library includes
-matters for GCC and MSVC. Preserve the tested order in each consumer.
+Import order relative to textual standard-library includes matters for GCC
+and MSVC. Keep the tested order in each consumer. The animation graph, language
+loader, and block atlas import the filesystem-related interfaces before their
+stream headers to avoid a GCC 14 crash during LTO.
 
 Use Ninja 1.11 or newer and enable `-DMINECRAFTC_EXPERIMENTAL_CXX_MODULES=ON`
 in a separate build directory alongside the usual dependency options.

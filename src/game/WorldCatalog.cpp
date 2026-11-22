@@ -1,4 +1,6 @@
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Utf8Path.h"
+#endif
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
 #include "game/WorldCatalog.h"
@@ -14,6 +16,10 @@ import minecraftc.world.gen_context;
 #include <cctype>
 #include <stdexcept>
 #include <system_error>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.utf8_path;
+#endif
 
 std::string WorldCatalog::slug(const std::string& displayName) {
     std::string result;

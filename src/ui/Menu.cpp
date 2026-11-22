@@ -1,4 +1,6 @@
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Utf8Path.h"
+#endif
 #include "ui/Menu.h"
 #include "ui/UIRenderer.h"
 #include "ui/UIStyle.h"
@@ -18,6 +20,7 @@
 
 #if defined(MINECRAFTC_USE_NAMED_MODULES)
 import minecraftc.core.runtime_clock;
+import minecraftc.core.utf8_path;
 #endif
 
 namespace {

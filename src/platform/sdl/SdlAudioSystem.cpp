@@ -2,7 +2,9 @@
 #include "plugins/ContentQueries.h"
 #include "plugins/Runtime.h"
 
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/AssetStore.h"
+#endif
 #include "debug/Log.h"
 
 #include <SDL3/SDL.h>
@@ -14,6 +16,10 @@
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.asset_store;
+#endif
 
 struct AudioSystem::Impl {
     static constexpr int CHANNELS = 2;

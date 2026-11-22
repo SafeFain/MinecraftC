@@ -1,10 +1,18 @@
 #include "world/BlockTextureDefinitions.h"
 #include "plugins/AtlasPublication.h"
 #include "plugins/ContentQueries.h"
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+// Import before <fstream> to avoid GCC 14's LTO crash.
+import minecraftc.core.asset_store;
+#endif
+
 #include <fstream>
 #include "renderer/BlockAtlasData.h"
 
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/AssetStore.h"
+#endif
 #include "world/Block.h"
 
 #include <algorithm>

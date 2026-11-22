@@ -1,6 +1,8 @@
 #include "core/Utf8Path.h"
 #include "model/GltfLoader.h"
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/AssetStore.h"
+#endif
 #include "core/AllocationBudget.h"
 
 #define CGLTF_IMPLEMENTATION
@@ -20,6 +22,10 @@
 #include <memory>
 #include <sstream>
 #include <string>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.asset_store;
+#endif
 
 namespace model {
 namespace {

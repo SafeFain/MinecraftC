@@ -127,8 +127,10 @@ minecraftc_add_engine_library(minecraftc_model_animation
 minecraftc_add_engine_library(minecraftc_animation_graph
     src/model/AnimationGraph.cpp
     src/model/AnimationMixer.cpp)
+minecraftc_enable_module_imports(minecraftc_animation_graph src/model/AnimationGraph.cpp)
 minecraftc_add_engine_library(minecraftc_gltf
     src/model/GltfLoader.cpp)
+minecraftc_enable_module_imports(minecraftc_gltf src/model/GltfLoader.cpp)
 minecraftc_add_engine_library(minecraftc_content_registry
     src/plugins/ContentRegistry.cpp
     src/plugins/ContentMutation.h)
@@ -291,6 +293,7 @@ set(MINECRAFTC_TEXT_SOURCES
     src/game/Localization.cpp
     src/ui/StbTruetypeImpl.cpp)
 minecraftc_add_engine_library(minecraftc_text ${MINECRAFTC_TEXT_SOURCES})
+minecraftc_enable_module_imports(minecraftc_text src/game/Localization.cpp)
 target_include_directories(minecraftc_text PRIVATE external/stb)
 target_link_libraries(minecraftc_text
     PUBLIC minecraftc_sdk glm::glm
@@ -314,6 +317,9 @@ set(MINECRAFTC_RENDER_DATA_SOURCES
     src/renderer/TexturedCubeScene.cpp
     src/renderer/UIRenderBackend.h)
 minecraftc_add_engine_library(minecraftc_render_data ${MINECRAFTC_RENDER_DATA_SOURCES})
+minecraftc_enable_module_imports(minecraftc_render_data
+    src/renderer/BlockAtlasData.cpp
+    src/renderer/TexturedCubeScene.cpp)
 target_link_libraries(minecraftc_render_data
     PUBLIC minecraftc_sdk glm::glm
     PRIVATE minecraftc_animation_graph minecraftc_assets minecraftc_atlas_bindings
@@ -321,6 +327,9 @@ target_link_libraries(minecraftc_render_data
             minecraftc_json minecraftc_log minecraftc_simulation_common)
 
 add_library(minecraftc_platform_sdl STATIC ${MINECRAFTC_SDL_BACKEND_SOURCES})
+minecraftc_enable_module_imports(minecraftc_platform_sdl
+    src/platform/sdl/SdlAudioSystem.cpp
+    src/platform/sdl/SdlGamepadManager.cpp)
 target_link_libraries(minecraftc_platform_sdl PRIVATE
     minecraftc_assets minecraftc_content_registry minecraftc_core minecraftc_log minecraftc_sdk)
 target_include_directories(minecraftc_platform_sdl PRIVATE src)
@@ -337,6 +346,8 @@ target_link_libraries(minecraftc_render_vulkan PRIVATE
     minecraftc_core minecraftc_image_decoder minecraftc_log minecraftc_model_animation
     minecraftc_plugin_runtime minecraftc_render_data minecraftc_sdk minecraftc_text)
 target_include_directories(minecraftc_render_vulkan PRIVATE src)
+minecraftc_enable_module_imports(minecraftc_render_vulkan
+    src/renderer/backend/vulkan/VulkanHelpers.cpp)
 target_include_directories(minecraftc_render_vulkan SYSTEM PRIVATE
     external/VulkanMemoryAllocator/include external/stb)
 target_compile_definitions(minecraftc_render_vulkan PRIVATE
@@ -367,6 +378,7 @@ set(MINECRAFTC_UI_SOURCES
     src/ui/VillagerTradeScreen.cpp)
 minecraftc_add_engine_library(minecraftc_ui ${MINECRAFTC_UI_SOURCES})
 minecraftc_enable_module_imports(minecraftc_ui
+    src/app/ApplicationInputController.cpp
     src/ui/ContainerScreen.cpp
     src/ui/LanMenu.cpp
     src/ui/Menu.cpp
@@ -407,6 +419,10 @@ set(MINECRAFTC_SESSION_SOURCES
     src/app/GameUiController.cpp)
 function(minecraftc_add_session target scene)
     minecraftc_add_engine_library(${target} ${MINECRAFTC_SESSION_SOURCES})
+    minecraftc_enable_module_imports(${target}
+        src/app/GameFlowController.cpp
+        src/app/GameScenePresenter.cpp
+        src/app/GameUiController.cpp)
     target_link_libraries(${target}
         PUBLIC ${scene} minecraftc_network minecraftc_ui
         PRIVATE minecraftc_assets minecraftc_content_registry minecraftc_core minecraftc_json

@@ -2,7 +2,10 @@ option(MINECRAFTC_EXPERIMENTAL_CXX_MODULES
     "Use experimental C++20 named modules in selected MinecraftC sources" OFF)
 
 set(minecraftc_named_module_sources
+    src/core/AssetStore.cppm
     src/core/RuntimeClock.cppm
+    src/core/Utf8Path.cppm
+    src/core/Window.cppm
     src/world/WorldGenContext.cppm)
 
 if(MINECRAFTC_EXPERIMENTAL_CXX_MODULES)

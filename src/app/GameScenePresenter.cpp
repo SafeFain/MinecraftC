@@ -6,7 +6,9 @@
 
 #include "Config.h"
 #include "app/GameSession.h"
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Window.h"
+#endif
 #include "entity/EntityPresenter.h"
 #include "entity/ProjectileCollision.h"
 #include "game/ClientSettings.h"
@@ -21,6 +23,10 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.window;
+#endif
 
 void GameScenePresenter::render(
     const GameSession& session, IGameRenderer& renderer,

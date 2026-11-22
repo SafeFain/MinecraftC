@@ -1,4 +1,6 @@
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/Utf8Path.h"
+#endif
 #include "world/RedstonePersistence.h"
 #include "plugins/ContentQueries.h"
 #include "plugins/GenerationValidation.h"
@@ -27,6 +29,7 @@
 #include <regex>
 #if defined(MINECRAFTC_USE_NAMED_MODULES)
 import minecraftc.world.gen_context;
+import minecraftc.core.utf8_path;
 #else
 #include "world/WorldGenContext.h"
 #endif

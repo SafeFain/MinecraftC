@@ -1,13 +1,19 @@
 #include "core/GamepadManager.h"
 
 #include "debug/Log.h"
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/RuntimeClock.h"
+#endif
 
 #include <SDL3/SDL.h>
 
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#endif
 
 struct GamepadManager::Impl {
     std::unordered_map<uint32_t, SDL_Gamepad*> gamepads;
