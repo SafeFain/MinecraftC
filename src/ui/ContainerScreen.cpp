@@ -11,12 +11,14 @@
 #include "world/BlockEntity.h"
 
 #include "core/Window.h"
-#if defined(MINECRAFTC_USE_NAMED_MODULES)
-import minecraftc.core.runtime_clock;
-#else
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/RuntimeClock.h"
 #endif
 #include <algorithm>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#endif
 
 bool ContainerScreen::open(IContainerAccess& access, const glm::ivec3& position) {
     m_gamepadFocus=false;m_focusIndex=0;m_slotFeedback={};

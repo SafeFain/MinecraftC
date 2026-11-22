@@ -6,9 +6,7 @@
 #include "plugins/ContentQueries.h"
 
 #include "core/Window.h"
-#if defined(MINECRAFTC_USE_NAMED_MODULES)
-import minecraftc.core.runtime_clock;
-#else
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/RuntimeClock.h"
 #endif
 #include <algorithm>
@@ -17,6 +15,10 @@ import minecraftc.core.runtime_clock;
 #include "game/ArabicShaper.h"
 #include "game/TextWrap.h"
 #include "game/SaveStore.h"
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#endif
 
 namespace {
 struct ThirdPartyCredit {

@@ -26,6 +26,19 @@ GPL-3.0-only except for third-party components and assets that identify a
 different license; their notices remain beside the corresponding source or
 asset and are summarized in [third-party licenses](../docs/licenses.md).
 
+## Experimental C++20 modules
+
+Pass the absolute path to Ninja 1.11 or newer to opt in. Gradle continues to
+use the pinned SDK CMake and NDK. The Ninja bundled with SDK CMake 3.31.5
+is too old for module dependency scanning.
+
+```bash
+gradle -p android assembleRelease "-PminecraftcModulesNinja=$(command -v ninja)"
+```
+
+See the [toolchain matrix](../docs/modularization.md#c20-named-module-builds)
+for the other platforms.
+
 ## Versioning and releases
 
 The root `VERSION` supplies Gradle's full `versionName`, including an optional

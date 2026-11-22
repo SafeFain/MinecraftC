@@ -167,14 +167,52 @@ positive and negative coordinates.
   Its final log reported MSVC /LTCG restarts. Repeat the measurement before
   attributing the difference or changing IPO policy.
 
-## C++20 named-module pilot
+## C++20 named-module builds
 
-On native Windows x64, configure a separate MSVC/Ninja build with
-`-DMINECRAFTC_EXPERIMENTAL_CXX_MODULES=ON` alongside the usual dependency
-options. The pilot uses named interfaces for `WorldGenContext` and
-`RuntimeClock` in selected production translation units. Their headers remain
-the definition source and are available to the rest of the project. The
-default build uses the headers on every platform.
+The experiment uses named interfaces for `WorldGenContext` and `RuntimeClock`
+in selected production translation units. Their headers remain the definition
+source. Header builds remain the default on every platform.
+
+The order of `RuntimeClock` imports and textual standard-library includes
+matters for GCC and MSVC. Preserve the tested order in each consumer.
+
+Use Ninja 1.11 or newer and enable `-DMINECRAFTC_EXPERIMENTAL_CXX_MODULES=ON`
+in a separate build directory alongside the usual dependency options.
+
+| Platform | Toolchain |
+| --- | --- |
+| Windows x64 and ARM64 | MSVC 19.34 or newer, set up for the target architecture |
+| Linux | GCC 14 or newer, or upstream LLVM Clang 16 or newer with matching `clang-scan-deps` |
+| macOS | Upstream LLVM Clang with matching `clang-scan-deps` and the Xcode macOS SDK. Configure arm64 and x86_64 in separate directories. |
+| iOS | Upstream LLVM Clang with matching `clang-scan-deps` and the Xcode SDK. Configure `iphoneos` and `iphonesimulator` in separate directories. |
+| Android arm64 | NDK 28.2.13676358 and SDK CMake 3.31.5 with a separately installed Ninja 1.11 or newer. See the [Gradle command](../android/README.md#experimental-c20-modules). |
+
+On Apple platforms, upstream LLVM and Ninja are required for CMake's module
+scanning. The validation workflow selects Homebrew `llvm@21`. Use the existing
+MoltenVK path and deployment settings. For example, on macOS:
+
+```bash
+brew install llvm@21 ninja
+llvm="$(brew --prefix llvm@21)/bin"
+CC="$llvm/clang" CXX="$llvm/clang++" cmake -S . -B build-local/macos-modules -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+  "-DCMAKE_OSX_SYSROOT=$(xcrun --sdk macosx --show-sdk-path)" \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+  -DMINECRAFTC_EXPERIMENTAL_CXX_MODULES=ON -DMINECRAFTC_FETCH_DEPENDENCIES=ON \
+  "-DMINECRAFTC_MOLTENVK_ROOT=$MINECRAFTC_MOLTENVK_ROOT"
+cmake --build build-local/macos-modules --target minecraftc named_modules_tests
+```
+
+For iOS, use the same compiler and options with `-DCMAKE_SYSTEM_NAME=iOS`,
+`-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0`, and the SDK path reported by
+`xcrun --sdk iphoneos --show-sdk-path` or its `iphonesimulator` equivalent.
+Build the `minecraftc` target. Use the [Xcode procedure](../ios/README.md)
+for the regular archive and signing workflow.
+
+Manually run the **Cross-platform build and release** workflow with
+`cxx_modules` enabled to exercise the module builds across the platform matrix.
+The Apple jobs additionally build and check the separate slices. The usual
+automatic builds and tag releases continue to use the header path.
 
 Run CTest with `BUILD_TESTING=ON` to check linking and passing values between
 module and header callers. For incremental validation, check that Ninja

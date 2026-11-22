@@ -1,22 +1,54 @@
 option(MINECRAFTC_EXPERIMENTAL_CXX_MODULES
-    "Use experimental C++20 named modules in selected Windows x64 sources" OFF)
+    "Use experimental C++20 named modules in selected MinecraftC sources" OFF)
 
 set(minecraftc_named_module_sources
     src/core/RuntimeClock.cppm
     src/world/WorldGenContext.cppm)
 
 if(MINECRAFTC_EXPERIMENTAL_CXX_MODULES)
-    if(NOT WIN32 OR CMAKE_CROSSCOMPILING
-       OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC"
-       OR NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64"
-       OR MSVC_VERSION LESS 1934 OR NOT CMAKE_GENERATOR STREQUAL "Ninja")
+    if(NOT CMAKE_GENERATOR MATCHES "^Ninja( Multi-Config)?$")
         message(FATAL_ERROR
-            "MINECRAFTC_EXPERIMENTAL_CXX_MODULES requires native Windows x64, "
-            "MSVC 19.34 or newer, and the Ninja generator (Ninja 1.11 or newer).")
+            "MINECRAFTC_EXPERIMENTAL_CXX_MODULES requires a Ninja generator "
+            "with Ninja 1.11 or newer.")
     endif()
+    if(WIN32)
+        if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR MSVC_VERSION LESS 1934
+           OR NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "^(x64|ARM64)$")
+            message(FATAL_ERROR
+                "Windows named modules require MSVC 19.34 or newer targeting x64 or ARM64.")
+        endif()
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+            message(FATAL_ERROR "Linux named modules with GCC require GCC 14 or newer.")
+        endif()
+    else()
+        if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+           OR CMAKE_CXX_COMPILER_VERSION VERSION_LESS 16)
+            message(FATAL_ERROR
+                "This named-module build requires LLVM Clang 16 or newer "
+                "with matching clang-scan-deps (use upstream LLVM on Apple platforms).")
+        endif()
+        if(NOT EXISTS "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}")
+            message(FATAL_ERROR
+                "clang-scan-deps was not found. Install the scanner matching clang++, "
+                "or set CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS to its absolute path.")
+        endif()
+    endif()
+    if(APPLE)
+        list(LENGTH CMAKE_OSX_ARCHITECTURES named_modules_arch_count)
+        if(named_modules_arch_count GREATER 1)
+            message(FATAL_ERROR
+                "Apple named modules require a separate build directory for each architecture.")
+        endif()
+    endif()
+
     add_library(minecraftc_named_modules STATIC)
     target_include_directories(minecraftc_named_modules PRIVATE src)
-    target_compile_options(minecraftc_named_modules PRIVATE /W4 /permissive-)
+    if(MSVC)
+        target_compile_options(minecraftc_named_modules PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(minecraftc_named_modules PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
     target_sources(minecraftc_named_modules PUBLIC
         FILE_SET named_modules TYPE CXX_MODULES
         FILES ${minecraftc_named_module_sources})

@@ -31,6 +31,7 @@ if (versionCodeValue > 2100000000) {
 }
 def androidVersionCode = versionCodeValue.toInteger()
 def generatedLegalAssetsDir = layout.buildDirectory.dir("generated/legalAssets").get().asFile
+def modulesNinja = providers.gradleProperty("minecraftcModulesNinja")
 def contentPackageRoots = (findProperty("minecraftcContentPackages") ?: "").toString()
         .split(";").findAll { !it.isEmpty() }.collect { file(it).canonicalFile }
 def contentPackagePaths = contentPackageRoots.collect { it.path.replace('\\', '/') }.join(";")
@@ -90,6 +91,10 @@ android {
                 arguments "-DANDROID_PLATFORM=android-29", "-DANDROID_STL=c++_shared",
                           "-DBUILD_TESTING=OFF", "-DMINECRAFTC_FETCH_DEPENDENCIES=ON",
                           "-DFETCHCONTENT_SOURCE_DIR_SDL3=${gradle.ext.sdlSourceDir.absolutePath}"
+                if (modulesNinja.isPresent()) {
+                    arguments "-DMINECRAFTC_EXPERIMENTAL_CXX_MODULES=ON",
+                              "-DCMAKE_MAKE_PROGRAM=${file(modulesNinja.get()).canonicalPath}"
+                }
                 if (!contentPackageRoots.isEmpty()) {
                     arguments "-DMINECRAFTC_CONTENT_PACKAGES=${contentPackagePaths}"
                     if (findProperty("minecraftcPython")) {

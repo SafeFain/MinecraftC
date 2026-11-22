@@ -47,6 +47,9 @@ The application is written to
 `build-ios-simulator/Release-iphonesimulator/MinecraftC.app`. Install and launch
 it with Xcode or `xcrun simctl install` and `xcrun simctl launch`.
 
+The [experimental C++20 module build](../docs/modularization.md#c20-named-module-builds)
+uses upstream LLVM and Ninja for separate device and simulator builds.
+
 ## Device build and signing
 
 Configure a separate directory with `-DCMAKE_OSX_SYSROOT=iphoneos` and

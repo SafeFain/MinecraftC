@@ -7,13 +7,15 @@
 #include "ui/UILayout.h"
 
 #include "core/Window.h"
-#if defined(MINECRAFTC_USE_NAMED_MODULES)
-import minecraftc.core.runtime_clock;
-#else
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/RuntimeClock.h"
 #endif
 #include <algorithm>
 #include <string>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#endif
 
 namespace {
 constexpr size_t RECIPES_PER_PAGE = 6;

@@ -304,6 +304,17 @@ if(IOS)
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "io.github.SafeFain.MinecraftC"
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
         XCODE_GENERATE_SCHEME TRUE)
+    if(MINECRAFTC_EXPERIMENTAL_CXX_MODULES)
+        # SDL locates the statically linked MoltenVK entry point by name.
+        set(ios_exported_symbols "${CMAKE_CURRENT_SOURCE_DIR}/ios/MinecraftC.exports")
+        target_link_options(${MINECRAFTC_APP_TARGET} PRIVATE
+            -ObjC
+            "LINKER:-u,_vkGetInstanceProcAddr"
+            "LINKER:-exported_symbols_list,${ios_exported_symbols}"
+            "LINKER:-export_dynamic")
+        set_property(TARGET ${MINECRAFTC_APP_TARGET} APPEND PROPERTY
+            LINK_DEPENDS "${ios_exported_symbols}")
+    endif()
     foreach(MINECRAFTC_IOS_LIBRARY IN ITEMS
             minecraftc_assets
             minecraftc_platform

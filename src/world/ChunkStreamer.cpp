@@ -4,9 +4,7 @@
 #include <set>
 #include <tuple>
 
-#if defined(MINECRAFTC_USE_NAMED_MODULES)
-import minecraftc.core.runtime_clock;
-#else
+#if !defined(MINECRAFTC_USE_NAMED_MODULES)
 #include "core/RuntimeClock.h"
 #endif
 #include "game/SaveStore.h"
@@ -22,6 +20,10 @@ import minecraftc.core.runtime_clock;
 #include <chrono>
 #include <cmath>
 #include <thread>
+
+#if defined(MINECRAFTC_USE_NAMED_MODULES)
+import minecraftc.core.runtime_clock;
+#endif
 
 namespace {
 int worldToChunk(double coordinate, int chunkSize) {
