@@ -26,9 +26,11 @@ Plugins::PluginInfo info(const std::string& id){Plugins::PluginInfo p;p.manifest
 }
 #include "ContentPackageIntegration.h"
 #include "NaturalTextureIntegration.h"
+#include "RecipePluginIntegration.h"
 int main(int argc,char** argv) try {
     if(argc==2&&std::string(argv[1])=="--natural-textures")return NaturalTextureIntegration::run();
     if(argc==4&&std::string(argv[1])=="--content-package-tests")return ContentPackageIntegration::run(argv[2],argv[3]);
+    if(argc==5&&std::string(argv[1])=="--recipe-tests")return RecipePluginIntegration::run(argv[2],argv[3],argv[4]);
     try {
         const auto root=std::filesystem::temp_directory_path()/"minecraftc-plugin-regressions";
         std::filesystem::remove_all(root);std::filesystem::create_directories(root);

@@ -345,6 +345,12 @@ int32_t PluginManager::renderPass(MC_PluginContext& ctx,const MC_RenderPass& d) 
 const void* PluginManager::extension(MC_PluginContext*,const char* name,uint32_t version) {
     if(const auto* result=capability(name,version))return result;
     if(!name)return nullptr;
+    if(version==1&&std::string(name)==MC_RECIPES_EXTENSION) {
+        static const MC_RecipesV1 recipes{sizeof(MC_RecipesV1),1,
+            [](MC_PluginContext* c,const MC_ItemGroupV1* d){return call(c,[&]{require(d,"Missing item group");owner(c).itemGroup(*c,*d);},true);},
+            [](MC_PluginContext* c,const MC_RecipeDefinitionV1* d){return call(c,[&]{require(d,"Missing recipe");owner(c).recipeV1(*c,*d);},true);}};
+        return &recipes;
+    }
     if(version==1&&std::string(name)==MC_LOCALIZATION_EXTENSION) {
         static const MC_LocalizationV1 localization{sizeof(MC_LocalizationV1),1,
             [](MC_PluginContext* c,const char* directory){return call(c,[&]{owner(c).localizationBundle(*c,directory);},true);},

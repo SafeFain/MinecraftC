@@ -1,6 +1,7 @@
 #include "world/BlockEntityLogic.h"
 #include "game/SurvivalRules.h"
 #include "game/NetherProgression.h"
+#include <algorithm>
 
 bool tickFurnace(BlockEntity& entity){
     if(entity.type==BlockEntityType::BrewingStand)return tickBrewingStand(entity);
@@ -19,7 +20,17 @@ bool tickFurnace(BlockEntity& entity){
     if(entity.burnRemaining>0){--entity.burnRemaining;changed=true;}
     if(entity.burnRemaining>0&&fits){entity.cookTotal=recipe->cookTicks;if(++entity.cookProgress>=entity.cookTotal){entity.cookProgress=0;
         if(recipe->experienceMilli) {
-            auto& pending=entity.furnaceExperience[smeltingRecipeKey(*recipe)];
+            auto& experience = entity.furnaceExperience;
+            const auto key = smeltingRecipeKey(*recipe);
+            auto record = experience.find(key);
+            if (record == experience.end()) {
+                if (experience.size() < BlockEntity::MAX_FURNACE_EXPERIENCE_RECIPES)
+                    record = experience.emplace(key, 0).first;
+                else
+                    record = std::min_element(experience.begin(), experience.end(),
+                        [](const auto& a, const auto& b) { return a.second < b.second; });
+            }
+            auto& pending = record->second;
             pending=std::min<uint64_t>(uint64_t(INT32_MAX)*1000,pending+recipe->experienceMilli);
         }
         if(!--entity.input.count)entity.input.clear();

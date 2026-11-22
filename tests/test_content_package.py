@@ -94,6 +94,23 @@ class ContentPackageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             package.stage(source, self.root / "published/author_data")
 
+    def test_recipe_delivery(self):
+        if not OPTIONS.plugin_tests or OPTIONS.builtin_stage:
+            self.skipTest("Recipe runtime executable not supplied")
+        examples = REPO / "examples/plugins"
+        data_source = examples / "recipe_demo"
+        native_source = examples / "recipe_native"
+        data = self.root / "data/recipe_demo"
+        native = self.root / "module"
+        builtin = self.root / "builtin/recipe_demo"
+        package.stage(data_source, data)
+        package.stage(native_source, builtin, builtin=True)
+        self.assertTrue((data / "item_groups/stone.json").is_file())
+        subprocess.run([sys.executable, str(REPO / "tools/content_package.py"), "build",
+                        str(native_source), "--output", str(native)], check=True)
+        subprocess.run([OPTIONS.plugin_tests, "--recipe-tests", str(data),
+                        str(native / "recipe_demo"), str(builtin)], check=True)
+
     def test_native_build_and_runtime(self):
         global VULKAN_SKIPPED
         if not OPTIONS.plugin_tests:

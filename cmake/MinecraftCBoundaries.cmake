@@ -58,6 +58,7 @@ minecraftc_header_boundary(src/plugins/ContentMutation.h minecraftc_content_regi
     src/plugins/PluginCapabilities.cpp
     src/plugins/PluginExtensions.cpp
     src/plugins/PluginManager.cpp
+    src/plugins/PluginRecipes.cpp
     src/plugins/PluginRenderData.cpp
     src/plugins/official_heaven/HeavenDefinitions.cpp
     src/plugins/official_heaven/HeavenProvider.h

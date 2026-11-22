@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.28)
+project(recipe_demo LANGUAGES C CXX)
+set(MINECRAFTC_SDK "" CACHE PATH "MinecraftC SDK directory")
+include("${MINECRAFTC_SDK}/cmake/ContentPackage.cmake")
+minecraftc_add_content_package(recipe_demo ROOT "${CMAKE_CURRENT_SOURCE_DIR}" MODE MODULE)
+target_compile_features(recipe_demo PRIVATE c_std_11)

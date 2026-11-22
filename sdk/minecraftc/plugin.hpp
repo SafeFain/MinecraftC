@@ -1,5 +1,6 @@
 #pragma once
 #include "plugin.h"
+#include "recipes.h"
 #include "extensions.h"
 #include <cstddef>
 namespace minecraftc {
@@ -17,6 +18,7 @@ public:
         return api->query_extension(ctx,key,version);
     }
     const MC_BehaviorsV1* behaviors() const {return static_cast<const MC_BehaviorsV1*>(extension(MC_BEHAVIORS_EXTENSION));}
+    const MC_RecipesV1* recipes() const {return static_cast<const MC_RecipesV1*>(extension(MC_RECIPES_EXTENSION));}
     const MC_BehaviorsV2* behaviorsV2() const {return static_cast<const MC_BehaviorsV2*>(extension(MC_BEHAVIORS_EXTENSION,2));}
     const MC_StructuresV1* structures() const {return static_cast<const MC_StructuresV1*>(extension(MC_STRUCTURES_EXTENSION));}
     const MC_StructuresV2* structuresV2() const {return static_cast<const MC_StructuresV2*>(extension(MC_STRUCTURES_EXTENSION,2));}

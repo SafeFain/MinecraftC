@@ -479,7 +479,7 @@ if(BUILD_TESTING)
     target_link_libraries(plugin_tests PRIVATE
         minecraftc_log minecraftc_image_decoder minecraftc_model_animation minecraftc_gltf
         minecraftc_assets minecraftc_json minecraftc_sdk glm::glm minecraftc_platform
-        package_fixture minecraftc_simulation_common minecraftc_plugins minecraftc_render_data
+        package_fixture recipe_fixture minecraftc_simulation_common minecraftc_plugins minecraftc_render_data
         minecraftc_content_registry minecraftc_atlas_bindings minecraftc_plugin_runtime)
     target_include_directories(plugin_tests PRIVATE src external external/stb external/cgltf)
     target_compile_definitions(plugin_tests PRIVATE MINECRAFTC_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
@@ -491,11 +491,21 @@ if(BUILD_TESTING)
         ${CMAKE_SOURCE_DIR}/tests/test_natural_pixels.py NaturalPixelsTests.test_reproducible_and_publishable)
     minecraftc_add_content_package(package_fixture
         ROOT "${CMAKE_SOURCE_DIR}/examples/plugins/package_demo" MODE BUILTIN)
+    add_library(recipe_fixture STATIC "${CMAKE_SOURCE_DIR}/examples/plugins/recipe_native/code/plugin.c")
+    target_link_libraries(recipe_fixture PRIVATE minecraftc_sdk)
+    target_compile_features(recipe_fixture PRIVATE c_std_11)
+    target_compile_definitions(recipe_fixture PRIVATE MCPlugin_Query=mc_content_query_recipe_fixture)
     minecraftc_add_test(NAME content_package_authoring_loading_and_delivery
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_content_package.py
             --plugin-tests $<TARGET_FILE:plugin_tests>
             --builtin-stage "${CMAKE_BINARY_DIR}/content-assets/plugins/package_demo")
     set_tests_properties(content_package_authoring_loading_and_delivery PROPERTIES TIMEOUT 180)
+    if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        minecraftc_add_test(NAME plugin_recipe_delivery_and_gameplay
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/test_content_package.py
+                --plugin-tests $<TARGET_FILE:plugin_tests> ContentPackageTests.test_recipe_delivery)
+        set_tests_properties(plugin_recipe_delivery_and_gameplay PROPERTIES TIMEOUT 180)
+    endif()
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(plugin_tests PRIVATE -Wall -Wextra -Wpedantic)
     elseif(MSVC)

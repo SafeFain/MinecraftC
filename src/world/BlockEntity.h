@@ -2,6 +2,7 @@
 #include <map>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -13,6 +14,8 @@ enum class BlockEntityType : uint8_t {
 };
 
 struct BlockEntity {
+    static constexpr std::size_t MAX_FURNACE_EXPERIENCE_RECIPES = 1024;
+
     BlockEntityType type = BlockEntityType::Chest;
     std::array<ItemStack, 27> chest{};
     ItemStack input;

@@ -3,6 +3,7 @@
 #include "core/Platform.h"
 #include "plugins/Json.h"
 #include "plugins/Runtime.h"
+#include "minecraftc/recipes.h"
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -18,6 +19,13 @@ struct MC_PluginContext {
     size_t index=0;
     std::string error;
     bool registrationFailed=false;
+    struct PendingRecipe {
+        std::array<std::string, MC_MAX_RECIPE_INGREDIENTS> ingredients;
+        std::string output;
+        uint32_t kind, count, width, height, mirror, cookTicks, experienceMilli;
+    };
+    std::map<std::string, std::vector<std::string>> pendingItemGroups;
+    std::map<std::string, PendingRecipe> pendingRecipes;
 };
 namespace Plugins {
 struct PackageDefinition;
@@ -95,6 +103,8 @@ public:
     int32_t material(MC_PluginContext&,const MC_Material&);
     void materialSequence(MC_PluginContext&,const MC_MaterialSequenceDefinition&);
     int32_t recipe(MC_PluginContext&,const MC_Recipe&);
+    void itemGroup(MC_PluginContext&,const MC_ItemGroupV1&);
+    void recipeV1(MC_PluginContext&,const MC_RecipeDefinitionV1&);
     int32_t subscribe(MC_PluginContext&,uint32_t,int32_t,MC_EventCallback,void*);
     int32_t addCommand(MC_PluginContext&,const char*,MC_EventCallback,void*,uint32_t flags=0);
     int32_t enqueue(MC_PluginContext&,std::function<bool()>);
@@ -202,6 +212,8 @@ private:
     struct ActionReceipt {size_t owner=0;uint32_t status=MC_ACTION_PENDING;};
     std::map<uint64_t,ActionReceipt> m_actionResults;
     void loadData(MC_PluginContext&,const Json&);
+    void loadRecipeData(MC_PluginContext&,const Json&);
+    void resolveRecipes(MC_PluginContext&);
     std::vector<PackageDefinition> readPackage(MC_PluginContext&);
     void loadPackage(MC_PluginContext&,const std::vector<PackageDefinition>&,bool primary);
     void loadRenderData(MC_PluginContext&,const Json&);

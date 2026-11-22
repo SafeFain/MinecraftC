@@ -1,0 +1,6 @@
+{
+  "key": "recipe_demo:blank",
+  "type": "shapeless",
+  "ingredients": ["#recipe_demo:stone", "minecraftc:flint"],
+  "result": {"item": "recipe_demo:blank"}
+}

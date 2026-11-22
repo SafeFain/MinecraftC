@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -9,6 +10,8 @@
 #include "game/Item.h"
 
 class InventoryModel;
+
+using CraftingIngredients = std::array<std::vector<ItemId>, 9>;
 
 struct BlockSurvivalProperties {
     float hardness = 1.0f;
@@ -26,6 +29,7 @@ struct CraftingRecipe {
     bool allowPlankVariants = true;
     uint32_t sortOrder=UINT32_MAX;
     bool shapeless = false;
+    std::shared_ptr<const CraftingIngredients> ingredientChoices{};
 };
 
 struct SmeltingRecipe {

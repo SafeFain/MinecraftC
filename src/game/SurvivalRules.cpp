@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <set>
+#include <span>
 
 #include "game/InventoryModel.h"
 
@@ -549,18 +550,93 @@ bool recipeMatches(const CraftingRecipe& recipe, const std::array<ItemId, 9>& gr
     for (uint8_t y = 0; y < gridHeight; ++y) {
         for (uint8_t x = 0; x < gridWidth; ++x) {
             ItemId expected = ItemId::EMPTY;
+            const ItemId actual = grid[y * gridWidth + x];
             if (x >= offsetX && x < offsetX + recipe.width &&
                 y >= offsetY && y < offsetY + recipe.height) {
                 const uint8_t rx = mirrored
                     ? static_cast<uint8_t>(recipe.width - 1 - (x - offsetX))
                     : static_cast<uint8_t>(x - offsetX);
-                expected = recipe.ingredients[(y - offsetY) * recipe.width + rx];
+                const size_t index = (y - offsetY) * recipe.width + rx;
+                if (recipe.ingredientChoices) {
+                    const auto& choices = (*recipe.ingredientChoices)[index];
+                    if (choices.empty() ? actual != ItemId::EMPTY :
+                        !std::binary_search(choices.begin(), choices.end(), actual)) return false;
+                    continue;
+                }
+                expected = recipe.ingredients[index];
             }
-            const ItemId actual = grid[y * gridWidth + x];
             if (actual != expected && !(expected == ItemId::OAK_PLANKS &&
                                         recipe.allowPlankVariants && isWoodPlankItem(actual))) return false;
         }
     }
+    return true;
+}
+
+// Each candidate represents one unit. An augmenting path lets a more
+// constrained ingredient use a unit that an earlier ingredient can replace.
+std::optional<std::array<size_t, 9>> matchIngredients(const CraftingIngredients& ingredients,
+                                                     std::span<const ItemId> candidates) {
+    std::array<size_t, 9> selected{};
+    std::vector<int> assigned(candidates.size(), -1);
+    std::vector<bool> visited(candidates.size());
+    const auto assign = [&](auto&& self, size_t ingredient) -> bool {
+        const auto& choices = ingredients[ingredient];
+        for (size_t i = 0; i < candidates.size(); ++i) {
+            if (visited[i] || !std::binary_search(choices.begin(), choices.end(), candidates[i])) continue;
+            visited[i] = true;
+            if (assigned[i] != -1 && !self(self, static_cast<size_t>(assigned[i]))) continue;
+            assigned[i] = static_cast<int>(ingredient);
+            selected[ingredient] = i;
+            return true;
+        }
+        return false;
+    };
+    for (size_t i = 0; i < ingredients.size(); ++i) {
+        if (ingredients[i].empty()) continue;
+        std::fill(visited.begin(), visited.end(), false);
+        if (!assign(assign, i)) return std::nullopt;
+    }
+    return selected;
+}
+
+bool tryFillPluginRecipe(const CraftingRecipe& recipe, InventoryModel& inventory,
+                         std::array<ItemStack, 9>& grid, uint8_t gridWidth, uint8_t gridHeight) {
+    const auto& ingredients = *recipe.ingredientChoices;
+    const size_t needed = static_cast<size_t>(std::ranges::count_if(ingredients, [](const auto& group) {
+        return !group.empty();
+    }));
+    if (needed > size_t(gridWidth) * gridHeight) return false;
+
+    std::vector<ItemId> candidates;
+    std::vector<ItemStack*> sources;
+    const auto add = [&](ItemStack& stack) {
+        if (stack.empty()) return;
+        const auto count = std::min<size_t>(needed, stack.count);
+        candidates.insert(candidates.end(), count, stack.id);
+        sources.insert(sources.end(), count, &stack);
+    };
+    for (auto& stack : grid) add(stack);
+    for (size_t i = 0; i < InventoryModel::STORAGE_SIZE; ++i) add(inventory.slot(i));
+    const auto match = matchIngredients(ingredients, candidates);
+    if (!match) return false;
+
+    std::array<ItemStack, 9> filled{};
+    size_t packed = 0;
+    for (size_t i = 0; i < ingredients.size(); ++i) {
+        if (ingredients[i].empty()) continue;
+        auto& source = *sources[(*match)[i]];
+        const size_t cell = recipe.shapeless ? packed++ : (i / recipe.width) * gridWidth + i % recipe.width;
+        filled[cell] = source.withCount(1);
+        if (--source.count == 0) source.clear();
+    }
+    for (const auto& stack : grid)
+        if (!stack.empty() && inventory.add(stack) != 0) return false;
+
+    std::array<ItemId, 9> itemGrid{};
+    std::ranges::transform(filled, itemGrid.begin(), [](const auto& stack) { return stack.id; });
+    const auto* first = findCraftingRecipe(itemGrid, gridWidth, gridHeight);
+    if (!first || first->ingredientChoices != recipe.ingredientChoices) return false;
+    grid = std::move(filled);
     return true;
 }
 
@@ -590,6 +666,7 @@ bool tryFillCraftingRecipe(const CraftingRecipe& recipe,
     if (gridWidth == 0 || gridHeight == 0 || gridWidth > 3 || gridHeight > 3 ||
         recipe.width > gridWidth || recipe.height > gridHeight)
         return false;
+    if (recipe.ingredientChoices) return tryFillPluginRecipe(recipe, inventory, grid, gridWidth, gridHeight);
 
     std::array<ItemId, 9> selected{};
     for (uint8_t y = 0; y < recipe.height; ++y)
@@ -801,6 +878,7 @@ const std::vector<CraftingRecipe>& craftingRecipes() {
         }
         for (const auto& entry:Plugins::content().crafting) merged.push_back(entry.second);
         std::stable_sort(merged.begin(),merged.end(),[](const auto& a,const auto& b){return a.sortOrder<b.sortOrder;});
+        for (const auto& [key, recipe] : Plugins::content().craftingV1) merged.push_back(recipe);
         revision=Plugins::content().revision;
     }
     return merged;
@@ -812,6 +890,17 @@ const CraftingRecipe* findCraftingRecipe(
         return nullptr;
     for (const auto& recipe : craftingRecipes()) {
         if (recipe.shapeless) {
+            if (recipe.ingredientChoices) {
+                std::array<ItemId, 9> actual{};
+                size_t count = 0;
+                for (size_t i = 0; i < size_t(gridWidth) * gridHeight; ++i)
+                    if (grid[i] != ItemId::EMPTY) actual[count++] = grid[i];
+                const auto& choices = *recipe.ingredientChoices;
+                const auto expected = std::ranges::count_if(choices, [](const auto& items) { return !items.empty(); });
+                if (count == static_cast<size_t>(expected) &&
+                    matchIngredients(choices, std::span(actual).first(count))) return &recipe;
+                continue;
+            }
             std::multiset<ItemId> expected, actual;
             for (const auto item : recipe.ingredients) if (item != ItemId::EMPTY) expected.insert(item);
             for (size_t i = 0; i < size_t(gridWidth)*gridHeight; ++i) if (grid[i] != ItemId::EMPTY) actual.insert(grid[i]);
@@ -867,6 +956,8 @@ const SmeltingRecipe* findSmeltingRecipe(ItemId input) {
         const auto& removed=Plugins::content().removeSmelting;
         if (SMELTING[i].output.id!=ItemId::EMPTY&&Plugins::availableItem(input)&&Plugins::availableItem(SMELTING[i].output.id)&&SMELTING[i].input==input && std::find(removed.begin(),removed.end(),key)==removed.end()) return &SMELTING[i];
     }
+    for (const auto& [key, recipe] : Plugins::content().smeltingV1)
+        if (recipe.input == input) return &recipe;
     return nullptr;
 }
 
@@ -921,5 +1012,7 @@ std::string smeltingRecipeKey(const SmeltingRecipe& recipe) {
         if (&entry.second == &recipe) return entry.first;
     for (size_t i=0;i<SMELTING.size();++i)
         if (&SMELTING[i] == &recipe) return "minecraftc:smelting_"+std::to_string(i);
+    for (const auto& [key, entry] : Plugins::content().smeltingV1)
+        if (&entry == &recipe) return key;
     throw std::runtime_error("Unregistered smelting recipe");
 }

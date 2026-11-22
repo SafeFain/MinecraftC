@@ -564,7 +564,7 @@ void appendBlockEntity(Bytes& payload, const PersistedBlockEntity& entity) {
         append(payload, entity.value.burnTotal);
         append(payload, entity.value.cookProgress);
         append(payload, entity.value.cookTotal);
-        if(entity.value.furnaceExperience.size()>1024)throw std::runtime_error("Too many furnace experience recipes");
+        if(entity.value.furnaceExperience.size()>BlockEntity::MAX_FURNACE_EXPERIENCE_RECIPES)throw std::runtime_error("Too many furnace experience recipes");
         append(payload,static_cast<uint16_t>(entity.value.furnaceExperience.size()));
         for(const auto& xp:entity.value.furnaceExperience) {
             if(!Plugins::validKey(xp.first)||xp.second>uint64_t(INT32_MAX)*1000)throw std::runtime_error("Invalid furnace experience");
@@ -612,7 +612,7 @@ PersistedBlockEntity readBlockEntity(Reader& reader, uint32_t version) {
         entity.value.cookProgress = reader.read<uint16_t>();
         entity.value.cookTotal = reader.read<uint16_t>();
         if (entity.value.cookTotal == 0) entity.value.cookTotal = 200;
-        if(version>=23) {const auto count=reader.read<uint16_t>();if(count>1024)throw std::runtime_error("Too many furnace experience recipes");
+        if(version>=23) {const auto count=reader.read<uint16_t>();if(count>BlockEntity::MAX_FURNACE_EXPERIENCE_RECIPES)throw std::runtime_error("Too many furnace experience recipes");
             for(uint16_t i=0;i<count;++i){auto key=reader.readString();const auto value=reader.read<uint64_t>();
                 if(!Plugins::validKey(key)||value>uint64_t(INT32_MAX)*1000||!entity.value.furnaceExperience.emplace(key,value).second)throw std::runtime_error("Invalid furnace experience");}}
     }

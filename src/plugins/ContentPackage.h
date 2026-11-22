@@ -11,7 +11,7 @@ namespace Plugins {
 inline const std::vector<std::string>& packageCategories() {
     static const std::vector<std::string> names{
         "materials","blocks","block_families","block_geometry","items","dimensions",
-        "recipes","entities","generators","block_behaviors","item_behaviors",
+        "item_groups","recipes","entities","generators","block_behaviors","item_behaviors",
         "loot_tables","structures","player_actions","environments","particles",
         "held_models","playlists","render_resources","render_passes","item_icons"};
     return names;

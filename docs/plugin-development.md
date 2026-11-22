@@ -4,7 +4,8 @@ This guide takes a plugin from an example package to a distributable build.
 For installation, manifest fields and world recovery, start with
 [the loader reference](plugins.md). Public declarations in
 [`plugin.h`](../sdk/minecraftc/plugin.h), [`extensions.h`](../sdk/minecraftc/extensions.h)
-and [`capabilities.h`](../sdk/minecraftc/capabilities.h) define the exact C layouts.
+[`capabilities.h`](../sdk/minecraftc/capabilities.h), and
+[`recipes.h`](../sdk/minecraftc/recipes.h) define the exact C layouts.
 Use a source checkout for source, build and test links in this documentation;
 release packages also include the SDK and plugin examples.
 
@@ -140,6 +141,7 @@ Check returned table/descriptor sizes before accessing optional fields.
 | Environment, presentation | 1, 2 | [Presentation](plugin-capabilities.md#environment-and-presentation), [V2](plugins.md#registered-localization-travel-and-presentation) |
 | Localization, material sequences | 1 | [Registered resources](plugins.md#registered-localization-travel-and-presentation) |
 | Multiplayer | 1 | [Actor-aware host API](plugins.md#lan-multiplayer-and-abi-1-extension) |
+| Recipes | 1 | [Item groups and typed recipes](plugins.md#item-groups-and-typed-recipes) |
 
 Some newer tables have no dedicated C++ helper. Use `Host::extension(name, version)`
 and the exact SDK table type. Dimension handles, entity instance IDs and dynamic
@@ -159,6 +161,7 @@ block/item IDs are launch/session-local; persist stable keys and author revision
 | [block_shapes_data](../examples/plugins/block_shapes_data/README.md), [block_shapes_demo](../examples/plugins/block_shapes_demo/README.md) | JSON/native shape families and boxes |
 | [capability_demo](../examples/plugins/capability_demo/README.md), [capability_native](../examples/plugins/capability_native/README.md) | Behavior, structures, actions, environment and presentation |
 | [render_demo](../examples/plugins/render_demo/README.md) | Host-owned render resources, shaders and stages |
+| [recipe_demo](../examples/plugins/recipe_demo/README.md), [recipe_native](../examples/plugins/recipe_native/README.md) | Item groups, shapeless crafting and furnace experience in data and C |
 
 ## Compatibility, testing and distribution
 

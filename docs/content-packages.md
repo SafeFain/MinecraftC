@@ -78,7 +78,7 @@ Each JSON file contains one object using the corresponding existing
 ```
 
 Supported definition directories are `materials`, `blocks`, `block_families`,
-`block_geometry`, `items`, `dimensions`, `recipes`, `entities`, `generators`,
+`block_geometry`, `items`, `dimensions`, `item_groups`, `recipes`, `entities`, `generators`,
 `block_behaviors`, `item_behaviors`, `loot_tables`, `structures`, `player_actions`,
 `environments`, `particles`, `held_models`, `playlists`, `render_resources`,
 `render_passes` and `item_icons`. Subdirectories are supported; only `.json` files are definitions.
@@ -162,3 +162,9 @@ The complete [`package_demo`](../examples/plugins/package_demo) defines blue bri
 a crystal, recipes and translations. `/package_demo:gift` queues four bricks;
 using the crystal queues one. Brick placement remains normal. Its original procedural
 color, code and translations are documented in LICENSE.md.
+
+The [kiln recipe demo](../examples/plugins/recipe_demo/README.md) adds an
+item group, an unordered recipe and furnace experience. The
+[native demo](../examples/plugins/recipe_native/README.md) registers equivalent
+definitions from C. See the [recipe reference](plugins.md#item-groups-and-typed-recipes)
+for the format and minimum-version guidance.

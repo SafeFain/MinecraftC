@@ -410,6 +410,8 @@ void PluginManager::itemIcon(MC_PluginContext& ctx,const MC_ItemIcon& d) {
 int32_t PluginManager::recipe(MC_PluginContext& ctx,const MC_Recipe& v) {
     check(v.size>=sizeof(v)&&v.operation<=2,"Invalid recipe descriptor");const auto key=required(v.key);owned(ctx,key);
     auto& c=mutableContentState();const std::string target=optional(v.target);
+    check(v.operation==2||(!c.craftingV1.count(key)&&!c.smeltingV1.count(key)&&!ctx.pendingRecipes.count(key)),
+          "Duplicate recipe key used by recipes extension");
     if(v.operation) {
         check(validKey(target),"Recipe patch needs explicit target");
         if(v.smelting) {check(c.smelting.count(target)||isBuiltinRecipeKey(target,true),"Unknown recipe target");c.smelting.erase(target);c.removeSmelting.push_back(target);}
@@ -571,7 +573,9 @@ void PluginManager::loadData(MC_PluginContext& ctx,const Json& data) {
     });
     each("items",[&](const Json& j){MC_Item item{};item.size=sizeof(item);std::string key=j.at("key").text(),name=j.at("name").text(),mat=j.at("material").text(),placed=j.text("placed_block");item.key=key.c_str();item.name=name.c_str();item.material=mat.c_str();item.placed_block=placed.c_str();item.kind=integer(j,"kind",placed.empty()?0:1);item.category=integer(j,"category",placed.empty()?6:0);item.max_stack=integer(j,"max_stack",64);item.durability=integer(j,"durability",0);item.tool=integer(j,"tool",0);item.tier=integer(j,"tier",0);item.food=integer(j,"food",0);item.saturation=static_cast<float>(j.numeric("saturation",0));item.attack_damage=static_cast<float>(j.numeric("attack_damage",0));item.attack_speed=static_cast<float>(j.numeric("attack_speed",0));uint16_t id=0;this->item(ctx,item,id);});
     each("item_icons",[&](const Json& j){const auto item=j.at("item").text(),image=j.at("image").text();const MC_ItemIcon d{sizeof(d),item.c_str(),image.c_str()};itemIcon(ctx,d);});
-    each("recipes",[&](const Json& j){MC_Recipe r{};r.size=sizeof(r);std::string key=j.at("key").text(),target=j.text("target"),output=j.text("output");r.key=key.c_str();r.target=target.c_str();r.output=output.c_str();r.operation=integer(j,"operation",0);r.smelting=j.flag("smelting",false);r.width=integer(j,"width",1);r.height=integer(j,"height",1);r.mirror=j.flag("mirror",true);r.count=integer(j,"count",1);r.cook_ticks=integer(j,"cook_ticks",200);std::array<std::string,9> ingredients;if(j.has("ingredients")){const auto& a=j.at("ingredients");check(a.type==Json::Type::Array&&a.array.size()<=9,"Invalid ingredient array");for(size_t i=0;i<a.array.size();++i){ingredients[i]=a.array[i].text();r.ingredients[i]=ingredients[i].c_str();}}recipe(ctx,r);});
+    const bool splitPackage=m_info[ctx.index].manifest.packageFormat==1;
+    if(splitPackage)loadRecipeData(ctx,data);
+    each("recipes",[&](const Json& j){if(splitPackage&&j.has("type"))return;MC_Recipe r{};r.size=sizeof(r);std::string key=j.at("key").text(),target=j.text("target"),output=j.text("output");r.key=key.c_str();r.target=target.c_str();r.output=output.c_str();r.operation=integer(j,"operation",0);r.smelting=j.flag("smelting",false);r.width=integer(j,"width",1);r.height=integer(j,"height",1);r.mirror=j.flag("mirror",true);r.count=integer(j,"count",1);r.cook_ticks=integer(j,"cook_ticks",200);std::array<std::string,9> ingredients;if(j.has("ingredients")){const auto& a=j.at("ingredients");check(a.type==Json::Type::Array&&a.array.size()<=9,"Invalid ingredient array");for(size_t i=0;i<a.array.size();++i){ingredients[i]=a.array[i].text();r.ingredients[i]=ingredients[i].c_str();}}recipe(ctx,r);});
     each("dimensions",[&](const Json& j){
         MC_DimensionDefinition d{};d.size=sizeof(d);
         const auto key=j.at("key").text(),name=j.text("name",key),revision=j.at("revision").text();
@@ -802,6 +806,7 @@ void PluginManager::initialize(bool safeMode) {
             if(!info.manifest.data.empty())loadData(*loaded.context,readJson(containedPath(info.root,info.manifest.data)));
             if(info.manifest.packageFormat)loadPackage(*loaded.context,packageDefinitions,false);
             check(!loaded.context->registrationFailed,"Plugin ignored a failed registration");
+            resolveRecipes(*loaded.context);
             validateContent();
             if(!info.manifest.visual)mutableContentState().requirements.push_back({info.manifest.id,info.manifest.version+":"+fingerprint(info.root,(info.manifest.builtin?builtinRevision:std::string{}) + ([&]{const auto config=m_paths.dataRoot/"config"/"plugins"/(info.manifest.id+".json");if(!std::filesystem::exists(config))return std::string{};std::ifstream file(config);return std::string(std::istreambuf_iterator<char>(file),{});}()))});
             if(!info.manifest.visual) {

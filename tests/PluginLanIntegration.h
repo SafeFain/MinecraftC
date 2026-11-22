@@ -5,6 +5,7 @@
 #include "plugins/ContentMutation.h"
 #include "network/ContentIds.h"
 #include "network/LodProtocol.h"
+#include "world/BlockEntityLogic.h"
 
 namespace PluginLanIntegration {
 inline void codecs() {
@@ -54,6 +55,8 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         std::filesystem::copy_file(fixture.second,directory/fixture.second.filename());
         std::ofstream manifest(directory/"mod.json");manifest<<"{\"id\":\""<<fixture.first<<"\",\"version\":\"1.0.0\",\"api\":1,\"network_compatibility\":\"fixture-1\",\"native\":{\"linux\":\""<<fixture.second.filename().string()<<"\",\"windows\":\""<<fixture.second.filename().string()<<"\",\"macos\":\""<<fixture.second.filename().string()<<"\"}}";
     }
+    std::filesystem::copy(assets.parent_path()/"examples/plugins/recipe_demo", root/"mods/recipe_demo",
+                          std::filesystem::copy_options::recursive);
     Plugins::PluginManager plugins({assets,root});plugins.initialize();
     for(const auto& info:plugins.plugins())if(info.manifest.id=="legacy_fixture"||info.manifest.id=="lan_fixture")require(info.active,"old and new native fixtures load");
     codecs();
@@ -69,14 +72,94 @@ inline int run(const std::filesystem::path& assets,const std::filesystem::path& 
         Plugins::contextProvider()=[&]{return host.pluginContext();};
         const auto world=host.createWorld("Plugin LAN",42,GameMode::Survival,Difficulty::Normal,true,WorldType::Superflat);
         host.startWorld(world,true,0);SessionScenario::prepareLanScene(host);
+        {
+            auto& terrain = SessionScenario::world(host);
+            auto& entities = SessionScenario::entities(host);
+            const glm::ivec3 position{8, 8, 8};
+            terrain.setBlock(position.x, position.y, position.z, BlockId::FURNACE);
+            auto* furnace = terrain.getBlockEntity(position);
+            require(furnace != nullptr, "Recipe furnace placed for destruction test");
+            furnace->input = {Plugins::resolveItem("recipe_demo:blank"), 1};
+            furnace->fuel = {ItemId::COAL, 1};
+            for (int tick=0; tick<100; ++tick) tickFurnace(*furnace);
+            const auto xp = [&] {
+                uint32_t total = 0;
+                for (const auto& entity : entities.entities())
+                    if (entity.type==EntityType::ExperienceOrb && entity.health>0)
+                        total += entity.experienceOrb.value * entity.experienceOrb.count;
+                return total;
+            };
+            const auto before = xp();
+            const auto center = glm::dvec3(position) + glm::dvec3(.5);
+            entities.explodeAt(center, 3, {});
+            require(terrain.getBlock(position.x, position.y, position.z)==BlockId::AIR &&
+                    !terrain.getBlockEntity(position) &&
+                    xp()==before+1, "Destroyed plugin furnace did not release banked XP");
+            // Remove the paid orb before replaying the explosion, which also damages entities.
+            entities.clear();
+            entities.explodeAt(center, 3, {});
+            require(xp()==0, "Destroyed plugin furnace released XP twice");
+        }
         auto ready=Plugins::event(MC_WORLD_READY);plugins.dispatch(ready);
         require(host.openLanRoom(0,2,true),"plugin world opens LAN");
+        double now=0;
+        for (const char* entry : {"item-group/recipe_demo:stone", "smelting-v1/recipe_demo:tile"}) {
+            auto changed = GameSession::lanCompatibility();
+            auto value = nlohmann::json::parse(changed.content.at(entry));
+            if (std::string_view(entry).starts_with("item-group/")) value.erase(0);
+            else value.back() = 500;
+            changed.content.at(entry) = value.dump();
+            changed.contentSignature = Lan::contentSignature(changed.content);
+            Lan::Client incompatible;
+            require(incompatible.join("::1", host.lanPort(), changed,
+                {Lan::randomToken(), Lan::randomToken(), "Recipe mismatch"}, now), "Recipe mismatch client starts");
+            for (int i=0; i<1000 && incompatible.state()!=Lan::Client::State::Failed; ++i) {
+                now += .001;
+                host.pollLan(now);
+                incompatible.poll(now);
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            require(incompatible.state()==Lan::Client::State::Failed &&
+                    incompatible.error().find(entry)!=std::string::npos,
+                    ("Expected mismatch rejection for " + std::string(entry) + ", got: " + incompatible.error()).c_str());
+        }
         client.configureLod({false,16,LodAggressiveness::PowerSaver,LodPrecision::Low});
-        require(client.joinLanRoom("::1",host.lanPort(),0),"plugin-enabled client joins");
-        double now=0;auto pump=[&]{now+=.005;host.pollLan(now);client.pollLan(now);SessionScenario::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
+        require(client.joinLanRoom("::1",host.lanPort(),now),"plugin-enabled client joins");
+        auto pump=[&]{now+=.005;host.pollLan(now);client.pollLan(now);SessionScenario::world(client).processCompletedGenerations();std::this_thread::sleep_for(std::chrono::milliseconds(1));};
         for(int i=0;i<500&&!client.lanWorldReady();++i)pump();
         require(client.lanWorldReady(),"plugin bootstrap accepted");
         auto& guest=SessionScenario::guest(host,SessionScenario::replicaPeer(client));
+        {
+            SessionScenario::tickLanPlayers(host, .01f);
+            require(!guest.loading, "LAN crafting guest has loaded terrain");
+            const auto blank = Plugins::resolveItem("recipe_demo:blank");
+            const auto& recipes = craftingRecipes();
+            const auto recipe = std::find_if(recipes.begin(), recipes.end(), [&](const auto& r) {
+                return r.output.id == blank;
+            });
+            require(recipe != recipes.end(), "LAN recipe index available");
+            guest.player.inventory().slot(0) = {ItemId::DIORITE, 1};
+            guest.player.inventory().slot(1) = {ItemId::FLINT, 1};
+            guest.lastStateSent = -1;
+            for (int i=0; i<20; ++i) pump();
+            client.openInventoryWindow(InventoryWindowKind::Player);
+            InventoryAction fill;
+            fill.operation = InventoryOperation::FillRecipe;
+            fill.argument = static_cast<uint16_t>(recipe - recipes.begin());
+            client.submitInventoryAction(fill);
+            for (int i=0; i<100 && client.inventoryWindowPending(); ++i) pump();
+            require(client.inventoryWindow().kind == InventoryWindowKind::Player &&
+                    guest.window.crafting()[0].id == ItemId::DIORITE &&
+                    client.inventoryWindow().crafting == guest.window.crafting(), "LAN recipe fill did not sync");
+            InventoryAction craft;
+            craft.operation = InventoryOperation::QuickMove;
+            craft.slot = {InventoryArea::Output, 0};
+            client.submitInventoryAction(craft);
+            client.closeInventoryWindow();
+            for (int i=0; i<100 && client.inventoryWindowPending(); ++i) pump();
+            require(guest.player.inventory().count(blank) == 1 && client.inventory().count(blank) == 1 &&
+                    host.inventory().count(blank) == 0, "LAN authority did not craft for the guest");
+        }
         const auto item=Plugins::resolveItem("official_content:crystal");const auto block=Plugins::resolveBlock("official_content:crystal_block");
         guest.player.inventory().slot(0)={item,1,0};guest.player.setPosition({.5,1.01,.5});guest.player.setOrientation(0,0);
         SessionScenario::world(host).setBlock(0,2,2,block);

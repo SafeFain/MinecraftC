@@ -76,6 +76,9 @@ struct ContentState {
     std::map<std::string,MaterialContent> materials;
     std::map<std::string,CraftingRecipe> crafting;
     std::map<std::string,SmeltingRecipe> smelting;
+    std::map<std::string,std::vector<ItemId>> itemGroups;
+    std::map<std::string,CraftingRecipe> craftingV1;
+    std::map<std::string,SmeltingRecipe> smeltingV1;
     std::vector<std::string> removeCrafting, removeSmelting;
     std::vector<std::pair<std::string,std::string>> requirements;
     std::map<std::string,std::string> networkDescription;

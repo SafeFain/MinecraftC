@@ -263,6 +263,7 @@ set(MINECRAFTC_PLUGIN_SOURCES
     src/plugins/PluginCapabilityData.cpp
     src/plugins/PluginExtensions.cpp
     src/plugins/PluginManager.cpp
+    src/plugins/PluginRecipes.cpp
     src/plugins/PluginRenderData.cpp)
 minecraftc_add_engine_library(minecraftc_plugins ${MINECRAFTC_PLUGIN_SOURCES})
 target_link_libraries(minecraftc_plugins

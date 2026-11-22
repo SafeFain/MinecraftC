@@ -117,6 +117,8 @@ int main(int argc,char** argv) try {
         std::filesystem::remove_all(pluginRoot);
         std::filesystem::create_directories(pluginRoot/"mods");
         if(contentPackage&&std::string(argv[3])!="builtin")std::filesystem::copy(std::filesystem::absolute(argv[3]),pluginRoot/"mods/package_demo",std::filesystem::copy_options::recursive);
+        if(contentPackage)std::filesystem::copy(assets.parent_path()/"examples/plugins/recipe_demo",
+            pluginRoot/"mods/recipe_demo",std::filesystem::copy_options::recursive);
         std::filesystem::copy(assets.parent_path()/"examples"/"plugins"/"block_shapes_data",pluginRoot/"mods"/"block_shapes_data",std::filesystem::copy_options::recursive);
         const auto legacy=pluginRoot/"mods"/"legacy_icon";std::filesystem::create_directories(legacy);
         {std::ofstream manifest(legacy/"mod.json");manifest<<R"({"id":"legacy_icon","version":"1.0.0","api":1,"data":"content.json"})";}
@@ -564,6 +566,26 @@ int main(int argc,char** argv) try {
         shapeImage(Plugins::resolveBlock("block_shapes_data:button"));shapeImage(Plugins::resolveBlock("block_shapes_data:box"));
         const auto legacyItem=Plugins::resolveItem("legacy_icon:item");const auto legacyTile=Plugins::itemTile(static_cast<uint16_t>(legacyItem));
         if(contentPackage) {
+            InventoryModel recipeInventory;
+            recipeInventory.slot(0) = {ItemId::GRANITE, 1};
+            recipeInventory.slot(1) = {ItemId::FLINT, 1};
+            SurvivalInventoryScreen recipeScreen(recipeInventory);
+            const auto renderRecipe = [&] { recipeScreen.render(ui, width, height, 0, 0); };
+            draw("plugin-recipe-book", renderRecipe, 3);
+            const UiCanvasFit fit(static_cast<float>(width), static_cast<float>(height), 600, 470);
+            auto clickRecipe = [&](float localX, float localY) {
+                const int x = static_cast<int>(fit.x + localX * fit.scale);
+                const int y = static_cast<int>(fit.y + localY * fit.scale);
+                recipeScreen.onMouseButton(MouseButton::Left, ButtonAction::Press, x, y);
+                recipeScreen.onMouseButton(MouseButton::Left, ButtonAction::Release, x, y);
+            };
+            clickRecipe(308, 362);
+            draw("plugin-recipe-preview", renderRecipe, 3);
+            clickRecipe(244, 310);
+            recipeScreen.onClose();
+            if(recipeInventory.count(Plugins::resolveItem("recipe_demo:blank"))!=1)
+                throw std::runtime_error("Vulkan recipe book did not fill and craft the plugin recipe");
+
             for(const auto& info:plugins.plugins())if(info.manifest.id=="package_demo"&&!info.active)throw std::runtime_error(info.status);
             const auto block=Plugins::resolveBlock("package_demo:blue_brick");
             const auto brick=Plugins::resolveItem("package_demo:blue_brick"),crystal=Plugins::resolveItem("package_demo:crystal");

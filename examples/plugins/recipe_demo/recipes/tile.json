@@ -1,0 +1,8 @@
+{
+  "key": "recipe_demo:tile",
+  "type": "furnace",
+  "ingredients": ["recipe_demo:blank"],
+  "result": {"item": "recipe_demo:tile"},
+  "cook_ticks": 100,
+  "experience_milli": 1000
+}

@@ -219,6 +219,37 @@ as version-specific. Builtin item aliases such as `minecraftc:stone` can be used
 in recipes. Serialized builtin keys remain the stable numeric
 `minecraftc:block_N` / `minecraftc:item_N` forms.
 
+### Item groups and typed recipes
+
+Packages using `package_format: 1` can declare an item group in
+`item_groups/*.json` with `key` and `items`. List 1–128 distinct nonempty
+item keys. Crafting ingredients can be item keys or `#namespace:group`.
+Groups are named by their owning package, and cross-package references
+require the usual manifest dependency.
+
+Typed recipe files in `recipes/` use `key`, `type`, `ingredients` and
+`result: {"item": "namespace:item", "count": 1}`. The result count defaults
+to one and must fit the item's stack limit.
+
+| Type | Ingredients and settings |
+|---|---|
+| `shaped` | `width` and `height` from 1 to 3, exactly width × height ingredients in row order, `null` for empty cells, and optional `mirror` (default true). |
+| `shapeless` | 1–9 ingredients in any grid order. Each entry requires its own occupied cell, including repeats. |
+| `furnace` | One concrete item key, optional `cook_ticks` (1–65535, default 200) and `experience_milli` (0–65535, default 0). A value of 1000 awards one experience point per completed operation. |
+
+Typed recipes add to the registry. When several recipes match, existing
+recipes have priority, followed by typed recipes in key order. The recipe book
+only offers a typed recipe if its fill can be completed and the resulting grid
+selects that recipe. Furnace experience waits in the furnace until it is
+collected through the normal output or break flow.
+
+Native plugins query `minecraftc.recipes` version 1 and register the same
+definitions through [`recipes.h`](../sdk/minecraftc/recipes.h). Native and data
+definitions resolve together before the package commits. Package authors
+should set `game_min` to the first released build that includes this extension.
+See the [data example](../examples/plugins/recipe_demo/README.md) and
+[C example](../examples/plugins/recipe_native/README.md).
+
 ## Native SDK and events
 
 Include [`sdk/minecraftc/plugin.h`](../sdk/minecraftc/plugin.h) (C) or `plugin.hpp`
