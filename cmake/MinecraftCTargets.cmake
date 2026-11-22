@@ -377,6 +377,8 @@ set(MINECRAFTC_UI_SOURCES
     src/ui/UIRenderer.cpp
     src/ui/VillagerTradeScreen.cpp)
 minecraftc_add_engine_library(minecraftc_ui ${MINECRAFTC_UI_SOURCES})
+target_compile_definitions(minecraftc_ui PRIVATE
+    MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
 minecraftc_enable_module_imports(minecraftc_ui
     src/app/ApplicationInputController.cpp
     src/ui/ContainerScreen.cpp
@@ -419,6 +421,8 @@ set(MINECRAFTC_SESSION_SOURCES
     src/app/GameUiController.cpp)
 function(minecraftc_add_session target scene)
     minecraftc_add_engine_library(${target} ${MINECRAFTC_SESSION_SOURCES})
+    target_compile_definitions(${target} PRIVATE
+        MINECRAFTC_VERSION_STRING="${MINECRAFTC_VERSION_DISPLAY}")
     minecraftc_enable_module_imports(${target}
         src/app/GameFlowController.cpp
         src/app/GameScenePresenter.cpp

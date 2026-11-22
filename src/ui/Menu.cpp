@@ -678,7 +678,7 @@ void MainMenu::render(UIRenderer& ui,int screenWidth,int screenHeight) {
             m_buttons[i].setSize(bw,rowH);prepareButton(m_buttons[i]);m_buttons[i].render(ui);
         }
     }
-    UiTheme::textWithShadow(ui,Config::GAME_VERSION,16,8,.85f,UiTheme::TEXT_DIM);
+    UiTheme::textWithShadow(ui, Config::GAME_VERSION, 16, 8, 1.0f, UiTheme::TEXT_DIM);
 }
 
 void MainMenu::renderAbout(UIRenderer& ui, int screenWidth, int screenHeight) {
